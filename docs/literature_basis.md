@@ -42,12 +42,16 @@ include these rows under a fixed detector and training recipe:
 9. Mechanism validation before expensive fine-tuning: paired stress cases should
    show that sensor-native maps move in the expected direction for low light,
    glare/HDR saturation, optical blur or low MTF, and CFA-specific decode paths.
+10. CFA-dependent stress sweeps should be kept separate from detector claims:
+    they can justify which sensor-native signals are worth studying, but they
+    do not establish downstream task performance by themselves.
 
 The current project now covers rows 1-4 at the software-reference level on
 KITTI-derived evidence, exercises row 8 through auxiliary-map tensor export,
-training, and direct dense evaluation, and now covers row 9 with a synthetic
-front-end mechanism report. It does not yet cover claim-quality RAW-domain
-pretraining or large adverse-condition RAW datasets.
+training, and direct dense evaluation, covers row 9 with a synthetic front-end
+mechanism report, and covers row 10 with a synthetic CFA stress sweep. It does
+not yet cover claim-quality RAW-domain pretraining or large adverse-condition
+RAW datasets.
 
 ## Dataset Direction
 

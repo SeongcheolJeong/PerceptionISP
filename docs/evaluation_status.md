@@ -279,6 +279,30 @@ This is the right evidence to build before expensive DNN fine-tuning. It shows
 the front-end signal is plausible and measurable, but it does not prove
 HumanISP detector superiority.
 
+### CFA Stress Sweep
+
+The current CFA-dependent front-end signal sweep is:
+
+```text
+reports/perception_cfa_stress_sweep_synthetic/index.html
+```
+
+It evaluates `RGGB`, `GRBG`, `RCCB`, `RGBIR`, and `MONO` under `nominal_hdr`,
+`low_light`, `glare`, and `low_mtf` synthetic conditions. All 20 cases have
+finite supported outputs. The condition rankings are diagnostic:
+
+| Condition | Top CFA | Score meaning |
+| --- | --- | --- |
+| `nominal_hdr` | `MONO` | SNR, visibility, edge/demosaic confidence, color confidence |
+| `low_light` | `MONO` | SNR, visibility, edge/demosaic confidence, inverse under-exposure |
+| `glare` | `RGBIR` | clipping distance, visibility, edge/demosaic confidence, inverse saturation/over-exposure |
+| `low_mtf` | `MONO` | edge, demosaic, and focus confidence |
+
+This answers the CFA-feasibility question more concretely than a decode-only
+check. It still does not prove detector performance, and it should not be used
+as a product sensor recommendation without real sensor data and downstream
+task metrics.
+
 ### KITTI Train-Subset to Val Calibration
 
 To separate calibration fitting from the validation report more strictly, a

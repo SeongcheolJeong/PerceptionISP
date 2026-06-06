@@ -865,6 +865,37 @@ glare saturation/clipping response, low-MTF edge/demosaic/focus-confidence
 response, and configured CFA decode/map validity. This is feasibility evidence
 for the PerceptionISP front-end signals, not a detector-performance claim.
 
+To inspect CFA-dependent front-end behavior rather than only pass/fail support,
+run the synthetic CFA stress sweep:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.cfa_stress_sweep \
+  --width 160 \
+  --height 96 \
+  --cfa RGGB \
+  --cfa GRBG \
+  --cfa RCCB \
+  --cfa RGBIR \
+  --cfa MONO \
+  --condition nominal_hdr \
+  --condition low_light \
+  --condition glare \
+  --condition low_mtf \
+  --output-dir reports/perception_cfa_stress_sweep_synthetic
+```
+
+The current CFA stress report is:
+
+```text
+reports/perception_cfa_stress_sweep_synthetic/index.html
+```
+
+It ranks front-end signal quality by condition. In the current synthetic scene,
+`MONO` ranks highest for low-light and low-MTF structure scores, while `RGBIR`
+ranks highest for the glare score. Treat this as CFA-dependent signal
+feasibility evidence, not as a detector result or a product sensor
+recommendation.
+
 Make that task-level decision reproducible with the task gate:
 
 ```bash
