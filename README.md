@@ -714,4 +714,29 @@ The dashboard currently says: broad HumanISP superiority is not supported,
 bounded FP reduction is supported, and the learned RGB+aux DNN path is
 trainable but not yet claim-quality.
 
+For the current KITTI evidence bundle, the one-shot readiness command rebuilds
+both claim gates, the RGB+aux training rollup, and the dashboard:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.claim_readiness \
+  reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux \
+  --human-baseline-input human_rgb \
+  --fusion-baseline-input perception_fusion_rgb_aux \
+  --min-samples 1000 \
+  --bootstrap-samples 2000 \
+  --bootstrap-seed kitti_train512_to_val1496 \
+  --training-summary exports/perception_rgb_aux_kitti_val128_detector_log \
+  --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_dense_rgb_aux_ablation \
+  --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_dense_rgb_only_ablation \
+  --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_dense_aux_only_ablation \
+  --training-summary reports/perception_rgb_aux_dense_kitti_val128_rgb_aux_ablation_eval_conf050 \
+  --training-summary reports/perception_rgb_aux_dense_kitti_val128_rgb_only_ablation_eval_conf050 \
+  --training-summary reports/perception_rgb_aux_dense_kitti_val128_aux_only_ablation_eval_conf050 \
+  --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
+  --output-dir reports/perception_claim_readiness_repro
+```
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

@@ -319,6 +319,13 @@ The consolidated claim-readiness dashboard is:
 reports/perception_claim_readiness_dashboard/index.html
 ```
 
+The same evidence can be rebuilt as one bundle with `perception_isp.claim_readiness`;
+the current reproduced output is:
+
+```text
+reports/perception_claim_readiness_repro/dashboard/index.html
+```
+
 It intentionally separates three decisions:
 
 | Decision | Current status |
