@@ -27,6 +27,7 @@ from PIL import Image
 
 from .camerae2e_bridge import raw_from_camerae2e_rgb, raw_from_rgb_direct
 from .eval_types import BoundingBox, EvaluationSample
+from .sample_cache import load_cached_sample, sample_cache_key, save_cached_sample
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -44,6 +45,7 @@ def load_yolo_detection_samples(
     use_camerae2e: bool = True,
     progress_interval: int = 0,
     progress_label: str = "load_yolo_detection_samples",
+    cache_dir: str | Path | None = None,
 ) -> Tuple[EvaluationSample, ...]:
     """Load a YOLO-format detection dataset as PerceptionISP samples."""
 
@@ -70,21 +72,35 @@ def load_yolo_detection_samples(
     for index, image_path in enumerate(image_paths):
         rgb, original_size = _load_rgb(image_path, width=int(width), height=int(height))
         label_path = _label_path_for_image(label_dir, image_dir, image_path)
-        boxes = _read_yolo_boxes(label_path, names, original_size, (int(width), int(height)))
-        raw = (
-            raw_from_camerae2e_rgb(rgb, width=int(width), height=int(height), cfa_pattern=cfa_pattern)
-            if use_camerae2e
-            else raw_from_rgb_direct(rgb, width=int(width), height=int(height), cfa_pattern=cfa_pattern)
+        cache_key = sample_cache_key(
+            namespace="yolo_detection_dataset",
+            image_path=image_path,
+            label_path=label_path,
+            params={
+                "split": split,
+                "dataset_index": int(start + index),
+                "width": int(width),
+                "height": int(height),
+                "cfa_pattern": str(cfa_pattern),
+                "use_camerae2e": bool(use_camerae2e),
+            },
         )
-        raw.metadata = replace(
-            raw.metadata,
-            frame_counter=start + index,
-            timestamp_us=33333.0 * (start + index),
-            camera_id="camerae2e_yolo_dataset_bridge" if use_camerae2e else "direct_yolo_dataset_bridge",
-            module_serial=str(image_path),
-        )
-        samples.append(
-            EvaluationSample(
+        sample = load_cached_sample(cache_dir, cache_key)
+        if sample is None:
+            boxes = _read_yolo_boxes(label_path, names, original_size, (int(width), int(height)))
+            raw = (
+                raw_from_camerae2e_rgb(rgb, width=int(width), height=int(height), cfa_pattern=cfa_pattern)
+                if use_camerae2e
+                else raw_from_rgb_direct(rgb, width=int(width), height=int(height), cfa_pattern=cfa_pattern)
+            )
+            raw.metadata = replace(
+                raw.metadata,
+                frame_counter=start + index,
+                timestamp_us=33333.0 * (start + index),
+                camera_id="camerae2e_yolo_dataset_bridge" if use_camerae2e else "direct_yolo_dataset_bridge",
+                module_serial=str(image_path),
+            )
+            sample = EvaluationSample(
                 sample_id=image_path.stem,
                 raw=raw,
                 ground_truth=boxes,
@@ -106,7 +122,8 @@ def load_yolo_detection_samples(
                 },
                 reference_rgb=rgb,
             )
-        )
+            save_cached_sample(cache_dir, cache_key, sample)
+        samples.append(sample)
         sample_index = index + 1
         if interval and (sample_index == total or sample_index % interval == 0):
             _print_load_progress(str(progress_label), sample_index, total, started)

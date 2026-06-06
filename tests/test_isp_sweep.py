@@ -53,6 +53,7 @@ class ISPSweepTest(unittest.TestCase):
             cfa="auto",
             no_camerae2e=False,
             load_progress_interval=0,
+            raw_cache_dir=None,
             label_aware=True,
         )
         runs = [

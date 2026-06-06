@@ -6,6 +6,7 @@ import os
 from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 from PIL import Image
@@ -72,6 +73,46 @@ class YoloDatasetAdapterTest(unittest.TestCase):
             self.assertEqual(len(samples), 2)
             self.assertIn("[unit-load] loaded 1/2 samples", stream.getvalue())
             self.assertIn("[unit-load] loaded 2/2 samples", stream.getvalue())
+
+    def test_raw_cache_reuses_saved_sample_without_regenerating_raw(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image_dir = root / "images" / "val"
+            label_dir = root / "labels" / "val"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            rgb[8:16, 10:22, :] = 255
+            Image.fromarray(rgb).save(image_dir / "sample.jpg")
+            (label_dir / "sample.txt").write_text("0 0.5 0.5 0.25 0.25\n")
+            (root / "data.yaml").write_text("path: .\nval: images/val\nnames: ['car']\n")
+            cache_dir = root / "cache"
+
+            first = load_yolo_detection_samples(
+                root / "data.yaml",
+                split="val",
+                limit=1,
+                width=64,
+                height=48,
+                use_camerae2e=False,
+                cache_dir=cache_dir,
+            )
+
+            with mock.patch("perception_isp.yolo_dataset.raw_from_rgb_direct", side_effect=AssertionError("cache miss")):
+                second = load_yolo_detection_samples(
+                    root / "data.yaml",
+                    split="val",
+                    limit=1,
+                    width=64,
+                    height=48,
+                    use_camerae2e=False,
+                    cache_dir=cache_dir,
+                )
+
+            self.assertEqual(len(list(cache_dir.glob("*.npz"))), 1)
+            self.assertEqual(second[0].sample_id, first[0].sample_id)
+            self.assertTrue(np.array_equal(second[0].raw.data, first[0].raw.data))
+            self.assertEqual(second[0].ground_truth[0].label, "car")
 
     def test_coco_root_without_yaml_uses_coco_class_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

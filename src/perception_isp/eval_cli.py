@@ -47,6 +47,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--fusion-score-penalty", type=float, default=0.06, help="Score penalty for low-score detections with weak aux support.")
     parser.add_argument("--progress-interval", type=int, default=0, help="Print progress every N samples to stderr; 0 disables progress logging.")
     parser.add_argument("--load-progress-interval", type=int, default=0, help="Print dataset loading progress every N samples; 0 disables progress logging.")
+    parser.add_argument("--raw-cache-dir", default=None, help="Optional directory for cached dataset RAW samples.")
     parser.add_argument("--ground-truth-label-map", default=None, help="Comma-separated src=dst labels, or preset 'kitti-coco'.")
     args = parser.parse_args(argv)
 
@@ -100,6 +101,7 @@ def main(argv: Any = None) -> int:
             use_camerae2e=not bool(args.no_camerae2e),
             progress_interval=int(args.load_progress_interval),
             progress_label=f"load:{args.source}:{args.offset}+{args.count}",
+            cache_dir=args.raw_cache_dir,
         )
     elif args.source == "kitti-dataset":
         if not args.dataset:
@@ -117,6 +119,7 @@ def main(argv: Any = None) -> int:
             use_camerae2e=not bool(args.no_camerae2e),
             progress_interval=int(args.load_progress_interval),
             progress_label=f"load:{args.source}:{args.offset}+{args.count}",
+            cache_dir=args.raw_cache_dir,
         )
     else:
         samples = make_synthetic_evaluation_samples(
@@ -177,6 +180,7 @@ def main(argv: Any = None) -> int:
         "fusion_options": fusion_options,
         "progress_interval": int(args.progress_interval),
         "load_progress_interval": int(args.load_progress_interval),
+        "raw_cache_dir": args.raw_cache_dir,
         "ground_truth_label_map": label_map,
         "tone_mapping": args.tone_mapping,
         "denoise_strength": float(args.denoise_strength),

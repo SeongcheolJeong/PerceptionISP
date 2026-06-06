@@ -32,6 +32,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-visuals", action="store_true")
     parser.add_argument("--no-fusion", action="store_true")
     parser.add_argument("--load-progress-interval", type=int, default=0)
+    parser.add_argument("--raw-cache-dir", default=None)
     parser.add_argument("--output-dir", default="reports/perception_resolution_sweep")
     args = parser.parse_args(argv)
 
@@ -60,6 +61,7 @@ def main(argv: Any = None) -> int:
             use_camerae2e=not bool(args.no_camerae2e),
             progress_interval=int(args.load_progress_interval),
             progress_label=f"load:{args.source}:{width}x{height}",
+            cache_dir=args.raw_cache_dir,
         )
         result = compare_dataset(
             samples,
@@ -86,6 +88,7 @@ def main(argv: Any = None) -> int:
             "visuals": not bool(args.no_visuals),
             "fusion": not bool(args.no_fusion),
             "load_progress_interval": int(args.load_progress_interval),
+            "raw_cache_dir": args.raw_cache_dir,
             "tone_mapping": args.tone_mapping,
             "denoise_strength": float(args.denoise_strength),
             "demosaic_method": str(args.demosaic_method),
@@ -171,6 +174,7 @@ def _load_samples(
     use_camerae2e: bool,
     progress_interval: int = 0,
     progress_label: str = "load_resolution_sweep",
+    cache_dir: str | Path | None = None,
 ) -> Sequence[Any]:
     if source == "kitti-dataset":
         from .kitti_dataset import load_kitti_detection_samples
@@ -185,6 +189,7 @@ def _load_samples(
             use_camerae2e=use_camerae2e,
             progress_interval=int(progress_interval),
             progress_label=str(progress_label),
+            cache_dir=cache_dir,
         )
     from .yolo_dataset import load_yolo_detection_samples
 
@@ -198,6 +203,7 @@ def _load_samples(
         use_camerae2e=use_camerae2e,
         progress_interval=int(progress_interval),
         progress_label=str(progress_label),
+        cache_dir=cache_dir,
     )
 
 

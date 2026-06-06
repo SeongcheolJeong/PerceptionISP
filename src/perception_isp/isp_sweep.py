@@ -58,6 +58,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-fusion", action="store_true")
     parser.add_argument("--progress-interval", type=int, default=0)
     parser.add_argument("--load-progress-interval", type=int, default=0)
+    parser.add_argument("--raw-cache-dir", default=None)
     parser.add_argument("--output-dir", default="reports/perception_isp_sweep")
     args = parser.parse_args(argv)
 
@@ -73,6 +74,7 @@ def main(argv: Any = None) -> int:
         use_camerae2e=not bool(args.no_camerae2e),
         progress_interval=int(args.load_progress_interval),
         progress_label=f"load:{args.source}:{args.offset}+{args.count}",
+        cache_dir=args.raw_cache_dir,
     )
     label_map = parse_label_map(args.ground_truth_label_map)
     if label_map:
@@ -223,6 +225,7 @@ def build_sweep_summary(
         "cfa": str(args.cfa),
         "use_camerae2e": not bool(args.no_camerae2e),
         "load_progress_interval": int(args.load_progress_interval),
+        "raw_cache_dir": args.raw_cache_dir,
         "label_agnostic": not bool(args.label_aware),
         "ground_truth_label_map": dict(label_map),
         "human_baseline_config": _config_dict(human_config),
@@ -248,6 +251,7 @@ def _load_samples(
     use_camerae2e: bool,
     progress_interval: int = 0,
     progress_label: str = "load_samples",
+    cache_dir: str | Path | None = None,
 ) -> Sequence[EvaluationSample]:
     if source == "kitti-dataset":
         from .kitti_dataset import load_kitti_detection_samples
@@ -263,6 +267,7 @@ def _load_samples(
             use_camerae2e=use_camerae2e,
             progress_interval=int(progress_interval),
             progress_label=str(progress_label),
+            cache_dir=cache_dir,
         )
     from .yolo_dataset import load_yolo_detection_samples
 
@@ -277,6 +282,7 @@ def _load_samples(
         use_camerae2e=use_camerae2e,
         progress_interval=int(progress_interval),
         progress_label=str(progress_label),
+        cache_dir=cache_dir,
     )
 
 
@@ -315,6 +321,7 @@ def _run_config(
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),
         "load_progress_interval": int(args.load_progress_interval),
+        "raw_cache_dir": args.raw_cache_dir,
         "ground_truth_label_map": dict(label_map),
         "run_index": int(run_index),
         "run_count": int(run_count),

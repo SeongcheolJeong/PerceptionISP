@@ -306,10 +306,40 @@ Best Perception RGB candidate on this small subset:
 | `tone=srgb`, `denoise=0.30`, `edge_aware`, `artifact=0.20` | 0.4749 | 0.4865 | +0.0116 | +0.0270 | -0.0064 | +0.0221 | -0.1563 |
 
 This is a useful tuning signal, not a performance claim. The same candidate
-needs a 512-sample and full-val rerun. A 512-sample attempt exposed a tooling
-problem: dataset loading creates all CameraE2E RAW samples before compare
-progress starts, so long runs can appear stalled. The loaders and CLIs now have
-`--load-progress-interval` to make the raw-preparation phase visible.
+did not hold up at 512 samples. The follow-up 512-sample sweep used the same
+fixed HumanISP baseline and CameraE2E RAW cache:
+
+```text
+reports/perception_isp_sweep_kitti_val_512_log_srgb_denoise/index.html
+```
+
+512-sample sweep grid:
+
+```text
+tone_mapping: log, srgb
+denoise_strength: 0.0, 0.18, 0.30
+demosaic_method: edge_aware
+demosaic_artifact_suppression: 0.20
+```
+
+Best Perception RGB recall candidate at 512 samples:
+
+| Candidate | Human Recall@0.50 | Perception Recall@0.50 | Delta Recall@0.50 | Delta Precision@0.50 | Delta Recall@0.75 | Delta Small Recall@0.50 | Delta FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `tone=srgb`, `denoise=0.00`, `edge_aware`, `artifact=0.20` | 0.4803 | 0.4740 | -0.0062 | +0.0068 | -0.0042 | -0.0108 | -0.0645 |
+
+So far, KITTI tuning improves precision and reduces false positives mainly by
+reducing detections, but recall remains below HumanISP. This is the result that
+should drive the next work: broad performance claims are not justified, and the
+next step should be either a deeper image-formation change or task-specific
+DNN fine-tuning, not just small scalar tuning.
+
+The 512 run also exposed and then verified an experiment tooling fix. The first
+512 CameraE2E RAW cache fill took `474.8s` at `1.08 samples/s`; reloading the
+same 512 cached samples took `8.9s` at `57.8 samples/s`. The loaders and CLIs
+now have `--load-progress-interval` to make the raw-preparation phase visible
+and `--raw-cache-dir` to reuse already generated dataset RAW samples across
+tuning and validation reruns.
 
 ## Required Before Performance Claims
 

@@ -369,6 +369,7 @@ PYTHONPATH=src \
   --no-visuals \
   --progress-interval 374 \
   --load-progress-interval 374 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
   --output-dir reports/perception_yolo_kitti_val_1496_camerae2e_fusion
 ```
 
@@ -394,6 +395,7 @@ PYTHONPATH=src \
   --ground-truth-label-map kitti-coco \
   --no-visuals \
   --load-progress-interval 16 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
   --tone-mappings log,srgb,linear \
   --denoise-strengths 0.0,0.18,0.30 \
   --demosaic-methods edge_aware \
