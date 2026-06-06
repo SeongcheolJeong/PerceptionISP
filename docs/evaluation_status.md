@@ -226,7 +226,9 @@ artifacts can be applied and summarized in one command. Rollup report names now
 include proposal-calibration feature sets and automatically disambiguate
 duplicate calibrated runs by report directory. For feature ablations, generate
 the rollup with `--rollup-baseline-input perception_fusion_rgb_aux` so the delta
-columns show improvement over the uncalibrated fusion path instead of HumanISP.
+columns show improvement over the uncalibrated fusion path instead of HumanISP,
+including the precision, recall, small-recall, false-positive, and detection
+count deltas.
 
 | Val input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |

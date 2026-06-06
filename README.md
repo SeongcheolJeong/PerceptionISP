@@ -570,7 +570,8 @@ The rollup names calibrated runs by proposal feature set and adds the report
 directory when two calibrated runs would otherwise have the same display name.
 Use `--rollup-baseline-input perception_fusion_rgb_aux` for feature ablations,
 because the key question is improvement over the uncalibrated RGB+Aux fusion
-input.
+input. The rollup includes baseline-relative precision, recall, small-recall,
+false-positive, and detection-count deltas.
 
 Use `--split eval` for held-out evidence from the original calibration split.
 Use `--split all` only as an operational full-report application, because it

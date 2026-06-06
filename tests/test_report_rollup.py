@@ -56,6 +56,8 @@ class ReportRollupTest(unittest.TestCase):
             perception = rollup["runs"][0]["inputs"]["perception_rgb"]
             self.assertAlmostEqual(perception["delta_precision@0.50_mean"], 0.1)
             self.assertAlmostEqual(perception["delta_recall@0.50_mean"], 0.05)
+            self.assertAlmostEqual(perception["delta_fp@0.50_mean"], -0.2)
+            self.assertAlmostEqual(perception["delta_det_count_mean"], 0.1)
             calibrated = rollup["runs"][0]["inputs"]["perception_calibrated_fusion_rgb_aux"]
             self.assertAlmostEqual(calibrated["delta_precision@0.50_mean"], 0.2)
             self.assertAlmostEqual(calibrated["delta_recall@0.50_mean"], -0.01)
@@ -63,6 +65,7 @@ class ReportRollupTest(unittest.TestCase):
             self.assertTrue(html_path.exists())
             self.assertIn("PerceptionISP Comparison Rollup", html_path.read_text())
             self.assertIn("human_rgb", html_path.read_text())
+            self.assertIn("dFP@0.50", html_path.read_text())
             self.assertTrue((html_path.parent / "rollup_summary.json").exists())
 
     def test_rollup_can_use_custom_baseline_input(self) -> None:
@@ -81,11 +84,15 @@ class ReportRollupTest(unittest.TestCase):
                                 "precision@0.50_mean": 0.6,
                                 "recall@0.50_mean": 0.45,
                                 "small_recall@0.50_mean": 0.25,
+                                "fp@0.50_mean": 1.2,
+                                "det_count_mean": 3.0,
                             },
                             "perception_calibrated_fusion_rgb_aux": {
                                 "precision@0.50_mean": 0.7,
                                 "recall@0.50_mean": 0.43,
                                 "small_recall@0.50_mean": 0.24,
+                                "fp@0.50_mean": 0.8,
+                                "det_count_mean": 2.5,
                             },
                         },
                     }
@@ -99,6 +106,8 @@ class ReportRollupTest(unittest.TestCase):
             calibrated = rollup["runs"][0]["inputs"]["perception_calibrated_fusion_rgb_aux"]
             self.assertAlmostEqual(calibrated["delta_precision@0.50_mean"], 0.1)
             self.assertAlmostEqual(calibrated["delta_recall@0.50_mean"], -0.02)
+            self.assertAlmostEqual(calibrated["delta_fp@0.50_mean"], -0.4)
+            self.assertAlmostEqual(calibrated["delta_det_count_mean"], -0.5)
 
     def test_rollup_names_proposal_calibration_feature_sets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

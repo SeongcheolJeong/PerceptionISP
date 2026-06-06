@@ -52,6 +52,8 @@ def build_rollup(paths: Sequence[str | Path], *, baseline_input: str = "human_rg
                 row["delta_precision@0.50_mean"] = _delta(metrics, baseline, "precision@0.50_mean")
                 row["delta_recall@0.50_mean"] = _delta(metrics, baseline, "recall@0.50_mean")
                 row["delta_small_recall@0.50_mean"] = _delta(metrics, baseline, "small_recall@0.50_mean")
+                row["delta_fp@0.50_mean"] = _delta(metrics, baseline, "fp@0.50_mean")
+                row["delta_det_count_mean"] = _delta(metrics, baseline, "det_count_mean")
             inputs[input_name] = row
         runs.append(
             {
@@ -160,9 +162,12 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
                 f"<td>{_fmt(metrics.get('recall@0.75_mean'))}</td>"
                 f"<td>{_fmt(metrics.get('small_recall@0.50_mean'))}</td>"
                 f"<td>{_fmt(metrics.get('fp@0.50_mean'))}</td>"
+                f"<td>{_fmt(metrics.get('det_count_mean'))}</td>"
                 f"<td>{_fmt(metrics.get('delta_precision@0.50_mean'), signed=True)}</td>"
                 f"<td>{_fmt(metrics.get('delta_recall@0.50_mean'), signed=True)}</td>"
                 f"<td>{_fmt(metrics.get('delta_small_recall@0.50_mean'), signed=True)}</td>"
+                f"<td>{_fmt(metrics.get('delta_fp@0.50_mean'), signed=True)}</td>"
+                f"<td>{_fmt(metrics.get('delta_det_count_mean'), signed=True)}</td>"
                 "</tr>"
             )
     return f"""<!doctype html>
@@ -183,7 +188,7 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
   <h1>PerceptionISP Comparison Rollup</h1>
   <p>Delta columns are computed against <code>{html_lib.escape(baseline_input)}</code> within each run.</p>
   <table>
-    <thead><tr><th>Run</th><th>Samples</th><th>Report</th><th>Input</th><th>P@0.50</th><th>R@0.50</th><th>R@0.75</th><th>Small R@0.50</th><th>FP@0.50</th><th>dP@0.50</th><th>dR@0.50</th><th>dSmallR@0.50</th></tr></thead>
+    <thead><tr><th>Run</th><th>Samples</th><th>Report</th><th>Input</th><th>P@0.50</th><th>R@0.50</th><th>R@0.75</th><th>Small R@0.50</th><th>FP@0.50</th><th>Det/sample</th><th>dP@0.50</th><th>dR@0.50</th><th>dSmallR@0.50</th><th>dFP@0.50</th><th>dDet/sample</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
   <p>Raw JSON: <code>rollup_summary.json</code></p>
