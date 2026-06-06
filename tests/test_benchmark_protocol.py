@@ -19,6 +19,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             gate = _write_claim_gate(root / "gate")
             task = _write_task_metrics(root / "task")
             condition = _write_condition_metrics(root / "condition")
+            condition_gate = _write_condition_gate(root / "condition_gate")
 
             summary = build_protocol_coverage(
                 comparison_reports=[report],
@@ -26,6 +27,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 claim_gates=[gate],
                 task_metrics=task,
                 condition_metrics=condition,
+                condition_gate=condition_gate,
                 min_samples=3,
             )
 
@@ -52,6 +54,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             gate = _write_claim_gate(root / "gate")
             task = _write_task_metrics(root / "task")
             condition = _write_condition_metrics(root / "condition")
+            condition_gate = _write_condition_gate(root / "condition_gate")
 
             summary = build_protocol_coverage(
                 comparison_reports=[classical, naive],
@@ -60,6 +63,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 claim_gates=[gate],
                 task_metrics=task,
                 condition_metrics=condition,
+                condition_gate=condition_gate,
                 min_samples=3,
             )
 
@@ -76,6 +80,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             report = _write_comparison_report(root / "comparison", tone_mapping="log", demosaic_method="edge_aware")
             task = _write_task_metrics(root / "task")
             condition = _write_condition_metrics(root / "condition")
+            condition_gate = _write_condition_gate(root / "condition_gate")
             gate = _write_claim_gate(root / "gate")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -89,6 +94,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(task),
                         "--condition-metrics",
                         str(condition),
+                        "--condition-gate",
+                        str(condition_gate),
                         "--min-samples",
                         "3",
                         "--output-dir",
@@ -189,6 +196,20 @@ def _write_condition_metrics(path: Path) -> Path:
         "metrics": {},
     }
     (path / "condition_metrics_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_condition_gate(path: Path) -> Path:
+    path.mkdir()
+    payload = {
+        "profile": "fp_reducer",
+        "pass": True,
+        "verdict": "condition_gate_pass",
+        "evaluated_condition_count": 1,
+        "failed_condition_count": 0,
+        "skipped_condition_count": 1,
+    }
+    (path / "condition_gate_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

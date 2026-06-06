@@ -669,8 +669,8 @@ PYTHONPATH=src \
 artifact is trained on `perception_fusion_rgb_aux` proposals.
 
 For stricter evidence, train the proposal calibrator on a KITTI train report and
-apply it to the KITTI val report. The current quick holdout uses a 512-sample
-train subset and writes:
+apply it to the KITTI val report. An earlier comparison branch uses a
+512-sample train subset and writes:
 
 ```text
 reports/perception_proposal_calibration_kitti_train512_detector_log
@@ -678,8 +678,10 @@ reports/perception_calibrated_fusion_kitti_train512_to_val1496_detector_log
 reports/perception_claim_readiness_rollup
 ```
 
-That run keeps the FP/precision benefit on val, but still loses recall versus
-HumanISP, so it is not a broad superiority claim.
+That pre-`t001` run keeps the FP/precision benefit on val, but still loses
+recall versus HumanISP, so it is not a broad superiority claim. It is retained
+as a comparison branch; the current HumanISP-relative FP-reducer branch is the
+lower-threshold `t001` artifact below.
 
 Use the claim gate to make that decision reproducible:
 
@@ -792,22 +794,23 @@ reports/perception_claim_readiness_perception_rgb_fp_vs_human/index.html
 ```
 
 Create a consolidated readiness dashboard from the claim gates, RGB+aux
-training rollup, and calibration rollup:
+training rollup, benchmark protocol, and calibration rollup:
 
 ```bash
 PYTHONPATH=src \
 /Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
   -m perception_isp.claim_dashboard \
-  --claim-gate 'Human broad superiority=reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human' \
-  --claim-gate 'FP reducer vs RGB+Aux Fusion=reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_fp_reducer_vs_fusion' \
-  --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128 \
-  --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496 \
+  --claim-gate 'Aux broad vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_broad_vs_human' \
+  --claim-gate 'Aux FP reducer vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human' \
+  --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended \
+  --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
+  --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
-  --output-dir reports/perception_claim_readiness_dashboard
+  --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
 ```
 
 The dashboard currently says: broad HumanISP superiority is not supported,
-bounded FP reduction is supported, and the learned RGB+aux DNN path is
+bounded FP reduction versus HumanISP is supported, and the learned RGB+aux DNN path is
 trainable but not yet claim-quality. When task metrics are provided, it also
 keeps the task-level claim narrow: VRU/person recall improvement versus
 HumanISP is not supported when those task recall deltas are negative, even if
@@ -819,31 +822,32 @@ Task-oriented group metrics can be extracted from the same saved detections:
 PYTHONPATH=src \
 /Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
   -m perception_isp.task_metrics \
-  reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496 \
   --baseline-input human_rgb \
-  --inputs human_rgb,perception_fusion_rgb_aux,perception_calibrated_score_label_aux_fusion_rgb_aux \
-  --output-dir reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496
+  --inputs human_rgb,perception_fusion_rgb_aux,perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
+  --output-dir reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human
 ```
 
 The current task metric result reinforces the caution: calibrated
 score+label+aux reduces FP/sample, but VRU recall is still lower than HumanISP
-(`dR50=-0.0138` for `vru`, `dR50=-0.0157` for `person`).
+(`dR50=-0.0061` for `vru`, `dR50=-0.0063` for `person`).
 
 For the current KITTI evidence bundle, the one-shot readiness command rebuilds
-both claim gates, task metrics, the RGB+aux training rollup, benchmark-protocol
-coverage, and a dashboard that includes the task-metric tradeoff decision:
+both claim gates, task metrics, condition metrics, the condition robustness
+gate, the RGB+aux training rollup, benchmark-protocol coverage, and a dashboard
+that includes the task-metric tradeoff decision:
 
 ```bash
 PYTHONPATH=src \
 /Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
   -m perception_isp.claim_readiness \
-  reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
-  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux \
+  reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496 \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
   --human-baseline-input human_rgb \
   --fusion-baseline-input perception_fusion_rgb_aux \
   --min-samples 1000 \
   --bootstrap-samples 2000 \
-  --bootstrap-seed kitti_train512_to_val1496 \
+  --bootstrap-seed kitti_train512_to_val1496_t001 \
   --training-summary exports/perception_rgb_aux_kitti_val128_detector_log \
   --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_dense_rgb_aux_ablation \
   --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_dense_rgb_only_ablation \
@@ -866,16 +870,16 @@ The readiness bundle now writes
 `benchmark_protocol/index.html`. This checklist encodes the minimum evidence
 matrix from the RAW/perception-ISP literature: paired HumanISP and
 PerceptionISP streams, enough held-out samples, fixed detector recipe,
-CI-backed claim gates, task metrics, condition-specific metrics, naive
-RAW/minimal adaptation, classical lightweight RAW transform, and a task-aware
-or aux-assisted path. Missing rows are blockers for broad HumanISP or
-RAW/sensor-native superiority claims.
+CI-backed claim gates, task metrics, condition-specific metrics, a condition
+robustness gate, naive RAW/minimal adaptation, classical lightweight RAW
+transform, and a task-aware or aux-assisted path. Missing rows are blockers for
+broad HumanISP or RAW/sensor-native superiority claims.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
 ```bash
 PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
-  --comparison-report reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  --comparison-report reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496 \
   --comparison-report reports/perception_compare_kitti_val1496_naive_raw_like \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended \
@@ -883,6 +887,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --condition-metrics reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human \
+  --condition-gate reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -893,13 +898,16 @@ The latest extended-inclusive protocol report is:
 reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
+reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 ```
 
 It marks `coverage_status=coverage_complete`, including the recommended
 extended sensor-native tensor row, while `metric_claim_status=fp_reducer_only`.
 That is an evidence-coverage result, not a broad-superiority result; the
 dashboard still says broad HumanISP superiority is not supported, while
-recall-budgeted FP reduction versus HumanISP is supported.
+recall-budgeted FP reduction versus HumanISP is supported. The condition gate
+passes the `fp_reducer` profile on 8 evaluated condition slices; the
+`warning:over_exposure` slice is skipped because it has only 7 samples.
 
 The current 1496-image naive RAW-like baseline is:
 

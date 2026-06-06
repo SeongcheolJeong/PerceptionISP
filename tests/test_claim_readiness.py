@@ -35,11 +35,13 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue((root / "readiness" / "fp_reducer_vs_fusion" / "claim_gate_summary.json").exists())
             self.assertTrue((root / "readiness" / "task_metrics" / "task_metrics_summary.json").exists())
             self.assertTrue((root / "readiness" / "condition_metrics" / "condition_metrics_summary.json").exists())
+            self.assertTrue((root / "readiness" / "condition_gate" / "condition_gate_summary.json").exists())
             self.assertTrue((root / "readiness" / "benchmark_protocol" / "protocol_coverage_summary.json").exists())
             self.assertTrue((root / "readiness" / "rgb_aux_training_rollup" / "training_rollup_summary.json").exists())
             self.assertTrue((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").exists())
             self.assertIn("task_metrics", summary)
             self.assertIn("condition_metrics", summary)
+            self.assertIn("condition_gate", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -48,10 +50,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
             self.assertEqual(
-                decisions[
-                    "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim."
-                ],
-                "not_supported",
+                decisions["Task-group metrics are candidate evidence, but need a configured held-out task gate before a task-level claim."],
+                "needs_gate",
             )
             self.assertTrue(
                 any(
@@ -61,7 +61,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 )
             )
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
-            self.assertEqual(dashboard_summary["task_metrics"]["status"], "recall_tradeoff")
+            self.assertEqual(dashboard_summary["task_metrics"]["status"], "candidate_needs_gate")
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -91,6 +91,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(printed["fp_reducer"]["pass"])
             self.assertIn("task_metrics", printed)
             self.assertIn("condition_metrics", printed)
+            self.assertIn("condition_gate", printed)
             self.assertIn("benchmark_protocol", printed)
             self.assertTrue((root / "readiness" / "claim_readiness_summary.json").exists())
 
@@ -132,7 +133,7 @@ def _write_comparison_report(
     path.mkdir()
     samples = []
     for index in range(3):
-        target_detections = [_match_detection()] if index < 2 else []
+        target_detections = [_match_detection()]
         samples.append(
             {
                 "sample_id": str(index),

@@ -11,6 +11,7 @@ from .aux_training_rollup import build_training_rollup, write_training_rollup
 from .benchmark_protocol import build_protocol_coverage, write_protocol_coverage
 from .claim_dashboard import build_claim_dashboard, write_claim_dashboard
 from .claim_gate import build_claim_gate, write_claim_gate
+from .condition_gate import build_condition_gate, write_condition_gate
 from .condition_metrics import build_condition_metrics, write_condition_metrics
 from .task_metrics import build_task_metrics, write_task_metrics
 from .types import json_ready
@@ -133,6 +134,19 @@ def run_claim_readiness(
     )
     condition_html = write_condition_metrics(condition_summary, condition_metrics_dir)
 
+    condition_gate_dir = destination / "condition_gate"
+    condition_gate_profile = "broad_superiority" if bool(broad_summary.get("pass")) else "fp_reducer"
+    condition_min_samples = max(1, min(30, int(min_samples)))
+    condition_gate_summary = build_condition_gate(
+        condition_summary,
+        target_input=str(target_input),
+        baseline_input=str(human_baseline_input),
+        thresholds={"profile": condition_gate_profile},
+        min_condition_samples=condition_min_samples,
+        source_report=condition_html.parent / "condition_metrics_summary.json",
+    )
+    condition_gate_html = write_condition_gate(condition_gate_summary, condition_gate_dir)
+
     training_rollup_path = None
     if training_summaries:
         training_summary = build_training_rollup(training_summaries)
@@ -150,6 +164,7 @@ def run_claim_readiness(
         claim_gates=[broad_dir, fp_dir],
         task_metrics=task_metrics_dir,
         condition_metrics=condition_metrics_dir,
+        condition_gate=condition_gate_dir,
         min_samples=int(min_samples),
     )
     protocol_html = write_protocol_coverage(protocol_summary, protocol_dir)
@@ -202,6 +217,19 @@ def run_claim_readiness(
             "report": str(condition_html),
             "summary_json": str(condition_html.parent / "condition_metrics_summary.json"),
             "condition_count": len(condition_summary.get("conditions", ())),
+        },
+        "condition_gate": {
+            "report": str(condition_gate_html),
+            "summary_json": str(condition_gate_html.parent / "condition_gate_summary.json"),
+            "pass": bool(condition_gate_summary.get("pass")),
+            "verdict": condition_gate_summary.get("verdict"),
+            "profile": condition_gate_summary.get("profile"),
+            "min_condition_samples": condition_gate_summary.get("min_condition_samples"),
+            "failed_conditions": [
+                row.get("condition")
+                for row in condition_gate_summary.get("conditions", ())
+                if isinstance(row, Mapping) and row.get("status") == "fail"
+            ],
         },
         "benchmark_protocol": {
             "report": str(protocol_html),
@@ -259,6 +287,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "fp_reducer": summary.get("fp_reducer"),
         "task_metrics": summary.get("task_metrics"),
         "condition_metrics": summary.get("condition_metrics"),
+        "condition_gate": summary.get("condition_gate"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],

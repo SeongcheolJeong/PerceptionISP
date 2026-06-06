@@ -226,16 +226,20 @@ It reports `coverage_status=coverage_complete` for evidence coverage, including
 the recommended `extended_sensor_native_tensor` row, while the metric side
 stays narrow as `metric_claim_status=fp_reducer_only`. That means the configured
 protocol has the expected rows, not that the target wins every metric. The
-protocol now also includes condition-specific metrics:
+protocol now also includes condition-specific metrics and a condition
+robustness gate:
 
 ```text
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
+reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
 ```
 
 The current condition report has 9 slices from explicit/sample-derived
 metadata, including `low_light_proxy`, `low_visibility_proxy`,
 `glare_or_over_exposure_proxy`, `true_cfa_mosaic`, and `camerae2e_raw`.
+The condition gate passes the `fp_reducer` profile on 8 evaluated slices and
+skips `warning:over_exposure` because it has only 7 samples.
 The corresponding dashboard keeps the decision narrow:
 
 It supports recall-budgeted FP reduction versus HumanISP, rejects broad
@@ -492,6 +496,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
 | Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
+| Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
@@ -505,9 +510,9 @@ reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/protoc
 This protocol coverage is a blocker checklist, not a metric result. It checks
 whether the evidence includes the minimum matrix needed for broad claims:
 paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
-detector recipe, CI-backed gates, task metrics, condition-specific metrics,
-naive RAW/minimal adaptation, classical lightweight RAW transform, and
-task-aware/aux-assisted paths.
+detector recipe, CI-backed gates, task metrics, condition-specific metrics, a
+condition robustness gate, naive RAW/minimal adaptation, classical lightweight
+RAW transform, and task-aware/aux-assisted paths.
 
 The current naive RAW-like KITTI val baseline is:
 
@@ -533,8 +538,8 @@ support a HumanISP superiority claim.
 Task-oriented group metrics are also generated from the same saved detections:
 
 ```text
-reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496/index.html
-reports/perception_claim_readiness_with_naive/task_metrics/index.html
+reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
+reports/perception_claim_readiness_with_naive_extended/task_metrics/index.html
 ```
 
 The current task metrics show why the FP-reducer claim should stay narrow:
@@ -542,11 +547,11 @@ The current task metrics show why the FP-reducer claim should stay narrow:
 | Group / input | P@0.50 | R@0.50 | R@0.75 | FP/sample | Delta R@0.50 vs Human | Delta FP/sample vs Human |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Human VRU | 0.4993 | 0.2697 | 0.0779 | 0.2366 | +0.0000 | +0.0000 |
-| Calibrated VRU | 0.5888 | 0.2559 | 0.0741 | 0.1564 | -0.0138 | -0.0802 |
+| Calibrated VRU | 0.5450 | 0.2636 | 0.0764 | 0.1925 | -0.0061 | -0.0441 |
 | Human person | 0.5740 | 0.3647 | 0.1066 | 0.1731 | +0.0000 | +0.0000 |
-| Calibrated person | 0.5975 | 0.3490 | 0.1014 | 0.1504 | -0.0157 | -0.0227 |
+| Calibrated person | 0.5784 | 0.3584 | 0.1045 | 0.1671 | -0.0063 | -0.0060 |
 | Human vehicle | 0.6939 | 0.5061 | 0.3361 | 0.9866 | +0.0000 | +0.0000 |
-| Calibrated vehicle | 0.7205 | 0.4963 | 0.3326 | 0.8509 | -0.0098 | -0.1357 |
+| Calibrated vehicle | 0.7076 | 0.4990 | 0.3349 | 0.9111 | -0.0071 | -0.0755 |
 
 ## CameraE2E Resolution Finding
 
