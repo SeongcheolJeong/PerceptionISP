@@ -13,6 +13,7 @@ from .claim_dashboard import build_claim_dashboard, write_claim_dashboard
 from .claim_gate import build_claim_gate, write_claim_gate
 from .condition_gate import build_condition_gate, write_condition_gate
 from .condition_metrics import build_condition_metrics, write_condition_metrics
+from .task_gate import build_task_gate, write_task_gate
 from .task_metrics import build_task_metrics, write_task_metrics
 from .types import json_ready
 
@@ -125,6 +126,17 @@ def run_claim_readiness(
     )
     task_html = write_task_metrics(task_summary, task_metrics_dir)
 
+    task_gate_dir = destination / "task_gate"
+    task_gate_summary = build_task_gate(
+        task_summary,
+        target_input=str(target_input),
+        baseline_input=str(human_baseline_input),
+        thresholds={"profile": "recall_improvement"},
+        min_group_gt=1,
+        source_report=task_html.parent / "task_metrics_summary.json",
+    )
+    task_gate_html = write_task_gate(task_gate_summary, task_gate_dir)
+
     condition_metrics_dir = destination / "condition_metrics"
     condition_summary = build_condition_metrics(
         report,
@@ -163,6 +175,7 @@ def run_claim_readiness(
         training_rollup=training_rollup_path,
         claim_gates=[broad_dir, fp_dir],
         task_metrics=task_metrics_dir,
+        task_gate=task_gate_dir,
         condition_metrics=condition_metrics_dir,
         condition_gate=condition_gate_dir,
         min_samples=int(min_samples),
@@ -177,6 +190,7 @@ def run_claim_readiness(
         ],
         training_rollup=training_rollup_path,
         task_metrics=task_metrics_dir,
+        task_gate=task_gate_dir,
         protocol_coverage=protocol_dir,
         comparison_rollup_specs=comparison_rollups,
     )
@@ -212,6 +226,18 @@ def run_claim_readiness(
         "task_metrics": {
             "report": str(task_html),
             "summary_json": str(task_html.parent / "task_metrics_summary.json"),
+        },
+        "task_gate": {
+            "report": str(task_gate_html),
+            "summary_json": str(task_gate_html.parent / "task_gate_summary.json"),
+            "pass": bool(task_gate_summary.get("pass")),
+            "verdict": task_gate_summary.get("verdict"),
+            "profile": task_gate_summary.get("profile"),
+            "failed_groups": [
+                row.get("group")
+                for row in task_gate_summary.get("groups", ())
+                if isinstance(row, Mapping) and row.get("status") == "fail"
+            ],
         },
         "condition_metrics": {
             "report": str(condition_html),
@@ -286,6 +312,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "broad_superiority": summary.get("broad_superiority"),
         "fp_reducer": summary.get("fp_reducer"),
         "task_metrics": summary.get("task_metrics"),
+        "task_gate": summary.get("task_gate"),
         "condition_metrics": summary.get("condition_metrics"),
         "condition_gate": summary.get("condition_gate"),
         "benchmark_protocol": summary.get("benchmark_protocol"),

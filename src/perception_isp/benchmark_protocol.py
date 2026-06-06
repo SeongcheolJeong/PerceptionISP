@@ -17,6 +17,7 @@ COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
+TASK_GATE_SUMMARY = "task_gate_summary.json"
 CONDITION_METRICS_SUMMARY = "condition_metrics_summary.json"
 CONDITION_GATE_SUMMARY = "condition_gate_summary.json"
 
@@ -45,6 +46,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-rollup", default=None, help="training_rollup_summary.json path/dir.")
     parser.add_argument("--claim-gate", action="append", default=[], help="claim_gate_summary.json path/dir. Repeatable.")
     parser.add_argument("--task-metrics", default=None, help="task_metrics_summary.json path/dir.")
+    parser.add_argument("--task-gate", default=None, help="task_gate_summary.json path/dir.")
     parser.add_argument("--condition-metrics", default=None, help="condition_metrics_summary.json path/dir.")
     parser.add_argument("--condition-gate", default=None, help="condition_gate_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
@@ -57,6 +59,7 @@ def main(argv: Any = None) -> int:
         training_rollup=args.training_rollup,
         claim_gates=args.claim_gate,
         task_metrics=args.task_metrics,
+        task_gate=args.task_gate,
         condition_metrics=args.condition_metrics,
         condition_gate=args.condition_gate,
         min_samples=int(args.min_samples),
@@ -87,6 +90,7 @@ def build_protocol_coverage(
     training_rollup: str | Path | None = None,
     claim_gates: Sequence[str | Path] = (),
     task_metrics: str | Path | None = None,
+    task_gate: str | Path | None = None,
     condition_metrics: str | Path | None = None,
     condition_gate: str | Path | None = None,
     min_samples: int = 1000,
@@ -97,6 +101,7 @@ def build_protocol_coverage(
         training_rollup=training_rollup,
         claim_gates=claim_gates,
         task_metrics=task_metrics,
+        task_gate=task_gate,
         condition_metrics=condition_metrics,
         condition_gate=condition_gate,
     )
@@ -144,6 +149,7 @@ def _collect_evidence(
     training_rollup: str | Path | None,
     claim_gates: Sequence[str | Path],
     task_metrics: str | Path | None,
+    task_gate: str | Path | None,
     condition_metrics: str | Path | None,
     condition_gate: str | Path | None,
 ) -> Dict[str, Any]:
@@ -184,6 +190,7 @@ def _collect_evidence(
     training = _load_training(training_rollup)
     gates = [_load_gate(path) for path in claim_gates]
     task = _load_task_metrics(task_metrics)
+    task_gate_data = _load_task_gate(task_gate)
     condition = _load_condition_metrics(condition_metrics)
     condition_gate_data = _load_condition_gate(condition_gate)
 
@@ -200,6 +207,7 @@ def _collect_evidence(
         "training": training,
         "claim_gates": gates,
         "task_metrics": task,
+        "task_gate": task_gate_data,
         "condition_metrics": condition,
         "condition_gate": condition_gate_data,
     }
@@ -212,6 +220,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     consistency = evidence.get("run_config_consistency", {}) if isinstance(evidence.get("run_config_consistency"), Mapping) else {}
     gates = evidence.get("claim_gates", ()) if isinstance(evidence.get("claim_gates", ()), Sequence) else ()
     task = evidence.get("task_metrics", {}) if isinstance(evidence.get("task_metrics"), Mapping) else {}
+    task_gate = evidence.get("task_gate", {}) if isinstance(evidence.get("task_gate"), Mapping) else {}
     condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     condition_gate = evidence.get("condition_gate", {}) if isinstance(evidence.get("condition_gate"), Mapping) else {}
 
@@ -263,6 +272,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(task.get("available")),
             str(task.get("summary", "missing")),
             "Task-level groups are required before VRU/person/small-object claims.",
+        ),
+        _row(
+            "task_gate",
+            "Task-level gate evaluated",
+            "claim_required",
+            bool(task_gate.get("available")),
+            str(task_gate.get("summary", "missing")),
+            "Task-level metrics need a gate before promotion because raw group rows alone do not prove VRU/person/small-object claims.",
         ),
         _row(
             "condition_metrics",
@@ -384,6 +401,30 @@ def _load_task_metrics(path: str | Path | None) -> Dict[str, Any]:
         "group_count": len(data.get("groups", ())),
         "label_agnostic": bool(data.get("label_agnostic", True)),
         "summary": f"{len(data.get('groups', ()))} groups, {'label agnostic' if bool(data.get('label_agnostic', True)) else 'label aware'}",
+    }
+
+
+def _load_task_gate(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, TASK_GATE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "profile": str(data.get("profile", "")),
+        "pass": bool(data.get("pass")),
+        "verdict": str(data.get("verdict", "")),
+        "evaluated_group_count": int(data.get("evaluated_group_count", 0)),
+        "failed_group_count": int(data.get("failed_group_count", 0)),
+        "skipped_group_count": int(data.get("skipped_group_count", 0)),
+        "summary": (
+            f"{str(data.get('verdict', ''))}, profile={str(data.get('profile', ''))}, "
+            f"evaluated={int(data.get('evaluated_group_count', 0))}, "
+            f"failed={int(data.get('failed_group_count', 0))}, "
+            f"skipped={int(data.get('skipped_group_count', 0))}"
+        ),
     }
 
 
@@ -586,6 +627,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     evidence = summary.get("evidence", {}) if isinstance(summary.get("evidence"), Mapping) else {}
     training = evidence.get("training", {}) if isinstance(evidence.get("training"), Mapping) else {}
     task = evidence.get("task_metrics", {}) if isinstance(evidence.get("task_metrics"), Mapping) else {}
+    task_gate = evidence.get("task_gate", {}) if isinstance(evidence.get("task_gate"), Mapping) else {}
     condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     condition_gate = evidence.get("condition_gate", {}) if isinstance(evidence.get("condition_gate"), Mapping) else {}
     return f"""<!doctype html>
@@ -624,6 +666,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Claim gates</th><td>{html_lib.escape(_gate_outcome_text(summary.get('claim_gate_outcomes', {})))}</td></tr>
       <tr><th>Training</th><td>{_optional_link(training, destination)} {html_lib.escape(str(training.get('summary', 'missing')))}</td></tr>
       <tr><th>Task metrics</th><td>{_optional_link(task, destination)} {html_lib.escape(str(task.get('summary', 'missing')))}</td></tr>
+      <tr><th>Task gate</th><td>{_optional_link(task_gate, destination)} {html_lib.escape(str(task_gate.get('summary', 'missing')))}</td></tr>
       <tr><th>Condition metrics</th><td>{_optional_link(condition, destination)} {html_lib.escape(str(condition.get('summary', 'missing')))}</td></tr>
       <tr><th>Condition gate</th><td>{_optional_link(condition_gate, destination)} {html_lib.escape(str(condition_gate.get('summary', 'missing')))}</td></tr>
     </tbody>

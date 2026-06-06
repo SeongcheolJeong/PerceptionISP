@@ -19,8 +19,8 @@ not portable outside the Codex session.
 - The most relevant system architecture is a split output: a human display
   stream, a perception stream, auxiliary confidence maps, and sensor metadata.
 - Strong claims need paired or matched evaluation, fixed detector recipe,
-  condition-specific metrics plus a robustness gate, confidence intervals, and
-  compute/latency/memory reporting.
+  task-specific metrics with a task gate, condition-specific metrics plus a
+  robustness gate, confidence intervals, and compute/latency/memory reporting.
 
 ## Evaluation Requirements
 
@@ -33,9 +33,10 @@ include these rows under a fixed detector and training recipe:
    compression.
 4. Task-aware PerceptionISP or adapter path.
 5. RAW-domain adaptation or pretraining compared with sRGB-domain pretraining.
-6. Condition-specific metrics and a condition robustness gate for low light,
+6. Task-specific metrics and a task gate for VRU/person/small-object claims.
+7. Condition-specific metrics and a condition robustness gate for low light,
    HDR/glare, weather, visibility, and other adverse slices.
-7. Optional auxiliary-map variants, such as noise, saturation, HDR-source, or
+8. Optional auxiliary-map variants, such as noise, saturation, HDR-source, or
    demosaic-confidence channels.
 
 The current project now covers rows 1-4 at the software-reference level on
@@ -95,4 +96,5 @@ PerceptionISP is generally superior to HumanISP for detection.
 ```
 
 That broader claim still needs a real adapted detector, stronger held-out
-datasets, real adverse-condition slices, and a passing broad-superiority gate.
+datasets, passing task gates, real adverse-condition slices, and a passing
+broad-superiority gate.

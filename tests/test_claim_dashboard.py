@@ -87,6 +87,28 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
+    def test_dashboard_uses_task_gate_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True, baseline_input="human_rgb")
+            task_metrics = _write_task_metrics(root / "task_metrics")
+            task_gate = _write_task_gate(root / "task_gate")
+
+            dashboard = build_claim_dashboard(
+                claim_gate_specs=[str(fp)],
+                task_metrics=task_metrics,
+                task_gate=task_gate,
+            )
+
+            self.assertEqual(dashboard["task_gate"]["verdict"], "task_gate_fail")
+            decisions = {item["claim"]: item["status"] for item in dashboard["decisions"]}
+            self.assertEqual(
+                decisions["Task-level `recall_improvement` gate failed for vru, person; do not promote that task-level claim."],
+                "not_supported",
+            )
+            html_path = write_claim_dashboard(dashboard, root / "dashboard")
+            self.assertIn("Task Gate", html_path.read_text())
+
     def test_fp_reducer_decision_names_human_baseline(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -247,6 +269,34 @@ def _write_task_metrics(path: Path) -> Path:
                         },
                     },
                 },
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_task_gate(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "task_gate_summary.json").write_text(
+        json.dumps(
+            {
+                "profile": "recall_improvement",
+                "verdict": "task_gate_fail",
+                "pass": False,
+                "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
+                "baseline_input": "human_rgb",
+                "evaluated_group_count": 4,
+                "failed_group_count": 2,
+                "skipped_group_count": 0,
+                "groups": [
+                    {"group": "vru", "status": "fail"},
+                    {"group": "person", "status": "fail"},
+                    {"group": "vehicle", "status": "pass"},
+                    {"group": "small_all", "status": "pass"},
+                ],
+                "interpretation": "unit",
             }
         )
         + "\n"

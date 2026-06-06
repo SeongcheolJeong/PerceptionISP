@@ -804,6 +804,7 @@ PYTHONPATH=src \
   --claim-gate 'Aux FP reducer vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human' \
   --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
+  --task-gate reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
@@ -812,9 +813,9 @@ PYTHONPATH=src \
 The dashboard currently says: broad HumanISP superiority is not supported,
 bounded FP reduction versus HumanISP is supported, and the learned RGB+aux DNN path is
 trainable but not yet claim-quality. When task metrics are provided, it also
-keeps the task-level claim narrow: VRU/person recall improvement versus
-HumanISP is not supported when those task recall deltas are negative, even if
-FP/sample is reduced.
+keeps the task-level claim narrow: the `recall_improvement` task gate fails for
+VRU/person/cyclist/vehicle/small-object groups, so task recall improvement
+versus HumanISP is not supported even though FP/sample is reduced.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -832,10 +833,26 @@ The current task metric result reinforces the caution: calibrated
 score+label+aux reduces FP/sample, but VRU recall is still lower than HumanISP
 (`dR50=-0.0061` for `vru`, `dR50=-0.0063` for `person`).
 
+Make that task-level decision reproducible with the task gate:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.task_gate \
+  reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
+  --profile recall_improvement \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
+  --baseline-input human_rgb \
+  --min-group-gt 1 \
+  --output-dir reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human
+```
+
+The gate currently fails the `recall_improvement` profile for `vru`,
+`person`, `cyclist`, `vehicle`, and `small_all`; `traffic_light` is skipped
+because there is no positive GT in this KITTI slice.
+
 For the current KITTI evidence bundle, the one-shot readiness command rebuilds
-both claim gates, task metrics, condition metrics, the condition robustness
-gate, the RGB+aux training rollup, benchmark-protocol coverage, and a dashboard
-that includes the task-metric tradeoff decision:
+both claim gates, task metrics, the task gate, condition metrics, the condition
+robustness gate, the RGB+aux training rollup, benchmark-protocol coverage, and
+a dashboard that includes the task-metric tradeoff decision:
 
 ```bash
 PYTHONPATH=src \
@@ -870,10 +887,10 @@ The readiness bundle now writes
 `benchmark_protocol/index.html`. This checklist encodes the minimum evidence
 matrix from the RAW/perception-ISP literature: paired HumanISP and
 PerceptionISP streams, enough held-out samples, fixed detector recipe,
-CI-backed claim gates, task metrics, condition-specific metrics, a condition
-robustness gate, naive RAW/minimal adaptation, classical lightweight RAW
-transform, and a task-aware or aux-assisted path. Missing rows are blockers for
-broad HumanISP or RAW/sensor-native superiority claims.
+CI-backed claim gates, task metrics, task gate, condition-specific metrics, a
+condition robustness gate, naive RAW/minimal adaptation, classical lightweight
+RAW transform, and a task-aware or aux-assisted path. Missing rows are blockers
+for broad HumanISP or RAW/sensor-native superiority claims.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -886,6 +903,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_broad_vs_human \
   --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
+  --task-gate reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human \
   --condition-metrics reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --condition-gate reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
   --min-samples 1000 \
@@ -897,6 +915,7 @@ The latest extended-inclusive protocol report is:
 ```text
 reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
+reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 ```

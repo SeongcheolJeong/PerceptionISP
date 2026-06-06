@@ -16,6 +16,7 @@ CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
+TASK_GATE_SUMMARY = "task_gate_summary.json"
 PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 
 
@@ -24,6 +25,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--claim-gate", action="append", default=[], help="Claim gate summary path/dir, optionally name=path.")
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
+    parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
@@ -33,6 +35,7 @@ def main(argv: Any = None) -> int:
         claim_gate_specs=args.claim_gate,
         training_rollup=args.training_rollup,
         task_metrics=args.task_metrics,
+        task_gate=args.task_gate,
         protocol_coverage=args.protocol_coverage,
         comparison_rollup_specs=args.comparison_rollup,
     )
@@ -58,19 +61,22 @@ def build_claim_dashboard(
     claim_gate_specs: Sequence[str | Path],
     training_rollup: str | Path | None = None,
     task_metrics: str | Path | None = None,
+    task_gate: str | Path | None = None,
     protocol_coverage: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
     task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
+    task_gate_data = _load_task_gate(task_gate) if task_gate is not None else None
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task, protocol)
+    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol)
     return {
         "claims": claims,
         "training": training,
         "task_metrics": task,
+        "task_gate": task_gate_data,
         "protocol_coverage": protocol,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
@@ -184,6 +190,29 @@ def _load_task_metrics(spec: str | Path, *, claims: Sequence[Mapping[str, Any]])
     }
 
 
+def _load_task_gate(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, TASK_GATE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    groups = [row for row in data.get("groups", ()) if isinstance(row, Mapping)]
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "profile": str(data.get("profile", "")),
+        "verdict": str(data.get("verdict", "")),
+        "pass": bool(data.get("pass")),
+        "target_input": str(data.get("target_input", "")),
+        "baseline_input": str(data.get("baseline_input", "")),
+        "evaluated_group_count": int(data.get("evaluated_group_count", 0)),
+        "failed_group_count": int(data.get("failed_group_count", 0)),
+        "skipped_group_count": int(data.get("skipped_group_count", 0)),
+        "failed_groups": [str(row.get("group", "")) for row in groups if row.get("status") == "fail"],
+        "skipped_groups": [str(row.get("group", "")) for row in groups if row.get("status") == "skipped"],
+        "interpretation": str(data.get("interpretation", "")),
+    }
+
+
 def _load_protocol_coverage(spec: str | Path) -> Dict[str, Any]:
     label, path = _split_named_path(spec)
     summary_path = _summary_path(path, PROTOCOL_COVERAGE_SUMMARY)
@@ -286,6 +315,7 @@ def _claim_decisions(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
+    task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
@@ -310,7 +340,14 @@ def _claim_decisions(
             decisions.append({"status": "needs_gate", "claim": "The learned RGB+Aux DNN path has candidate metrics, but still needs a held-out claim gate."})
         elif status == "training_path_only":
             decisions.append({"status": "needs_eval", "claim": "The RGB+Aux DNN training path exists, but direct held-out detector evaluation is still missing."})
-    if task_metrics is not None:
+    if task_gate is not None:
+        profile = str(task_gate.get("profile", "task"))
+        if bool(task_gate.get("pass")):
+            decisions.append({"status": "supported", "claim": f"Task-level `{profile}` gate passed for the evaluated groups."})
+        else:
+            failed = ", ".join(str(value) for value in task_gate.get("failed_groups", ())) or "configured groups"
+            decisions.append({"status": "not_supported", "claim": f"Task-level `{profile}` gate failed for {failed}; do not promote that task-level claim."})
+    elif task_metrics is not None:
         status = str(task_metrics.get("status", "unknown"))
         if status == "recall_tradeoff":
             decisions.append({"status": "not_supported", "claim": "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim."})
@@ -468,6 +505,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
     task_metrics = dashboard.get("task_metrics")
     task_metrics_html = _task_metrics_html(task_metrics, destination) if isinstance(task_metrics, Mapping) else "<p>No task metrics summary was provided.</p>"
+    task_gate = dashboard.get("task_gate")
+    task_gate_html = _task_gate_html(task_gate, destination) if isinstance(task_gate, Mapping) else "<p>No task gate summary was provided.</p>"
     protocol = dashboard.get("protocol_coverage")
     protocol_html = _protocol_html(protocol, destination) if isinstance(protocol, Mapping) else "<p>No benchmark protocol coverage summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
@@ -509,6 +548,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {training_html}
   <h2>Task Metrics</h2>
   {task_metrics_html}
+  <h2>Task Gate</h2>
+  {task_gate_html}
   <h2>Benchmark Protocol Coverage</h2>
   {protocol_html}
   <h2>Supporting Rollups</h2>
@@ -611,6 +652,29 @@ def _task_metric_row(row: Mapping[str, Any]) -> str:
         f"<td>{_task_delta_cell(row.get('delta_recall@0.75'), lower_is_better=False)}</td>"
         f"<td>{_task_delta_cell(row.get('delta_fp@0.50_per_sample'), lower_is_better=True)}</td>"
         "</tr>"
+    )
+
+
+def _task_gate_html(task_gate: Mapping[str, Any], destination: Path) -> str:
+    verdict_class = "supported" if bool(task_gate.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in task_gate.get("failed_groups", ())) or "none"
+    skipped = ", ".join(str(value) for value in task_gate.get("skipped_groups", ())) or "none"
+    return (
+        f"<p>Verdict: <code class=\"{verdict_class}\">{html_lib.escape(str(task_gate.get('verdict', '')))}</code>. "
+        f"{html_lib.escape(str(task_gate.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Profile</th><th>Baseline</th><th>Target</th><th>Evaluated</th><th>Failed</th><th>Skipped</th><th>Failed Groups</th><th>Skipped Groups</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(task_gate, destination)}</td>"
+        f"<td><code>{html_lib.escape(str(task_gate.get('profile', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(task_gate.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(task_gate.get('target_input', '')))}</code></td>"
+        f"<td>{int(task_gate.get('evaluated_group_count', 0))}</td>"
+        f"<td>{int(task_gate.get('failed_group_count', 0))}</td>"
+        f"<td>{int(task_gate.get('skipped_group_count', 0))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        f"<td>{html_lib.escape(skipped)}</td>"
+        "</tr></tbody></table>"
     )
 
 

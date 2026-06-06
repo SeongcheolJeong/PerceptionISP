@@ -18,6 +18,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             training = _write_training_rollup(root / "training")
             gate = _write_claim_gate(root / "gate")
             task = _write_task_metrics(root / "task")
+            task_gate = _write_task_gate(root / "task_gate")
             condition = _write_condition_metrics(root / "condition")
             condition_gate = _write_condition_gate(root / "condition_gate")
 
@@ -26,6 +27,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 training_rollup=training,
                 claim_gates=[gate],
                 task_metrics=task,
+                task_gate=task_gate,
                 condition_metrics=condition,
                 condition_gate=condition_gate,
                 min_samples=3,
@@ -53,6 +55,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             training = _write_training_rollup(root / "training")
             gate = _write_claim_gate(root / "gate")
             task = _write_task_metrics(root / "task")
+            task_gate = _write_task_gate(root / "task_gate")
             condition = _write_condition_metrics(root / "condition")
             condition_gate = _write_condition_gate(root / "condition_gate")
 
@@ -62,6 +65,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 training_rollup=training,
                 claim_gates=[gate],
                 task_metrics=task,
+                task_gate=task_gate,
                 condition_metrics=condition,
                 condition_gate=condition_gate,
                 min_samples=3,
@@ -79,6 +83,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             root = Path(tmp)
             report = _write_comparison_report(root / "comparison", tone_mapping="log", demosaic_method="edge_aware")
             task = _write_task_metrics(root / "task")
+            task_gate = _write_task_gate(root / "task_gate")
             condition = _write_condition_metrics(root / "condition")
             condition_gate = _write_condition_gate(root / "condition_gate")
             gate = _write_claim_gate(root / "gate")
@@ -92,6 +97,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(gate),
                         "--task-metrics",
                         str(task),
+                        "--task-gate",
+                        str(task_gate),
                         "--condition-metrics",
                         str(condition),
                         "--condition-gate",
@@ -184,6 +191,20 @@ def _write_task_metrics(path: Path) -> Path:
         "metrics": {},
     }
     (path / "task_metrics_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_task_gate(path: Path) -> Path:
+    path.mkdir()
+    payload = {
+        "profile": "recall_improvement",
+        "pass": False,
+        "verdict": "task_gate_fail",
+        "evaluated_group_count": 1,
+        "failed_group_count": 1,
+        "skipped_group_count": 0,
+    }
+    (path / "task_gate_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

@@ -226,10 +226,11 @@ It reports `coverage_status=coverage_complete` for evidence coverage, including
 the recommended `extended_sensor_native_tensor` row, while the metric side
 stays narrow as `metric_claim_status=fp_reducer_only`. That means the configured
 protocol has the expected rows, not that the target wins every metric. The
-protocol now also includes condition-specific metrics and a condition
-robustness gate:
+protocol now also includes a task gate, condition-specific metrics, and a
+condition robustness gate:
 
 ```text
+reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
@@ -243,7 +244,8 @@ skips `warning:over_exposure` because it has only 7 samples.
 The corresponding dashboard keeps the decision narrow:
 
 It supports recall-budgeted FP reduction versus HumanISP, rejects broad
-HumanISP superiority, rejects VRU/person recall improvement, and marks the
+HumanISP superiority, rejects task-level recall improvement through a failed
+`recall_improvement` task gate, and marks the
 learned RGB+aux DNN path as implemented but not claim-quality.
 
 ### KITTI Train-Subset to Val Calibration
@@ -494,7 +496,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Broad HumanISP superiority | Not supported |
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
-| Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
+| Task-level recall improvement | `task_gate_fail` for `vru`, `person`, `cyclist`, `vehicle`, and `small_all`; current evidence supports only the narrower FP-reduction claim |
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
@@ -510,9 +512,10 @@ reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/protoc
 This protocol coverage is a blocker checklist, not a metric result. It checks
 whether the evidence includes the minimum matrix needed for broad claims:
 paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
-detector recipe, CI-backed gates, task metrics, condition-specific metrics, a
-condition robustness gate, naive RAW/minimal adaptation, classical lightweight
-RAW transform, and task-aware/aux-assisted paths.
+detector recipe, CI-backed gates, task metrics, a task gate,
+condition-specific metrics, a condition robustness gate, naive RAW/minimal
+adaptation, classical lightweight RAW transform, and task-aware/aux-assisted
+paths.
 
 The current naive RAW-like KITTI val baseline is:
 
@@ -539,6 +542,7 @@ Task-oriented group metrics are also generated from the same saved detections:
 
 ```text
 reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
+reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
 reports/perception_claim_readiness_with_naive_extended/task_metrics/index.html
 ```
 
