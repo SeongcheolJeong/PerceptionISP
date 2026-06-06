@@ -38,11 +38,15 @@ include these rows under a fixed detector and training recipe:
    HDR/glare, weather, visibility, and other adverse slices.
 8. Optional auxiliary-map variants, such as noise, saturation, HDR-source, or
    demosaic-confidence channels.
+9. Mechanism validation before expensive fine-tuning: paired stress cases should
+   show that sensor-native maps move in the expected direction for low light,
+   glare/HDR saturation, optical blur or low MTF, and CFA-specific decode paths.
 
 The current project now covers rows 1-4 at the software-reference level on
-KITTI-derived evidence, and it exercises auxiliary-map tensors through export,
-training, and direct dense evaluation. It does not yet cover claim-quality
-RAW-domain pretraining or large adverse-condition RAW datasets.
+KITTI-derived evidence, exercises row 8 through auxiliary-map tensor export,
+training, and direct dense evaluation, and now covers row 9 with a synthetic
+front-end mechanism report. It does not yet cover claim-quality RAW-domain
+pretraining or large adverse-condition RAW datasets.
 
 ## Dataset Direction
 
@@ -78,6 +82,12 @@ direction:
 Existing RGB DNNs will not use these maps by themselves. They need a trained
 RGB+aux stem, an auxiliary branch, a proposal calibration head, or an adapter
 that preserves class-label behavior while using aux evidence.
+
+Before claiming detector gains from those maps, the front-end maps should pass
+controlled mechanism tests. The current synthetic validation does that for
+low-light SNR/visibility, glare saturation/clipping, low-MTF edge/focus
+confidence, and CFA decode/map validity. That is feasibility evidence for the
+PerceptionISP signal design, not external detector-performance evidence.
 
 ## Current Claim Position
 

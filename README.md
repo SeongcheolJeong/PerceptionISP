@@ -833,6 +833,34 @@ The current task metric result reinforces the caution: calibrated
 score+label+aux reduces FP/sample, but VRU recall is still lower than HumanISP
 (`dR50=-0.0061` for `vru`, `dR50=-0.0063` for `person`).
 
+Before spending on large DNN fine-tuning, use the mechanism-validation suite to
+show why PerceptionISP signals are feasible and useful. This suite creates
+paired synthetic sensor stressors and checks whether the corresponding
+aux/confidence maps respond in the expected direction:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.mechanism_validation \
+  --width 160 \
+  --height 96 \
+  --cfa RGGB \
+  --cfa GRBG \
+  --cfa RCCB \
+  --cfa RGBIR \
+  --cfa MONO \
+  --output-dir reports/perception_mechanism_validation_synthetic
+```
+
+The current synthetic mechanism report is:
+
+```text
+reports/perception_mechanism_validation_synthetic/index.html
+```
+
+It passes four front-end mechanism checks: low-light SNR/visibility response,
+glare saturation/clipping response, low-MTF edge/demosaic/focus-confidence
+response, and configured CFA decode/map validity. This is feasibility evidence
+for the PerceptionISP front-end signals, not a detector-performance claim.
+
 Make that task-level decision reproducible with the task gate:
 
 ```bash

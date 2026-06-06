@@ -248,6 +248,35 @@ HumanISP superiority, rejects task-level recall improvement through a failed
 `recall_improvement` task gate, and marks the
 learned RGB+aux DNN path as implemented but not claim-quality.
 
+### Mechanism Validation
+
+The current front-end feasibility suite is:
+
+```text
+reports/perception_mechanism_validation_synthetic/index.html
+```
+
+It is intentionally separate from detector metrics. It creates paired synthetic
+stress cases and checks whether PerceptionISP aux/confidence maps react in the
+expected physical direction:
+
+| Mechanism check | Current result |
+| --- | --- |
+| Low-light SNR/visibility response | pass |
+| Glare saturation/clipping response | pass |
+| Low-MTF edge/demosaic/focus confidence response | pass |
+| CFA variant decode/map validity | pass for RGGB, GRBG, RCCB, RGBIR, MONO |
+
+The current synthetic deltas are deliberately directional rather than tuned to
+detector output: low light lowers mean SNR map by `-0.2860` and visibility by
+`-0.2407`; glare raises saturation by `+0.3270` and lowers clipping distance by
+`-0.4345`; low MTF lowers edge confidence by `-0.3239`, demosaic confidence by
+`-0.2565`, and focus confidence by `-0.1474`.
+
+This is the right evidence to build before expensive DNN fine-tuning. It shows
+the front-end signal is plausible and measurable, but it does not prove
+HumanISP detector superiority.
+
 ### KITTI Train-Subset to Val Calibration
 
 To separate calibration fitting from the validation report more strictly, a
