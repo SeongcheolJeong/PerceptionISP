@@ -23,6 +23,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--output-input", default=None, help="Override output input name.")
     parser.add_argument("--output-dir", default="reports/perception_proposal_calibration_applied")
     parser.add_argument("--rollup-output-dir", default=None, help="Optional output directory for a rollup over all applied reports.")
+    parser.add_argument("--rollup-baseline-input", default="human_rgb", help="Input name used for optional rollup delta columns.")
     parser.add_argument("--include-source-report-in-rollup", action="store_true", help="Include the original report in the optional rollup.")
     parser.add_argument("--print-full-aggregate", action="store_true", help="Print the full aggregate metric payload instead of compact metrics.")
     args = parser.parse_args(argv)
@@ -62,7 +63,7 @@ def main(argv: Any = None) -> int:
             ([report_path] if bool(args.include_source_report_in_rollup) else [])
             + [item["summary_json"] for item in applied_reports]
         )
-        rollup = build_rollup(rollup_inputs)
+        rollup = build_rollup(rollup_inputs, baseline_input=str(args.rollup_baseline_input))
         rollup_path = write_rollup_report(rollup, args.rollup_output_dir)
 
     first = applied_reports[0] if applied_reports else {}

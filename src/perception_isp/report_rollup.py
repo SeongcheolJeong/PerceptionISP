@@ -26,31 +26,32 @@ METRIC_KEYS = ("precision@0.50_mean", "recall@0.50_mean", "recall@0.75_mean", "s
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Create a rollup report from comparison_summary.json files.")
     parser.add_argument("reports", nargs="+", help="comparison_summary.json paths or report directories.")
+    parser.add_argument("--baseline-input", default="human_rgb", help="Input name used for delta columns.")
     parser.add_argument("--output-dir", default="reports/perception_comparison_rollup")
     args = parser.parse_args(argv)
 
-    rollup = build_rollup(args.reports)
+    rollup = build_rollup(args.reports, baseline_input=str(args.baseline_input))
     html_path = write_rollup_report(rollup, args.output_dir)
     print(json.dumps(json_ready({"report": str(html_path), "run_count": rollup["run_count"]}), indent=2))
     return 0
 
 
-def build_rollup(paths: Sequence[str | Path]) -> Dict[str, Any]:
+def build_rollup(paths: Sequence[str | Path], *, baseline_input: str = "human_rgb") -> Dict[str, Any]:
     runs = []
     for raw_path in paths:
         summary_path = _summary_path(raw_path)
         summary = json.loads(summary_path.read_text())
         aggregate = summary.get("aggregate", {})
         run_config = summary.get("run_config", {})
-        human = aggregate.get("human_rgb", {})
+        baseline = aggregate.get(str(baseline_input), {})
         inputs = {}
         for input_name in _input_names(aggregate):
             metrics = aggregate.get(input_name, {})
             row = {key: metrics.get(key) for key in METRIC_KEYS if key in metrics}
-            if input_name != "human_rgb" and human:
-                row["delta_precision@0.50_mean"] = _delta(metrics, human, "precision@0.50_mean")
-                row["delta_recall@0.50_mean"] = _delta(metrics, human, "recall@0.50_mean")
-                row["delta_small_recall@0.50_mean"] = _delta(metrics, human, "small_recall@0.50_mean")
+            if input_name != str(baseline_input) and baseline:
+                row["delta_precision@0.50_mean"] = _delta(metrics, baseline, "precision@0.50_mean")
+                row["delta_recall@0.50_mean"] = _delta(metrics, baseline, "recall@0.50_mean")
+                row["delta_small_recall@0.50_mean"] = _delta(metrics, baseline, "small_recall@0.50_mean")
             inputs[input_name] = row
         runs.append(
             {
@@ -65,6 +66,7 @@ def build_rollup(paths: Sequence[str | Path]) -> Dict[str, Any]:
     _disambiguate_run_names(runs)
     return {
         "run_count": int(len(runs)),
+        "baseline_input": str(baseline_input),
         "metric_keys": list(METRIC_KEYS),
         "runs": runs,
     }
@@ -141,6 +143,7 @@ def _delta(metrics: Mapping[str, Any], baseline: Mapping[str, Any], key: str) ->
 
 def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
     rows = []
+    baseline_input = str(rollup.get("baseline_input", "human_rgb"))
     for run in rollup.get("runs", ()):
         run_name = html_lib.escape(str(run.get("name", "")))
         sample_count = int(run.get("sample_count", 0))
@@ -178,7 +181,7 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
 </head>
 <body>
   <h1>PerceptionISP Comparison Rollup</h1>
-  <p>Human delta columns are computed against <code>human_rgb</code> within each run.</p>
+  <p>Delta columns are computed against <code>{html_lib.escape(baseline_input)}</code> within each run.</p>
   <table>
     <thead><tr><th>Run</th><th>Samples</th><th>Report</th><th>Input</th><th>P@0.50</th><th>R@0.50</th><th>R@0.75</th><th>Small R@0.50</th><th>FP@0.50</th><th>dP@0.50</th><th>dR@0.50</th><th>dSmallR@0.50</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>

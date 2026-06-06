@@ -562,11 +562,15 @@ PYTHONPATH=src \
   --split all \
   --output-dir reports/perception_calibrated_fusion_kitti_train512_to_val1496_features \
   --rollup-output-dir reports/perception_train512_calibration_feature_ablation_rollup \
+  --rollup-baseline-input perception_fusion_rgb_aux \
   --include-source-report-in-rollup
 ```
 
 The rollup names calibrated runs by proposal feature set and adds the report
 directory when two calibrated runs would otherwise have the same display name.
+Use `--rollup-baseline-input perception_fusion_rgb_aux` for feature ablations,
+because the key question is improvement over the uncalibrated RGB+Aux fusion
+input.
 
 Use `--split eval` for held-out evidence from the original calibration split.
 Use `--split all` only as an operational full-report application, because it

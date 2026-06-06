@@ -62,7 +62,43 @@ class ReportRollupTest(unittest.TestCase):
             html_path = write_rollup_report(rollup, root / "rollup")
             self.assertTrue(html_path.exists())
             self.assertIn("PerceptionISP Comparison Rollup", html_path.read_text())
+            self.assertIn("human_rgb", html_path.read_text())
             self.assertTrue((html_path.parent / "rollup_summary.json").exists())
+
+    def test_rollup_can_use_custom_baseline_input(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_dir = root / "run_a"
+            report_dir.mkdir()
+            (report_dir / "comparison_summary.json").write_text(
+                json.dumps(
+                    {
+                        "sample_count": 2,
+                        "run_config": {"source": "synthetic", "count": 2},
+                        "aggregate": {
+                            "human_rgb": {"precision@0.50_mean": 0.5, "recall@0.50_mean": 0.4, "small_recall@0.50_mean": 0.2},
+                            "perception_fusion_rgb_aux": {
+                                "precision@0.50_mean": 0.6,
+                                "recall@0.50_mean": 0.45,
+                                "small_recall@0.50_mean": 0.25,
+                            },
+                            "perception_calibrated_fusion_rgb_aux": {
+                                "precision@0.50_mean": 0.7,
+                                "recall@0.50_mean": 0.43,
+                                "small_recall@0.50_mean": 0.24,
+                            },
+                        },
+                    }
+                )
+                + "\n"
+            )
+            rollup = build_rollup([report_dir], baseline_input="perception_fusion_rgb_aux")
+            self.assertEqual(rollup["baseline_input"], "perception_fusion_rgb_aux")
+            baseline = rollup["runs"][0]["inputs"]["perception_fusion_rgb_aux"]
+            self.assertNotIn("delta_precision@0.50_mean", baseline)
+            calibrated = rollup["runs"][0]["inputs"]["perception_calibrated_fusion_rgb_aux"]
+            self.assertAlmostEqual(calibrated["delta_precision@0.50_mean"], 0.1)
+            self.assertAlmostEqual(calibrated["delta_recall@0.50_mean"], -0.02)
 
     def test_rollup_names_proposal_calibration_feature_sets(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

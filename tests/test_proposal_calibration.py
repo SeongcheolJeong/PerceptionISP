@@ -251,6 +251,8 @@ class ProposalCalibrationTest(unittest.TestCase):
                         str(apply_dir),
                         "--rollup-output-dir",
                         str(rollup_dir),
+                        "--rollup-baseline-input",
+                        "perception_fusion_rgb_aux",
                         "--include-source-report-in-rollup",
                     ]
                 )
@@ -265,6 +267,7 @@ class ProposalCalibrationTest(unittest.TestCase):
             self.assertTrue((apply_dir / "score_label" / "comparison_summary.json").exists())
             self.assertTrue((apply_dir / "score_label_aux" / "comparison_summary.json").exists())
             rollup = json.loads((rollup_dir / "rollup_summary.json").read_text())
+            self.assertEqual(rollup["baseline_input"], "perception_fusion_rgb_aux")
             self.assertEqual(rollup["run_count"], 3)
             self.assertEqual(printed["rollup"], str(rollup_dir / "index.html"))
 
