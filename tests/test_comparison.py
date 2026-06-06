@@ -14,7 +14,7 @@ from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
 class ComparisonHarnessTest(unittest.TestCase):
     def test_synthetic_comparison_produces_default_input_metrics(self) -> None:
         samples = make_synthetic_evaluation_samples(count=1, width=96, height=64)
-        result = compare_dataset(samples)
+        result = compare_dataset(samples, fusion_options={"low_score_threshold": 0.50, "low_support_threshold": 0.10})
         self.assertEqual(result["sample_count"], 1)
         self.assertIn("human_rgb", result["aggregate"])
         self.assertIn("perception_rgb", result["aggregate"])
@@ -59,9 +59,20 @@ class ComparisonHarnessTest(unittest.TestCase):
     def test_report_writes_visual_overlay_assets(self) -> None:
         samples = make_synthetic_evaluation_samples(count=1, width=96, height=64)
         result = compare_dataset(samples, include_images=True)
+        result["run_config"] = {
+            "source": "synthetic",
+            "rgb_detector": "numpy_risk_object_detector",
+            "fusion": True,
+            "fusion_options": {"low_score_threshold": 0.50},
+        }
         with tempfile.TemporaryDirectory() as tmp:
             html_path = write_comparison_report(result, tmp)
             self.assertTrue(html_path.exists())
+            html_text = html_path.read_text()
+            self.assertIn("Run Config", html_text)
+            self.assertIn("HumanISP Delta", html_text)
+            self.assertIn("rgb_detector", html_text)
+            self.assertIn("fusion_options", html_text)
             assets = sorted((html_path.parent / "assets").glob("*.png"))
             self.assertGreaterEqual(len(assets), 3)
             json_text = (html_path.parent / "comparison_summary.json").read_text()

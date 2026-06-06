@@ -54,6 +54,7 @@ def compare_sample(
     label_agnostic: bool = True,
     include_images: bool = False,
     include_fusion: bool = True,
+    fusion_options: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     images = build_pipeline_images(sample, config=config)
     rgb_model = rgb_detector or NumpyRiskObjectDetector()
@@ -72,6 +73,7 @@ def compare_sample(
                 aux_result,
                 images.perception_aux_rgb,
                 input_name="perception_fusion_rgb_aux",
+                **dict(fusion_options or {}),
             )
         )
     if rgb_aux_detector is not None:
@@ -126,6 +128,7 @@ def compare_dataset(
     label_agnostic: bool = True,
     include_images: bool = False,
     include_fusion: bool = True,
+    fusion_options: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     sample_results = [
         compare_sample(
@@ -137,6 +140,7 @@ def compare_dataset(
             label_agnostic=label_agnostic,
             include_images=include_images,
             include_fusion=include_fusion,
+            fusion_options=fusion_options,
         )
         for sample in samples
     ]
@@ -389,6 +393,7 @@ def _draw_box(draw: Any, payload: Mapping[str, Any], image_width: int, image_hei
 
 def _render_html(result: Mapping[str, Any]) -> str:
     aggregate = result.get("aggregate", {})
+    run_config = result.get("run_config", {})
     rows = []
     for name in _input_names_from_aggregate(aggregate):
         metrics = aggregate.get(name, {})
@@ -400,6 +405,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
             f"<td>{metrics.get('small_recall@0.50_mean', 0.0):.3f}</td>"
             f"<td>{metrics.get('det_count_mean', 0.0):.2f}</td></tr>"
         )
+    delta_rows = _render_delta_rows(aggregate)
     sample_rows = []
     visual_sections = []
     for sample in result.get("samples", []):
@@ -436,6 +442,8 @@ def _render_html(result: Mapping[str, Any]) -> str:
             )
     class_rows = _render_class_breakdown_rows(result.get("breakdown", {}))
     area_rows = _render_area_breakdown_rows(result.get("breakdown", {}))
+    detector_note = _detector_note(run_config)
+    run_config_rows = _render_run_config_rows(run_config)
     return f"""<!doctype html>
 <html lang=\"ko\">
 <head>
@@ -463,11 +471,20 @@ def _render_html(result: Mapping[str, Any]) -> str:
 <body>
   <h1>HumanISP vs PerceptionISP Comparison</h1>
   <p>이 리포트는 현재 harness가 같은 RAW에서 Human RGB, Perception RGB, Perception auxiliary RGB를 만들고 detector metric을 계산한 결과입니다.</p>
-  <div class=\"note\">현재 기본 detector는 순수 numpy smoke detector입니다. 성능 주장에는 Ultralytics YOLO 또는 학습된 aux-map detector 결과가 필요합니다.</div>
+  <div class=\"note\">{detector_note}</div>
+  <h2>Run Config</h2>
+  <table>
+    <tbody>{run_config_rows if run_config_rows else '<tr><td>No run config captured.</td></tr>'}</tbody>
+  </table>
   <h2>Aggregate</h2>
   <table>
     <thead><tr><th>Input</th><th>Mean Recall</th><th>Mean Precision</th><th>Small Recall@0.50</th><th>Detections / sample</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
+  </table>
+  <h2>HumanISP Delta</h2>
+  <table>
+    <thead><tr><th>Input</th><th>Recall@0.50 Delta</th><th>Precision@0.50 Delta</th><th>Small Recall@0.50 Delta</th><th>Detections / sample Delta</th></tr></thead>
+    <tbody>{delta_rows if delta_rows else '<tr><td colspan="5">HumanISP baseline is not available in this run.</td></tr>'}</tbody>
   </table>
   <h2>Samples</h2>
   <table>
@@ -491,6 +508,69 @@ def _render_html(result: Mapping[str, Any]) -> str:
 </body>
 </html>
 """
+
+
+def _detector_note(run_config: Mapping[str, Any]) -> str:
+    detector = str(run_config.get("rgb_detector", "")).lower()
+    if "yolo" in detector:
+        return (
+            "RGB detector는 Ultralytics YOLO입니다. Fusion은 RGB detector의 class label을 유지하고 "
+            "aux-map support를 score/filtering evidence로만 사용합니다."
+        )
+    return "현재 RGB detector는 순수 numpy smoke detector입니다. 성능 주장에는 Ultralytics YOLO 또는 학습된 detector 결과가 필요합니다."
+
+
+def _render_run_config_rows(run_config: Mapping[str, Any]) -> str:
+    rows = []
+    for key in (
+        "source",
+        "dataset",
+        "split",
+        "count",
+        "width",
+        "height",
+        "use_camerae2e",
+        "cfa",
+        "rgb_detector",
+        "rgb_detector_model",
+        "rgb_detector_confidence",
+        "aux_detector",
+        "fusion",
+        "fusion_options",
+        "label_agnostic",
+        "demosaic_method",
+        "tone_mapping",
+    ):
+        if key not in run_config:
+            continue
+        rows.append(
+            f"<tr><th>{html_lib.escape(str(key))}</th>"
+            f"<td><code>{html_lib.escape(str(run_config.get(key)))}</code></td></tr>"
+        )
+    return "".join(rows)
+
+
+def _render_delta_rows(aggregate: Mapping[str, Any]) -> str:
+    human = aggregate.get("human_rgb")
+    if not human:
+        return ""
+    rows = []
+    for input_name in ("reference_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_rgb_aux_dnn", "perception_aux_rgb"):
+        if input_name not in aggregate or input_name == "human_rgb":
+            continue
+        metrics = aggregate.get(input_name, {})
+        rows.append(
+            f"<tr><td>{html_lib.escape(str(input_name))}</td>"
+            f"<td>{_metric_delta(metrics, human, 'recall@0.50_mean'):+.3f}</td>"
+            f"<td>{_metric_delta(metrics, human, 'precision@0.50_mean'):+.3f}</td>"
+            f"<td>{_metric_delta(metrics, human, 'small_recall@0.50_mean'):+.3f}</td>"
+            f"<td>{_metric_delta(metrics, human, 'det_count_mean'):+.2f}</td></tr>"
+        )
+    return "".join(rows)
+
+
+def _metric_delta(metrics: Mapping[str, Any], baseline: Mapping[str, Any], key: str) -> float:
+    return float(metrics.get(key, 0.0)) - float(baseline.get(key, 0.0))
 
 
 def _render_class_breakdown_rows(breakdown: Mapping[str, Any]) -> str:

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .comparison import compare_dataset, write_comparison_report
-from .detectors import detector_from_name, rgb_aux_detector_from_checkpoint
+from .detectors import UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
 from .synthetic_eval import make_camerae2e_synthetic_evaluation_samples, make_synthetic_evaluation_samples
 from .types import PerceptionISPConfig, json_ready
 
@@ -25,6 +25,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--height", type=int, default=90)
     parser.add_argument("--cfa", default="auto", help="auto uses CameraE2E sensor-native CFA when available.")
     parser.add_argument("--rgb-detector", default="numpy", help="numpy or yolo")
+    parser.add_argument("--rgb-detector-model", default="yolo11n.pt", help="Model path/name for --rgb-detector yolo.")
+    parser.add_argument("--rgb-detector-confidence", type=float, default=0.25, help="Confidence threshold for --rgb-detector yolo.")
     parser.add_argument("--aux-detector", default="aux", help="aux or numpy")
     parser.add_argument("--rgb-aux-detector-checkpoint", default=None, help="Optional RGB+aux detector checkpoint.")
     parser.add_argument("--rgb-aux-detector-confidence", type=float, default=None)
@@ -36,9 +38,17 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--label-aware", action="store_true", help="Require exact class labels during metric matching.")
     parser.add_argument("--no-visuals", action="store_true", help="Skip overlay PNG generation in the HTML report.")
     parser.add_argument("--no-fusion", action="store_true", help="Skip the Perception RGB+Aux fusion metric.")
+    parser.add_argument("--fusion-low-score-threshold", type=float, default=0.42, help="Suppress RGB detections below this score when aux support is weak.")
+    parser.add_argument("--fusion-low-support-threshold", type=float, default=0.16, help="Weak aux support threshold for low-score RGB suppression.")
+    parser.add_argument("--fusion-score-gain", type=float, default=0.08, help="Score gain for detections with strong aux support.")
+    parser.add_argument("--fusion-score-penalty", type=float, default=0.06, help="Score penalty for low-score detections with weak aux support.")
     args = parser.parse_args(argv)
 
-    rgb_detector = detector_from_name(args.rgb_detector)
+    rgb_detector = (
+        UltralyticsYOLODetector(str(args.rgb_detector_model), confidence=float(args.rgb_detector_confidence))
+        if str(args.rgb_detector).lower().replace("-", "_") in {"yolo", "ultralytics", "yolo11n"}
+        else detector_from_name(args.rgb_detector)
+    )
     aux_detector = detector_from_name(args.aux_detector)
     rgb_aux_detector = (
         rgb_aux_detector_from_checkpoint(
@@ -110,6 +120,12 @@ def main(argv: Any = None) -> int:
         demosaic_method=str(args.demosaic_method),
         demosaic_artifact_suppression=float(args.demosaic_artifact_suppression),
     )
+    fusion_options = {
+        "low_score_threshold": float(args.fusion_low_score_threshold),
+        "low_support_threshold": float(args.fusion_low_support_threshold),
+        "score_gain": float(args.fusion_score_gain),
+        "score_penalty": float(args.fusion_score_penalty),
+    }
     result = compare_dataset(
         samples,
         rgb_detector=rgb_detector,
@@ -119,6 +135,7 @@ def main(argv: Any = None) -> int:
         label_agnostic=not bool(args.label_aware),
         include_images=not bool(args.no_visuals),
         include_fusion=not bool(args.no_fusion),
+        fusion_options=fusion_options,
     )
     result["run_config"] = {
         "source": args.source,
@@ -130,6 +147,8 @@ def main(argv: Any = None) -> int:
         "split": args.split,
         "use_camerae2e": not bool(args.no_camerae2e),
         "rgb_detector": rgb_detector.name,
+        "rgb_detector_model": args.rgb_detector_model,
+        "rgb_detector_confidence": float(args.rgb_detector_confidence),
         "aux_detector": aux_detector.name,
         "rgb_aux_detector": None if rgb_aux_detector is None else rgb_aux_detector.name,
         "rgb_aux_detector_checkpoint": args.rgb_aux_detector_checkpoint,
@@ -137,6 +156,7 @@ def main(argv: Any = None) -> int:
         "label_agnostic": not bool(args.label_aware),
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),
+        "fusion_options": fusion_options,
         "tone_mapping": args.tone_mapping,
         "denoise_strength": float(args.denoise_strength),
         "demosaic_method": str(args.demosaic_method),
