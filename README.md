@@ -211,6 +211,47 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
 Use `--no-camerae2e` only for fast adapter tests. CameraE2E-backed evidence
 should leave it off.
 
+Prepare a reproducible COCO val2017 subset without downloading full COCO train:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.prepare_coco_subset \
+  --output-dir data/coco_val2017_1k \
+  --count 1000 \
+  --split val2017 \
+  --threads 16
+```
+
+Run the 1k CameraE2E + YOLO comparison:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/coco_val2017_1k/data.yaml \
+  --split val \
+  --offset 0 \
+  --count 1000 \
+  --width 640 --height 480 \
+  --cfa auto \
+  --rgb-detector yolo \
+  --rgb-detector-model yolo11n.pt \
+  --rgb-detector-confidence 0.25 \
+  --label-aware \
+  --no-visuals \
+  --demosaic-method edge_aware \
+  --output-dir reports/perception_yolo_coco_val2017_1k_camerae2e_fusion
+```
+
+Roll up multiple comparison reports:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.report_rollup \
+  reports/perception_yolo_coco128_128_camerae2e_fusion \
+  reports/perception_yolo_coco_val2017_1k_camerae2e_fusion \
+  --output-dir reports/perception_yolo_coco_scale_rollup
+```
+
 Run a resolution sweep and summary report:
 
 ```bash

@@ -155,6 +155,70 @@ The current resolution sweep report is:
 reports/perception_resolution_sweep_coco8/index.html
 ```
 
+## COCO YOLO Evidence
+
+The strongest current evidence path uses real COCO images, CameraE2E-backed RAW
+generation, the same YOLO11n detector on each RGB output, label-aware COCO
+metrics, and no visualization overhead for larger runs. The setup is:
+
+- `--source yolo-dataset`
+- `--cfa auto`
+- `--width 640 --height 480`
+- `--rgb-detector yolo --rgb-detector-model yolo11n.pt`
+- `--rgb-detector-confidence 0.25`
+- `--label-aware`
+- `--demosaic-method edge_aware`
+
+Current aggregate results:
+
+| Dataset | Samples | Input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| COCO128 train2017 | 128 | Reference RGB | 0.7059 | 0.5240 | 0.4616 | 0.0802 |
+| COCO128 train2017 | 128 | HumanISP RGB | 0.6662 | 0.4697 | 0.3927 | 0.0519 |
+| COCO128 train2017 | 128 | PerceptionISP RGB | 0.6728 | 0.4973 | 0.4373 | 0.0674 |
+| COCO128 train2017 | 128 | RGB+Aux Fusion | 0.6749 | 0.4966 | 0.4365 | 0.0674 |
+| COCO val2017 subset | 1,000 | Reference RGB | 0.6956 | 0.5391 | 0.4759 | 0.0697 |
+| COCO val2017 subset | 1,000 | HumanISP RGB | 0.6621 | 0.4724 | 0.4035 | 0.0448 |
+| COCO val2017 subset | 1,000 | PerceptionISP RGB | 0.6834 | 0.5034 | 0.4325 | 0.0544 |
+| COCO val2017 subset | 1,000 | RGB+Aux Fusion | 0.6853 | 0.4992 | 0.4269 | 0.0542 |
+
+On the 1,000-image COCO val subset, PerceptionISP RGB improves over HumanISP
+RGB by:
+
+- Precision@0.50: `+0.0213`
+- Recall@0.50: `+0.0310`
+- Small Recall@0.50: `+0.0095`
+
+The current RGB+aux fusion is conservative: it keeps RGB detector labels and
+uses aux evidence for score/filtering only. On the 1,000-image run it reduces
+FP@0.50 slightly (`-0.034/sample` versus Perception RGB) and improves precision
+slightly (`+0.0020`), but it loses recall (`-0.0043`). That is not enough to
+claim that aux fusion is improving detector performance yet.
+
+The important limitation is that COCO is a general object dataset, not a
+driving-focused perception benchmark. These results are useful evidence that
+the PerceptionISP RGB path can help a pretrained detector relative to the
+HumanISP RGB rendering, but they are not sufficient for an automotive safety or
+VRU claim. A driving dataset such as KITTI, BDD100K, nuImages, or a curated
+CameraE2E driving-scene set is still required.
+
+Current reports:
+
+```text
+reports/perception_yolo_coco_val2017_1k_camerae2e_fusion/index.html
+reports/perception_yolo_coco_scale_rollup/index.html
+```
+
+The COCO val subset can be prepared reproducibly with:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.prepare_coco_subset \
+  --output-dir data/coco_val2017_1k \
+  --count 1000 \
+  --split val2017 \
+  --threads 16
+```
+
 ## Required Before Performance Claims
 
 Use a real labeled driving dataset subset and report at least:
