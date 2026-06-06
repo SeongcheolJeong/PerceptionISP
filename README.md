@@ -495,4 +495,27 @@ This only re-filters detections that already exist in the saved report. It is
 useful for checking whether PerceptionISP's FP/precision tradeoff can be fixed
 with detector score calibration before spending time on DNN training.
 
+Train/evaluate a lightweight proposal calibrator on a saved detector report:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.proposal_calibration \
+  reports/perception_isp_sweep_kitti_val_1496_detector_log_denoise030/001_tone-detector-log_denoise-0.30_demosaic-edge-aware_artifact-0.20 \
+  --input perception_fusion_rgb_aux \
+  --feature-sets score_aux,score_label,score_label_aux \
+  --thresholds 0.00:0.30:0.01 \
+  --baseline-input human_rgb \
+  --train-fraction 0.70 \
+  --split-strategy hash \
+  --epochs 800 \
+  --lr 0.05 \
+  --l2 0.001 \
+  --output-dir reports/perception_proposal_calibration_kitti_val_1496_detector_log
+```
+
+This is a detector-side calibration branch over saved RGB proposals. It is a
+cheap way to test whether aux evidence can help score/filtering before training
+a full detector.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

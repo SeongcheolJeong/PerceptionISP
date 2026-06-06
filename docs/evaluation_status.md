@@ -391,6 +391,59 @@ must be lower than HumanISP, the best-recall option is RGB+Aux Fusion at
 adapter more plausible than simple threshold tuning, but it also means any
 claim needs a trained and held-out validation result.
 
+## KITTI Proposal Calibration
+
+A lightweight detector-side proposal calibrator was added to test the next
+lowest-cost aux integration path. It trains logistic score calibration on saved
+`perception_fusion_rgb_aux` proposals and evaluates on a held-out sample split,
+without rerunning CameraE2E or YOLO:
+
+```text
+reports/perception_proposal_calibration_kitti_val_1496_detector_log/index.html
+```
+
+Setup:
+
+| Item | Value |
+| --- | --- |
+| Source report | Full KITTI val detector-log run |
+| Input proposals | `perception_fusion_rgb_aux` |
+| Split | Hash split, 1,039 train / 457 eval samples |
+| Train proposals | 2,534 positive / 1,394 negative |
+| Eval proposals | 1,115 positive / 586 negative |
+| Feature sets | `score_aux`, `score_label`, `score_label_aux` |
+
+Held-out eval baseline:
+
+| Eval input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HumanISP RGB | 0.6084 | 0.4573 | 0.2850 | 0.2641 | 1.2867 | 3.7593 |
+| Original RGB+Aux Fusion | 0.6027 | 0.4495 | 0.2802 | 0.2672 | 1.2823 | 3.7221 |
+
+Best low-recall-loss calibration point against the original fusion input:
+
+| Feature set | Threshold | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Delta P vs Original | Delta R vs Original | Delta FP vs Original |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `score_label_aux` | 0.02 | 0.6334 | 0.4492 | 0.2802 | 0.2672 | 1.0306 | +0.0307 | -0.0002 | -0.2516 |
+
+This is useful progress, but it is not a HumanISP superiority result. On the
+same eval split, the calibrated result is still `-0.0081` R50 versus HumanISP.
+It does improve precision and FP versus HumanISP (`+0.0250` P50, `-0.2560`
+FP50), while keeping small-object recall slightly above HumanISP (`+0.0031`).
+
+The ablation also matters:
+
+| Feature set | Threshold | Precision@0.50 | Recall@0.50 | FP@0.50 | Delta P vs Original | Delta R vs Original | Delta FP vs Original |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `score_aux` | 0.02 | 0.6029 | 0.4495 | 1.2757 | +0.0002 | +0.0000 | -0.0066 |
+| `score_label` | 0.02 | 0.6331 | 0.4492 | 1.0328 | +0.0304 | -0.0002 | -0.2495 |
+| `score_label_aux` | 0.02 | 0.6334 | 0.4492 | 1.0306 | +0.0307 | -0.0002 | -0.2516 |
+
+The main win is label/proposal calibration, with aux evidence adding only a
+small extra improvement on this run. That is the right caveat: aux maps are
+connected to a useful calibration path, but the current evidence does not show
+that aux alone is driving the gain.
+
 ## KITTI ISP Tuning Sweep
 
 The first KITTI tuning pass keeps the HumanISP baseline fixed at the default

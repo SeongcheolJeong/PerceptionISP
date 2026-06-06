@@ -23,6 +23,7 @@ perception-isp-prepare-coco-subset = "perception_isp.prepare_coco_subset:main"
 perception-isp-merge-comparison-reports = "perception_isp.merge_comparison_reports:main"
 perception-isp-isp-sweep = "perception_isp.isp_sweep:main"
 perception-isp-threshold-sweep = "perception_isp.threshold_sweep:main"
+perception-isp-proposal-calibration = "perception_isp.proposal_calibration:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
