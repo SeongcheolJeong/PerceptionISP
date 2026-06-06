@@ -221,6 +221,18 @@ to be no worse than HumanISP. The current train512-to-val gate verdict is
 `recall@0.75_mean`, and `small_recall@0.50_mean`. With `--fail-on-fail`, this
 same gate returns exit code `1` while still writing the HTML/JSON report.
 
+The latest gate also records paired sample-level bootstrap intervals with
+`--require-ci --bootstrap-samples 2000`. The precision and FP gains pass the CI
+check, but recall does not:
+
+| Metric delta vs HumanISP | Mean delta | 95% paired bootstrap CI | Gate |
+| --- | ---: | ---: | --- |
+| P50 | +0.0294 | [+0.0207, +0.0378] | pass |
+| R50 | -0.0108 | [-0.0148, -0.0069] | fail |
+| R75 | -0.0045 | [-0.0087, -0.0002] | fail |
+| Small R50 | -0.0025 | [-0.0064, +0.0015] | fail |
+| FP/sample | -0.3309 | [-0.3703, -0.2928] | pass |
+
 The train512 calibrator was also applied to the same 1,496-sample val report
 with feature-set-specific artifacts:
 

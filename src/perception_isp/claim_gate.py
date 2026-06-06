@@ -5,8 +5,11 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, Mapping
+
+import numpy as np
 
 from .types import json_ready
 
@@ -18,6 +21,14 @@ CRITERIA = (
     ("small_recall@0.50_mean", "minimum_delta", "min_small_recall_delta", 0.0),
     ("fp@0.50_mean", "maximum_delta", "max_fp_delta", 0.0),
 )
+
+SAMPLE_METRIC_MAP = {
+    "precision@0.50_mean": "precision@0.50",
+    "recall@0.50_mean": "recall@0.50",
+    "recall@0.75_mean": "recall@0.75",
+    "small_recall@0.50_mean": "small_recall@0.50",
+    "fp@0.50_mean": "fp@0.50",
+}
 
 
 def main(argv: Any = None) -> int:
@@ -31,6 +42,10 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--min-small-recall-delta", type=float, default=0.0)
     parser.add_argument("--max-fp-delta", type=float, default=0.0)
     parser.add_argument("--min-samples", type=int, default=1)
+    parser.add_argument("--bootstrap-samples", type=int, default=1000, help="Paired bootstrap resamples for sample-level delta confidence intervals.")
+    parser.add_argument("--bootstrap-confidence", type=float, default=0.95)
+    parser.add_argument("--bootstrap-seed", default="claim_gate")
+    parser.add_argument("--require-ci", action="store_true", help="Require the paired bootstrap CI to satisfy each delta threshold.")
     parser.add_argument("--fail-on-fail", action="store_true", help="Return exit code 1 when the metric gate fails.")
     parser.add_argument("--output-dir", default=None)
     args = parser.parse_args(argv)
@@ -48,6 +63,10 @@ def main(argv: Any = None) -> int:
             "min_small_recall_delta": float(args.min_small_recall_delta),
             "max_fp_delta": float(args.max_fp_delta),
             "min_samples": int(args.min_samples),
+            "bootstrap_samples": int(args.bootstrap_samples),
+            "bootstrap_confidence": float(args.bootstrap_confidence),
+            "bootstrap_seed": str(args.bootstrap_seed),
+            "require_ci": bool(args.require_ci),
         },
         source_report=report_path,
     )
@@ -79,6 +98,10 @@ def build_claim_gate(
     source_report: str | Path | None = None,
 ) -> Dict[str, Any]:
     threshold_values = dict(thresholds or {})
+    bootstrap_samples = max(int(threshold_values.get("bootstrap_samples", 1000)), 0)
+    bootstrap_confidence = float(threshold_values.get("bootstrap_confidence", 0.95))
+    bootstrap_seed = str(threshold_values.get("bootstrap_seed", "claim_gate"))
+    require_ci = bool(threshold_values.get("require_ci", False))
     aggregate = report.get("aggregate", {})
     if not isinstance(aggregate, Mapping):
         raise ValueError("comparison report aggregate is missing or invalid")
@@ -96,7 +119,18 @@ def build_claim_gate(
         available = target_value is not None and baseline_value is not None
         delta = None if not available else target_value - baseline_value
         threshold = float(threshold_values.get(threshold_key, default_value))
-        passed = bool(available and (delta >= threshold if direction == "minimum_delta" else delta <= threshold))
+        paired = _paired_delta_interval(
+            report,
+            baseline_input=baseline_input,
+            target_input=target_input,
+            aggregate_metric=metric,
+            bootstrap_samples=bootstrap_samples,
+            confidence=bootstrap_confidence,
+            seed=f"{bootstrap_seed}:{metric}",
+        )
+        mean_passed = bool(available and (delta >= threshold if direction == "minimum_delta" else delta <= threshold))
+        ci_passed = _ci_passes(paired, direction=direction, threshold=threshold) if require_ci else None
+        passed = bool(mean_passed and (ci_passed if ci_passed is not None else True))
         criteria.append(
             {
                 "metric": metric,
@@ -107,6 +141,10 @@ def build_claim_gate(
                 "target": target_value,
                 "delta": delta,
                 "available": bool(available),
+                "mean_pass": bool(mean_passed),
+                "ci_required": bool(require_ci),
+                "ci_pass": ci_passed,
+                "paired_delta": paired,
                 "pass": bool(passed),
             }
         )
@@ -137,6 +175,10 @@ def build_claim_gate(
             "min_small_recall_delta": float(threshold_values.get("min_small_recall_delta", 0.0)),
             "max_fp_delta": float(threshold_values.get("max_fp_delta", 0.0)),
             "min_samples": int(min_samples),
+            "bootstrap_samples": int(bootstrap_samples),
+            "bootstrap_confidence": float(bootstrap_confidence),
+            "bootstrap_seed": str(bootstrap_seed),
+            "require_ci": bool(require_ci),
         },
         "baseline_metrics": {key: baseline.get(key) for key, *_ in CRITERIA},
         "target_metrics": {key: target.get(key) for key, *_ in CRITERIA},
@@ -151,6 +193,75 @@ def _metric_value(metrics: Mapping[str, Any], key: str) -> float | None:
     if key not in metrics or metrics.get(key) is None:
         return None
     return float(metrics[key])
+
+
+def _paired_delta_interval(
+    report: Mapping[str, Any],
+    *,
+    baseline_input: str,
+    target_input: str,
+    aggregate_metric: str,
+    bootstrap_samples: int,
+    confidence: float,
+    seed: str,
+) -> Dict[str, Any] | None:
+    sample_metric = SAMPLE_METRIC_MAP.get(aggregate_metric)
+    if not sample_metric:
+        return None
+    deltas = []
+    for sample in report.get("samples", ()):
+        metrics = sample.get("metrics", {}) if isinstance(sample, Mapping) else {}
+        baseline = metrics.get(baseline_input, {}) if isinstance(metrics, Mapping) else {}
+        target = metrics.get(target_input, {}) if isinstance(metrics, Mapping) else {}
+        if not isinstance(baseline, Mapping) or not isinstance(target, Mapping):
+            continue
+        baseline_value = _metric_value(baseline, sample_metric)
+        target_value = _metric_value(target, sample_metric)
+        if baseline_value is None or target_value is None:
+            continue
+        deltas.append(float(target_value - baseline_value))
+    if not deltas:
+        return None
+    values = np.asarray(deltas, dtype=np.float64)
+    result: Dict[str, Any] = {
+        "sample_metric": sample_metric,
+        "sample_count": int(values.size),
+        "mean": float(np.mean(values)),
+    }
+    if bootstrap_samples <= 0 or values.size == 1:
+        result["ci_low"] = None
+        result["ci_high"] = None
+        result["confidence"] = float(confidence)
+        result["bootstrap_samples"] = int(bootstrap_samples)
+        return result
+    normalized_confidence = min(max(float(confidence), 0.0), 1.0)
+    alpha = 1.0 - normalized_confidence
+    rng = np.random.default_rng(_stable_seed(seed))
+    indices = rng.integers(0, values.size, size=(int(bootstrap_samples), values.size))
+    means = np.mean(values[indices], axis=1)
+    result["ci_low"] = float(np.quantile(means, alpha / 2.0))
+    result["ci_high"] = float(np.quantile(means, 1.0 - alpha / 2.0))
+    result["confidence"] = float(normalized_confidence)
+    result["bootstrap_samples"] = int(bootstrap_samples)
+    return result
+
+
+def _ci_passes(paired: Mapping[str, Any] | None, *, direction: str, threshold: float) -> bool:
+    if not paired:
+        return False
+    if direction == "minimum_delta":
+        value = paired.get("ci_low")
+        return bool(value is not None and float(value) >= float(threshold))
+    value = paired.get("ci_high")
+    return bool(value is not None and float(value) <= float(threshold))
+
+
+def _stable_seed(value: str) -> int:
+    # Avoid Python's process-randomized hash so reports are reproducible.
+    total = 0
+    for char in str(value):
+        total = (total * 131 + ord(char)) % (2**32)
+    return int(total)
 
 
 def write_claim_gate(summary: Mapping[str, Any], output_dir: str | Path) -> Path:
@@ -188,6 +299,8 @@ def _render_html(summary: Mapping[str, Any]) -> str:
             f"<td>{_fmt(item.get('baseline'))}</td>"
             f"<td>{_fmt(item.get('target'))}</td>"
             f"<td>{_fmt(item.get('delta'), signed=True)}</td>"
+            f"<td>{_fmt_nested(item.get('paired_delta'), 'ci_low', signed=True)}</td>"
+            f"<td>{_fmt_nested(item.get('paired_delta'), 'ci_high', signed=True)}</td>"
             f"<td>{_fmt(item.get('threshold'), signed=True)}</td>"
             f"<td class=\"{status.lower()}\">{status}</td>"
             "</tr>"
@@ -214,7 +327,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <p><strong>Verdict:</strong> <code>{html_lib.escape(str(summary.get('verdict', '')))}</code></p>
   <p>{html_lib.escape(str(summary.get('interpretation', '')))}</p>
   <table>
-    <thead><tr><th>Metric</th><th>Rule</th><th>Baseline</th><th>Target</th><th>Delta</th><th>Threshold</th><th>Status</th></tr></thead>
+    <thead><tr><th>Metric</th><th>Rule</th><th>Baseline</th><th>Target</th><th>Delta</th><th>CI Low</th><th>CI High</th><th>Threshold</th><th>Status</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
   <p>Raw JSON: <code>claim_gate_summary.json</code></p>
@@ -226,10 +339,18 @@ def _render_html(summary: Mapping[str, Any]) -> str:
 def _fmt(value: Any, *, signed: bool = False) -> str:
     if value is None:
         return ""
+    if isinstance(value, float) and math.isnan(value):
+        return ""
     if isinstance(value, int):
         return f"{value:+d}" if signed else str(value)
     number = float(value)
     return f"{number:+.4f}" if signed else f"{number:.4f}"
+
+
+def _fmt_nested(value: Any, key: str, *, signed: bool = False) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    return _fmt(value.get(key), signed=signed)
 
 
 def _safe_name(value: Any) -> str:

@@ -637,13 +637,17 @@ PYTHONPATH=src \
   --target-input perception_calibrated_score_label_aux_fusion_rgb_aux \
   --baseline-input human_rgb \
   --min-samples 1000 \
+  --bootstrap-samples 2000 \
+  --bootstrap-seed kitti_train512_to_val1496 \
+  --require-ci \
   --output-dir reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human
 ```
 
 The default gate requires the target to match or beat HumanISP on P50, R50,
 R75, small-object R50, and FP/sample. It is intentionally conservative and
-metric-only; passing it would still not be a product safety claim. Add
-`--fail-on-fail` when using it as a CI/readiness gate that should return a
-non-zero exit code on failure.
+metric-only; passing it would still not be a product safety claim. `--require-ci`
+uses paired sample-level bootstrap confidence intervals when sample metrics are
+available. Add `--fail-on-fail` when using it as a CI/readiness gate that should
+return a non-zero exit code on failure.
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
