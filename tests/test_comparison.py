@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+from contextlib import redirect_stderr
+from io import StringIO
 
 import numpy as np
 
@@ -55,6 +57,15 @@ class ComparisonHarnessTest(unittest.TestCase):
         result = compare_dataset(samples)
         self.assertIn("reference_rgb", result["aggregate"])
         self.assertIn("reference_rgb", result["samples"][0]["metrics"])
+
+    def test_progress_interval_writes_status_to_stderr(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=2, width=48, height=32)
+        stream = StringIO()
+        with redirect_stderr(stream):
+            compare_dataset(samples, progress_interval=1, progress_label="unit")
+        text = stream.getvalue()
+        self.assertIn("[unit] 1/2 samples", text)
+        self.assertIn("[unit] 2/2 samples", text)
 
     def test_report_writes_visual_overlay_assets(self) -> None:
         samples = make_synthetic_evaluation_samples(count=1, width=96, height=64)

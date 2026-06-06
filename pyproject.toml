@@ -20,6 +20,7 @@ perception-isp-aux-train-dense = "perception_isp.aux_train_dense:main"
 perception-isp-aux-eval-dense = "perception_isp.aux_eval_dense:main"
 perception-isp-report-rollup = "perception_isp.report_rollup:main"
 perception-isp-prepare-coco-subset = "perception_isp.prepare_coco_subset:main"
+perception-isp-merge-comparison-reports = "perception_isp.merge_comparison_reports:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

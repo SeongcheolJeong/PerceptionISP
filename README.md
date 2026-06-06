@@ -252,6 +252,34 @@ PYTHONPATH=src python3 -m perception_isp.report_rollup \
   --output-dir reports/perception_yolo_coco_scale_rollup
 ```
 
+For long runs, shard with `--offset`, print progress, then merge the shards:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/coco_val2017_1k/data.yaml \
+  --split val \
+  --offset 0 \
+  --count 250 \
+  --width 640 --height 480 \
+  --cfa auto \
+  --rgb-detector yolo \
+  --label-aware \
+  --no-visuals \
+  --progress-interval 25 \
+  --output-dir reports/perception_yolo_coco_val2017_1k_shard_0000
+
+PYTHONPATH=src python3 -m perception_isp.merge_comparison_reports \
+  reports/perception_yolo_coco_val2017_1k_shard_0000 \
+  reports/perception_yolo_coco_val2017_1k_shard_0250 \
+  reports/perception_yolo_coco_val2017_1k_shard_0500 \
+  reports/perception_yolo_coco_val2017_1k_shard_0750 \
+  --name coco_val_1k_sharded \
+  --output-dir reports/perception_yolo_coco_val2017_1k_merged
+```
+
 Run a resolution sweep and summary report:
 
 ```bash

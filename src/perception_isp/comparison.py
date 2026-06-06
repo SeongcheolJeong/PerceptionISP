@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import html as html_lib
 import re
+import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
@@ -129,21 +131,37 @@ def compare_dataset(
     include_images: bool = False,
     include_fusion: bool = True,
     fusion_options: Mapping[str, Any] | None = None,
+    progress_interval: int = 0,
+    progress_label: str = "compare_dataset",
 ) -> Dict[str, Any]:
-    sample_results = [
-        compare_sample(
-            sample,
-            rgb_detector=rgb_detector,
-            aux_detector=aux_detector,
-            rgb_aux_detector=rgb_aux_detector,
-            config=config,
-            label_agnostic=label_agnostic,
-            include_images=include_images,
-            include_fusion=include_fusion,
-            fusion_options=fusion_options,
+    sample_results = []
+    total = int(len(samples))
+    start_time = time.perf_counter()
+    interval = max(int(progress_interval), 0)
+    for sample_index, sample in enumerate(samples, start=1):
+        sample_results.append(
+            compare_sample(
+                sample,
+                rgb_detector=rgb_detector,
+                aux_detector=aux_detector,
+                rgb_aux_detector=rgb_aux_detector,
+                config=config,
+                label_agnostic=label_agnostic,
+                include_images=include_images,
+                include_fusion=include_fusion,
+                fusion_options=fusion_options,
+            )
         )
-        for sample in samples
-    ]
+        if interval and (sample_index == total or sample_index % interval == 0):
+            elapsed = max(time.perf_counter() - start_time, 1.0e-9)
+            rate = float(sample_index / elapsed)
+            remaining = float((total - sample_index) / max(rate, 1.0e-12))
+            print(
+                f"[{progress_label}] {sample_index}/{total} samples "
+                f"elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={remaining:.1f}s",
+                file=sys.stderr,
+                flush=True,
+            )
     aggregate: Dict[str, Any] = {}
     for input_name in _input_names_from_samples(sample_results):
         rows = [result["metrics"][input_name] for result in sample_results if input_name in result.get("metrics", {})]
@@ -524,6 +542,10 @@ def _render_run_config_rows(run_config: Mapping[str, Any]) -> str:
     rows = []
     for key in (
         "source",
+        "merged",
+        "merged_name",
+        "merged_shard_count",
+        "merged_sample_count",
         "dataset",
         "split",
         "count",

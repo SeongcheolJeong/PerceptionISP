@@ -219,6 +219,12 @@ PYTHONPATH=src python3 -m perception_isp.prepare_coco_subset \
   --threads 16
 ```
 
+The 1,000-image CameraE2E + YOLO run is long enough that larger runs should be
+sharded with `--offset`, monitored with `--progress-interval`, and merged with
+`perception_isp.merge_comparison_reports`. A single-shard merge smoke has been
+verified against the 1k report and reproduced the original aggregate metrics
+exactly.
+
 ## Required Before Performance Claims
 
 Use a real labeled driving dataset subset and report at least:

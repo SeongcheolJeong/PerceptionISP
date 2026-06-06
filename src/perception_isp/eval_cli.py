@@ -43,6 +43,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--fusion-low-support-threshold", type=float, default=0.16, help="Weak aux support threshold for low-score RGB suppression.")
     parser.add_argument("--fusion-score-gain", type=float, default=0.08, help="Score gain for detections with strong aux support.")
     parser.add_argument("--fusion-score-penalty", type=float, default=0.06, help="Score penalty for low-score detections with weak aux support.")
+    parser.add_argument("--progress-interval", type=int, default=0, help="Print progress every N samples to stderr; 0 disables progress logging.")
     args = parser.parse_args(argv)
 
     rgb_detector = (
@@ -139,6 +140,8 @@ def main(argv: Any = None) -> int:
         include_images=not bool(args.no_visuals),
         include_fusion=not bool(args.no_fusion),
         fusion_options=fusion_options,
+        progress_interval=int(args.progress_interval),
+        progress_label=f"{args.source}:{args.offset}+{args.count}",
     )
     result["run_config"] = {
         "source": args.source,
@@ -161,6 +164,7 @@ def main(argv: Any = None) -> int:
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),
         "fusion_options": fusion_options,
+        "progress_interval": int(args.progress_interval),
         "tone_mapping": args.tone_mapping,
         "denoise_strength": float(args.denoise_strength),
         "demosaic_method": str(args.demosaic_method),
