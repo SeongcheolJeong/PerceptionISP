@@ -1,0 +1,43 @@
+# Python caches and build outputs
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local environments
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Generated evaluation artifacts
+reports/
+
+# Downloaded datasets and images
+data/**/*.zip
+data/**/images/
+data/**/labels/
+data/sample_images/
+
+# Model weights and large ML artifacts
+*.pt
+*.pth
+*.onnx
+*.engine
+*.tflite
+
+# Generated binary image/tensor outputs
+*.npz
+*.npy
+*.ppm
+
+# macOS
+.DS_Store

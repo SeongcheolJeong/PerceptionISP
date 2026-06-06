@@ -1,0 +1,3 @@
+path: .
+val: images/val
+names: ['person', 'bus', 'dog']

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perception-isp"
+version = "0.1.0"
+description = "Software reference implementation of a perception-oriented automotive ISP."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["numpy", "pillow"]
+
+[project.scripts]
+perception-isp = "perception_isp.cli:main"
+perception-isp-eval = "perception_isp.eval_cli:main"
+perception-isp-sweep = "perception_isp.resolution_sweep:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

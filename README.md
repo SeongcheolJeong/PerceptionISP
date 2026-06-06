@@ -1,0 +1,211 @@
+# PerceptionISP
+
+Software reference implementation of a perception-oriented automotive ISP.
+
+This repo follows the design notes in `camera_sim_perception_isp_full_conversation_summary.md` and the attached Perception ISP text:
+
+- RGB-compatible vision stream is kept for existing DNN backbones.
+- Sensor-native auxiliary maps are preserved: noise, SNR, saturation, HDR source, edge, color confidence, IR/Clear, blur/focus, flicker, timing.
+- Fast safety path and accurate autonomy path are separate outputs.
+- CameraE2E under `/Users/seongcheoljeong/Documents/CameraE2E` can be used opportunistically, with synthetic RAW fallback.
+
+## Quick Run
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.cli --output-dir reports/perception_isp_demo
+```
+
+Try other CFA modes:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.cli --cfa RCCB
+PYTHONPATH=src python3 -m perception_isp.cli --cfa RGBIR
+PYTHONPATH=src python3 -m perception_isp.cli --cfa MONO
+```
+
+Try CameraE2E first, then synthetic fallback:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+python3 -m perception_isp.cli --camerae2e --scene "uniform ee"
+```
+
+## Implemented Blocks
+
+1. Sensor Interface / Metadata Capture
+2. Calibration Loader
+3. RAW Physical Normalization
+4. Noise / Uncertainty Engine
+5. CFA / Pixel Structure Decoder
+6. HDR / Exposure Fusion Engine
+7. Edge / Structure Engine
+8. Color / Spectral Engine
+9. Optics / Geometry / Timing Engine
+10. LED Flicker / Temporal Engine
+11. Task-specific Image Formation
+12. Output Formatter
+13. Runtime Controller
+14. Safety / health monitor
+
+## Outputs
+
+The CLI writes:
+
+- `perception_isp_outputs.npz`: vision RGB, accurate tensor, fast tensor, maps.
+- `summary.json`: channel names, metadata, health, latency estimate.
+- `vision_rgb.ppm` and `human_rgb.ppm`: simple preview images.
+
+The accurate tensor uses channels:
+
+```text
+rgb_r, rgb_g, rgb_b,
+noise_variance, saturation, edge_strength, edge_confidence,
+hdr_exposure_source, ir_or_clear, blur_focus_confidence
+```
+
+The fast tensor uses channels:
+
+```text
+luma, edge_strength, edge_confidence,
+temporal_difference, saturation, noise_variance
+```
+
+## Validation
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+```
+
+## HumanISP vs PerceptionISP Evaluation Harness
+
+Run a lightweight synthetic A/B comparison:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.eval_cli \
+  --source synthetic \
+  --output-dir reports/perception_compare_synthetic
+```
+
+Run the labeled synthetic scene through CameraE2E first:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source camerae2e-synthetic \
+  --output-dir reports/perception_compare_camerae2e
+```
+
+The default detector is a pure-numpy smoke detector. Use `--rgb-detector yolo`
+after installing `ultralytics` and `torch` to run a real pretrained detector.
+The HTML report writes `assets/*.png` overlays by default: green boxes are
+ground truth and red boxes are detector outputs. Add `--no-visuals` only when
+you need a metric-only batch run.
+
+Run a real-image detector-consistency smoke test using YOLO pseudo labels:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source sample-image \
+  --rgb-detector yolo \
+  --width 320 --height 240 \
+  --output-dir reports/perception_compare_sample_image
+```
+
+This uses detector-generated pseudo labels, not human ground truth. It proves
+the real-image + CameraE2E + ISP + detector path, but it is not sufficient for
+performance claims.
+
+Run a YOLO-format labeled dataset, such as a KITTI or BDD subset converted to
+Ultralytics layout:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset /path/to/data.yaml \
+  --split val \
+  --count 16 \
+  --rgb-detector yolo \
+  --tone-mapping srgb \
+  --output-dir reports/perception_compare_yolo_dataset
+```
+
+Use `--no-camerae2e` only for fast adapter tests. CameraE2E-backed evidence
+should leave it off.
+
+Run a resolution sweep and summary report:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.resolution_sweep \
+  --source yolo-dataset \
+  --dataset data/coco8/data.yaml \
+  --split val \
+  --count 4 \
+  --resolutions 640x480,1280x960 \
+  --rgb-detector yolo \
+  --label-aware \
+  --tone-mapping srgb \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.35 \
+  --output-dir reports/perception_resolution_sweep_coco8
+```
+
+The sweep summary checks whether each sample used true CameraE2E sensor CFA
+data, whether CameraE2E source CFA matches the ISP target CFA, and whether
+native sensor resolution was at least the requested target. The default
+`--cfa auto` keeps CameraE2E's sensor-native CFA pattern; use an explicit
+pattern such as `--cfa RGGB` only when intentionally testing remap behavior.
+It also includes `perception_fusion_rgb_aux`, a conservative RGB+aux adapter
+that keeps the RGB detector class labels and uses PerceptionISP edge,
+saturation, and reliability maps as support evidence. This is a reference
+integration path, not a learned aux-map detector.
+
+Bayer demosaic defaults to `edge_aware`. Use `--demosaic-method bilinear` to
+reproduce the earlier simple linear interpolation baseline.
+
+For CameraE2E-backed perception metrics, use a scene/sensor resolution that is
+large enough for the detector task. COCO8 smoke runs showed that 640x480 can be
+too low after RAW/CFA simulation for small or thin objects, while 1280x960
+recovers substantially more detector recall:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/coco8/data.yaml \
+  --split val \
+  --count 4 \
+  --width 1280 --height 960 \
+  --rgb-detector yolo \
+  --label-aware \
+  --tone-mapping srgb \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.35 \
+  --output-dir reports/perception_compare_coco8_val_1280
+```
+
+Run a native KITTI object-detection subset without converting labels:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source kitti-dataset \
+  --dataset /path/to/KITTI/object \
+  --split training \
+  --count 16 \
+  --rgb-detector yolo \
+  --output-dir reports/perception_compare_kitti
+```
+
+Supported KITTI layouts are `training/image_2` + `training/label_2` and compact
+`image_2` + `label_2` subsets.
+
+This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
