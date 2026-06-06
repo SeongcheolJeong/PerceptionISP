@@ -44,7 +44,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-detector", default="aux")
     parser.add_argument("--rgb-aux-detector-checkpoint", default=None)
     parser.add_argument("--rgb-aux-detector-confidence", type=float, default=None)
-    parser.add_argument("--tone-mappings", default="log,srgb,linear")
+    parser.add_argument("--tone-mappings", default="log,detector_log,srgb,linear")
     parser.add_argument("--denoise-strengths", default="0.0,0.18,0.30")
     parser.add_argument("--demosaic-methods", default="edge_aware")
     parser.add_argument("--demosaic-artifact-suppressions", default="0.20")

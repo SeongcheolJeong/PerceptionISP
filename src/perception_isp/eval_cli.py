@@ -33,7 +33,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-detector", default="aux", help="aux or numpy")
     parser.add_argument("--rgb-aux-detector-checkpoint", default=None, help="Optional RGB+aux detector checkpoint.")
     parser.add_argument("--rgb-aux-detector-confidence", type=float, default=None)
-    parser.add_argument("--tone-mapping", default="log", help="log, srgb, gamma, or linear.")
+    parser.add_argument("--tone-mapping", default="log", help="log, detector_log, srgb, gamma, or linear.")
     parser.add_argument("--denoise-strength", type=float, default=0.18)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"], help="Bayer demosaic method.")
     parser.add_argument("--demosaic-artifact-suppression", type=float, default=0.20)

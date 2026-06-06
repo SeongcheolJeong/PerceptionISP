@@ -334,6 +334,26 @@ should drive the next work: broad performance claims are not justified, and the
 next step should be either a deeper image-formation change or task-specific
 DNN fine-tuning, not just small scalar tuning.
 
+A follow-up detector-facing tone test found the likely reason for a large part
+of the KITTI recall loss: PerceptionISP `log` was a raw log tone curve, while
+HumanISP `log` was gamma-encoded for display/detector input. The gamma-encoded
+log curve is now exposed as `detector_log` for PerceptionISP runs. The 512-sample
+single-candidate report is:
+
+```text
+reports/perception_isp_sweep_kitti_val_512_detector_log_denoise030/index.html
+```
+
+Best detector-safe tone candidate at 512 samples:
+
+| Candidate | Human Recall@0.50 | Perception Recall@0.50 | Delta Recall@0.50 | Delta Precision@0.50 | Delta Recall@0.75 | Delta Small Recall@0.50 | Delta FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `tone=detector_log`, `denoise=0.30`, `edge_aware`, `artifact=0.20` | 0.4803 | 0.4803 | +0.0001 | -0.0047 | +0.0037 | +0.0005 | +0.0254 |
+
+This recovers recall parity and slightly improves Recall@0.75/small Recall,
+but it increases false positives and lowers precision. It is a better direction
+than `srgb`, but still not a clean win.
+
 The 512 run also exposed and then verified an experiment tooling fix. The first
 512 CameraE2E RAW cache fill took `474.8s` at `1.08 samples/s`; reloading the
 same 512 cached samples took `8.9s` at `57.8 samples/s`. The loaders and CLIs

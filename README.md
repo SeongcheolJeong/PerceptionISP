@@ -396,7 +396,7 @@ PYTHONPATH=src \
   --no-visuals \
   --load-progress-interval 16 \
   --raw-cache-dir data/.cache/perception_isp_raw \
-  --tone-mappings log,srgb,linear \
+  --tone-mappings log,detector_log,srgb,linear \
   --denoise-strengths 0.0,0.18,0.30 \
   --demosaic-methods edge_aware \
   --demosaic-artifact-suppressions 0.20 \
@@ -406,5 +406,7 @@ PYTHONPATH=src \
 The sweep report keeps the HumanISP baseline fixed while PerceptionISP settings
 change, then ranks configs by delta recall against HumanISP. Treat the best
 subset result as a candidate, then rerun it on the full validation set.
+For pretrained RGB detectors, include `detector_log`; it is the gamma-encoded
+log tone curve intended to preserve detector-facing contrast.
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

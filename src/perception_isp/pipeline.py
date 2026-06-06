@@ -1043,7 +1043,7 @@ def _tone_map_rgb(rgb: ArrayF, mode: str, gamma: float) -> ArrayF:
     values = np.asarray(rgb, dtype=np.float64)
     if normalized in {"log", "perception_log"}:
         return log_tonemap(values)
-    if normalized in {"human_log", "display_log"}:
+    if normalized in {"human_log", "display_log", "detector_log", "detector_safe_log"}:
         return gamma_encode(log_tonemap(values), gamma)
     if normalized in {"srgb", "detector_srgb", "display_srgb"}:
         return gamma_encode(_auto_level_rgb(values), gamma)

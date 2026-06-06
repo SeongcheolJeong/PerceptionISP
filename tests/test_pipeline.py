@@ -54,6 +54,13 @@ class PerceptionISPPipelineTest(unittest.TestCase):
         self.assertTrue(np.isfinite(linear_result.vision_rgb).all())
         self.assertGreater(float(np.mean(np.abs(edge_result.vision_rgb - linear_result.vision_rgb))), 1.0e-5)
 
+    def test_detector_log_tone_mapping_matches_gamma_encoded_log(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48, cfa_pattern="RGGB")
+        detector_result = PerceptionISPPipeline(PerceptionISPConfig(tone_mapping="detector_log")).run(raw)
+        human_log_result = PerceptionISPPipeline(PerceptionISPConfig(tone_mapping="human_log")).run(raw)
+        self.assertEqual(detector_result.metadata["processing"]["tone_mapping"], "detector_log")
+        self.assertTrue(np.allclose(detector_result.vision_rgb, human_log_result.vision_rgb))
+
 
 if __name__ == "__main__":
     unittest.main()
