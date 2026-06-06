@@ -627,4 +627,21 @@ reports/perception_claim_readiness_rollup
 That run keeps the FP/precision benefit on val, but still loses recall versus
 HumanISP, so it is not a broad superiority claim.
 
+Use the claim gate to make that decision reproducible:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.claim_gate \
+  reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux \
+  --baseline-input human_rgb \
+  --min-samples 1000 \
+  --output-dir reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human
+```
+
+The default gate requires the target to match or beat HumanISP on P50, R50,
+R75, small-object R50, and FP/sample. It is intentionally conservative and
+metric-only; passing it would still not be a product safety claim.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

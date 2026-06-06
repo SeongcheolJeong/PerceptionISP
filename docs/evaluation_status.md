@@ -208,6 +208,18 @@ larger than the val-internal calibration result. It strengthens the engineering
 case for proposal calibration as a conservative FP reducer, but it still does
 not justify a broad HumanISP superiority claim.
 
+The claim gate makes this explicit:
+
+```text
+reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human/index.html
+```
+
+The gate compares `perception_calibrated_score_label_aux_fusion_rgb_aux`
+against `human_rgb` and requires P50, R50, R75, small-object R50, and FP/sample
+to be no worse than HumanISP. The current train512-to-val gate verdict is
+`metric_gate_fail`; the failing metrics are `recall@0.50_mean`,
+`recall@0.75_mean`, and `small_recall@0.50_mean`.
+
 The train512 calibrator was also applied to the same 1,496-sample val report
 with feature-set-specific artifacts:
 
