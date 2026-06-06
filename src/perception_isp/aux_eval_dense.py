@@ -26,6 +26,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--confidence", type=float, default=None)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--label-aware", action="store_true")
+    parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to evaluate; default uses checkpoint labels.")
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_dense_eval")
     args = parser.parse_args(argv)
 
@@ -36,6 +37,7 @@ def main(argv: Any = None) -> int:
         confidence=args.confidence,
         device=str(args.device),
         label_agnostic=not bool(args.label_aware),
+        include_labels=parse_label_list(args.include_labels),
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -50,6 +52,7 @@ def evaluate_dense_manifest(
     confidence: float | None = None,
     device: str = "auto",
     label_agnostic: bool = False,
+    include_labels: Sequence[str] | None = None,
     output_dir: str | Path | None = None,
 ) -> Dict[str, Any]:
     import torch
@@ -59,6 +62,7 @@ def evaluate_dense_manifest(
     manifest_root = Path(manifest_path).expanduser().parent
     checkpoint = torch.load(str(checkpoint_path), map_location="cpu")
     checkpoint_summary = checkpoint.get("summary", {}) if isinstance(checkpoint, Mapping) else {}
+    eval_labels = _eval_labels(checkpoint, checkpoint_summary, include_labels)
     indices = _indices_for_split(
         split,
         sample_count=len(manifest),
@@ -77,10 +81,11 @@ def evaluate_dense_manifest(
         label_path = manifest_root / str(item["label_path"])
         with np.load(tensor_path) as payload:
             tensor = np.asarray(payload["rgb_aux_hwc"], dtype=np.float32)
-        ground_truth = _read_boxes(label_path)
+        ground_truth = _filter_boxes(_read_boxes(label_path), eval_labels)
         result = detector.detect(tensor, input_name="perception_rgb_aux_dnn")
+        detections = _filter_boxes(result.detections, eval_labels)
         metrics = evaluate_detections(
-            result.detections,
+            detections,
             ground_truth,
             label_agnostic=label_agnostic,
         )
@@ -92,7 +97,7 @@ def evaluate_dense_manifest(
                 "tensor_path": str(item["tensor_path"]),
                 "label_path": str(item["label_path"]),
                 "gt_count": int(len(ground_truth)),
-                "detector": result.to_dict(),
+                "detector": {**result.to_dict(), "detections": [box.to_dict() for box in detections]},
                 "metrics": metrics,
             }
         )
@@ -103,6 +108,7 @@ def evaluate_dense_manifest(
         "checkpoint": str(checkpoint_path),
         "split": str(split),
         "label_agnostic": bool(label_agnostic),
+        "eval_labels": list(eval_labels),
         "sample_count": int(len(sample_rows)),
         "selected_indices": [int(index) for index in indices],
         "detector_name": detector.name,
@@ -145,6 +151,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "checkpoint": summary.get("checkpoint"),
         "split": summary.get("split"),
         "label_agnostic": summary.get("label_agnostic"),
+        "eval_labels": summary.get("eval_labels"),
         "sample_count": summary.get("sample_count"),
         "detector_name": summary.get("detector_name"),
         "elapsed_seconds": summary.get("elapsed_seconds"),
@@ -152,6 +159,48 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "aggregate": summary.get("aggregate"),
         "checkpoint_summary": summary.get("checkpoint_summary"),
     }
+
+
+def parse_label_list(value: str | None) -> Tuple[str, ...] | None:
+    if value is None:
+        return None
+    labels = tuple(token.strip() for token in str(value).split(",") if token.strip())
+    return labels or None
+
+
+def _eval_labels(
+    checkpoint: Any,
+    checkpoint_summary: Mapping[str, Any],
+    include_labels: Sequence[str] | None,
+) -> Tuple[str, ...]:
+    checkpoint_labels = tuple(str(value) for value in checkpoint.get("class_names", ())) if isinstance(checkpoint, Mapping) else ()
+    if include_labels is not None:
+        labels = tuple(str(value) for value in include_labels)
+        if checkpoint_labels:
+            missing = tuple(label for label in labels if label not in checkpoint_labels)
+            if missing:
+                raise ValueError(f"include_labels not present in checkpoint class_names: {', '.join(missing)}")
+        return tuple(dict.fromkeys(labels))
+    if checkpoint_labels:
+        return checkpoint_labels
+    summary_labels = checkpoint_summary.get("class_names", ()) if isinstance(checkpoint_summary, Mapping) else ()
+    if summary_labels:
+        return tuple(str(value) for value in summary_labels)
+    return ("object",)
+
+
+def _filter_boxes(items: Sequence[Any], labels: Sequence[str]) -> Tuple[Any, ...]:
+    allowed = {str(label) for label in labels}
+    if not allowed:
+        return tuple(items)
+    filtered = []
+    for item in items:
+        label = getattr(item, "label", None)
+        if label is None and getattr(item, "box", None) is not None:
+            label = getattr(item.box, "label", None)
+        if str(label) in allowed:
+            filtered.append(item)
+    return tuple(filtered)
 
 
 def _read_boxes(path: Path) -> Tuple[BoundingBox, ...]:
@@ -180,6 +229,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
             "</tr>"
         )
     missing = ", ".join(str(value) for value in summary.get("checkpoint_summary", {}).get("missing_eval_class_names") or ())
+    eval_labels = ", ".join(str(value) for value in summary.get("eval_labels") or ())
     return f"""<!doctype html>
 <html lang=\"ko\">
 <head>
@@ -199,6 +249,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <h1>PerceptionISP RGB+Aux Dense Eval</h1>
   <div class=\"note\">Direct tensor-manifest evaluation. CameraE2E and ISP are not recomputed in this report.</div>
   <p>Split: <code>{html_lib.escape(str(summary.get('split', '')))}</code>, samples: {int(summary.get('sample_count', 0))}, label agnostic: {bool(summary.get('label_agnostic', False))}.</p>
+  <p>Eval labels: <code>{html_lib.escape(eval_labels or 'none')}</code>.</p>
   <p>Recall@0.50 mean: {float(aggregate.get('recall@0.50_mean', 0.0)):.3f}, precision@0.50 mean: {float(aggregate.get('precision@0.50_mean', 0.0)):.3f}, detections/sample: {float(aggregate.get('det_count_mean', 0.0)):.2f}.</p>
   <p>Missing eval classes from train: <code>{html_lib.escape(missing or 'none')}</code>.</p>
   <table>

@@ -30,6 +30,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--base-channels", type=int, default=24)
     parser.add_argument("--eval-fraction", type=float, default=0.25)
     parser.add_argument("--split-strategy", default="coverage", choices=["coverage", "sequential"])
+    parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to train/evaluate; default uses all labels.")
     parser.add_argument("--no-object-weight", type=float, default=0.15)
     parser.add_argument("--box-weight", type=float, default=5.0)
     parser.add_argument("--class-weight", type=float, default=1.0)
@@ -46,6 +47,7 @@ def main(argv: Any = None) -> int:
         base_channels=int(args.base_channels),
         eval_fraction=float(args.eval_fraction),
         split_strategy=str(args.split_strategy),
+        include_labels=parse_label_list(args.include_labels),
         no_object_weight=float(args.no_object_weight),
         box_weight=float(args.box_weight),
         class_weight=float(args.class_weight),
@@ -66,6 +68,7 @@ def train_dense(
     base_channels: int = 24,
     eval_fraction: float = 0.25,
     split_strategy: str = "coverage",
+    include_labels: Sequence[str] | None = None,
     no_object_weight: float = 0.15,
     box_weight: float = 5.0,
     class_weight: float = 1.0,
@@ -78,12 +81,12 @@ def train_dense(
     dataset = make_torch_dataset(manifest_path)
     if len(dataset) <= 0:
         raise ValueError("manifest contains no samples")
-    class_names = labels_from_manifest(manifest_path)
+    class_names = _selected_class_names(labels_from_manifest(manifest_path), include_labels)
     class_to_index = {name: index for index, name in enumerate(class_names)}
     device = _select_device(torch, device_name)
-    train_indices, eval_indices = _split_indices(dataset, eval_fraction, strategy=split_strategy)
-    train_class_names = _class_names_for_indices(dataset, train_indices)
-    eval_class_names = _class_names_for_indices(dataset, eval_indices)
+    train_indices, eval_indices = _split_indices(dataset, eval_fraction, strategy=split_strategy, allowed_labels=set(class_names))
+    train_class_names = _class_names_for_indices(dataset, train_indices, allowed_labels=set(class_names))
+    eval_class_names = _class_names_for_indices(dataset, eval_indices, allowed_labels=set(class_names))
     missing_eval_class_names = tuple(sorted(set(eval_class_names) - set(train_class_names)))
 
     model = make_aux_dense_detector_model(
@@ -177,6 +180,7 @@ def train_dense(
         "base_channels": int(base_channels),
         "split_strategy": str(split_strategy),
         "eval_fraction": float(eval_fraction),
+        "include_labels": list(class_names),
         "train_indices": [int(index) for index in train_indices],
         "eval_indices": [int(index) for index in eval_indices],
         "class_names": list(class_names),
@@ -185,6 +189,7 @@ def train_dense(
         "eval_class_names": list(eval_class_names),
         "missing_eval_class_names": list(missing_eval_class_names),
         "no_object_weight": float(no_object_weight),
+        "object_loss_mode": "balanced_positive_negative",
         "box_weight": float(box_weight),
         "class_weight": float(class_weight),
         "first_loss": float(first_loss if first_loss is not None else 0.0),
@@ -257,6 +262,24 @@ def parse_estimate_samples(value: str) -> Tuple[int, ...]:
     return tuple(samples) or (100, 1000, 10000)
 
 
+def parse_label_list(value: str | None) -> Tuple[str, ...] | None:
+    if value is None:
+        return None
+    labels = tuple(token.strip() for token in str(value).split(",") if token.strip())
+    return labels or None
+
+
+def _selected_class_names(all_labels: Sequence[str], include_labels: Sequence[str] | None) -> Tuple[str, ...]:
+    available = tuple(str(value) for value in all_labels)
+    if include_labels is None:
+        return available
+    requested = {str(value) for value in include_labels}
+    selected = tuple(label for label in available if label in requested)
+    if not selected:
+        raise ValueError("include_labels did not match any labels in manifest")
+    return selected
+
+
 def _sample_loss(
     model: Any,
     dataset: Any,
@@ -285,15 +308,16 @@ def _sample_loss(
     box_pred = torch.sigmoid(pred[:, 1:5, :, :])
     class_logits = pred[:, 5:, :, :]
 
-    object_loss_raw = functional.binary_cross_entropy_with_logits(object_logits, object_target, reduction="none")
-    object_weights = torch.where(
-        object_target > 0.5,
-        torch.ones_like(object_target),
-        torch.full_like(object_target, float(no_object_weight)),
-    )
-    object_loss = (object_loss_raw * object_weights).mean()
-
     positive = object_target[0] > 0.5
+    object_loss_raw = functional.binary_cross_entropy_with_logits(object_logits, object_target, reduction="none")
+    negative = object_target[0] <= 0.5
+    if bool(torch.any(positive)):
+        positive_object_loss = object_loss_raw[0, positive].mean()
+    else:
+        positive_object_loss = object_logits.sum() * 0.0
+    negative_object_loss = object_loss_raw[0, negative].mean() if bool(torch.any(negative)) else object_logits.sum() * 0.0
+    object_loss = positive_object_loss + float(no_object_weight) * negative_object_loss
+
     if bool(torch.any(positive)):
         pred_boxes = box_pred[0, :, positive].transpose(0, 1).contiguous()
         target_boxes = box_target[:, positive].transpose(0, 1).contiguous()
@@ -425,15 +449,24 @@ def _clone_state_dict_cpu(model: Any) -> Dict[str, Any]:
     return {str(key): value.detach().cpu().clone() for key, value in model.state_dict().items()}
 
 
-def _class_names_for_indices(dataset: Any, indices: Sequence[int]) -> Tuple[str, ...]:
+def _class_names_for_indices(dataset: Any, indices: Sequence[int], *, allowed_labels: set[str] | None = None) -> Tuple[str, ...]:
     labels = set()
     for index in indices:
         _, target = dataset[int(index)]
-        labels.update(str(value) for value in target.get("labels_text", ()))
+        values = {str(value) for value in target.get("labels_text", ())}
+        if allowed_labels is not None:
+            values &= allowed_labels
+        labels.update(values)
     return tuple(sorted(labels))
 
 
-def _split_indices(dataset: Any, eval_fraction: float, *, strategy: str = "coverage") -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+def _split_indices(
+    dataset: Any,
+    eval_fraction: float,
+    *,
+    strategy: str = "coverage",
+    allowed_labels: set[str] | None = None,
+) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
     count = int(len(dataset))
     indices = tuple(range(count))
     fraction = max(float(eval_fraction), 0.0)
@@ -441,39 +474,50 @@ def _split_indices(dataset: Any, eval_fraction: float, *, strategy: str = "cover
         return indices, ()
     eval_count = min(max(int(round(count * min(fraction, 0.9))), 1), count - 1)
     if str(strategy).lower() == "coverage":
-        return _coverage_split_indices(dataset, indices, eval_count)
+        return _coverage_split_indices(dataset, indices, eval_count, allowed_labels=allowed_labels)
     return indices[:-eval_count], indices[-eval_count:]
 
 
-def _coverage_split_indices(dataset: Any, indices: Sequence[int], eval_count: int) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+def _coverage_split_indices(
+    dataset: Any,
+    indices: Sequence[int],
+    eval_count: int,
+    *,
+    allowed_labels: set[str] | None = None,
+) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
     """Keep eval labels covered by train whenever the manifest allows it."""
 
-    sample_labels = {int(index): _labels_for_index(dataset, int(index)) for index in indices}
+    sample_labels = {int(index): _labels_for_index(dataset, int(index), allowed_labels=allowed_labels) for index in indices}
     train = set(int(index) for index in indices)
     eval_selected: list[int] = []
-    for candidate in reversed(indices):
+    positive_candidates = tuple(int(index) for index in reversed(indices) if sample_labels[int(index)])
+    background_candidates = tuple(int(index) for index in reversed(indices) if not sample_labels[int(index)])
+    for candidates in (positive_candidates, background_candidates):
+        for candidate in candidates:
+            if len(eval_selected) >= int(eval_count):
+                break
+            if candidate not in train:
+                continue
+            labels = sample_labels[candidate]
+            if labels:
+                remaining_labels = set()
+                for index in train:
+                    if index == candidate:
+                        continue
+                    remaining_labels.update(sample_labels[index])
+                if not labels.issubset(remaining_labels):
+                    continue
+            train.remove(candidate)
+            eval_selected.append(candidate)
         if len(eval_selected) >= int(eval_count):
             break
-        candidate = int(candidate)
-        labels = sample_labels[candidate]
-        if not labels:
-            train.remove(candidate)
-            eval_selected.append(candidate)
-            continue
-        remaining_labels = set()
-        for index in train:
-            if index == candidate:
-                continue
-            remaining_labels.update(sample_labels[index])
-        if labels.issubset(remaining_labels):
-            train.remove(candidate)
-            eval_selected.append(candidate)
     return tuple(sorted(train)), tuple(sorted(eval_selected))
 
 
-def _labels_for_index(dataset: Any, index: int) -> set[str]:
+def _labels_for_index(dataset: Any, index: int, *, allowed_labels: set[str] | None = None) -> set[str]:
     _, target = dataset[int(index)]
-    return {str(value) for value in target.get("labels_text", ())}
+    labels = {str(value) for value in target.get("labels_text", ())}
+    return labels if allowed_labels is None else labels & allowed_labels
 
 
 def _time_estimates(*, sample_epochs_per_second: float, epochs: int, sample_counts: Sequence[int]) -> list[Dict[str, Any]]:

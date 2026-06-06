@@ -137,11 +137,13 @@ class AuxDNNExportTest(unittest.TestCase):
                 grid_size=(4, 6),
                 base_channels=8,
                 eval_fraction=0.34,
+                include_labels=("car", "person"),
                 estimate_samples=(3, 30),
                 output_dir=Path(tmp) / "dense",
             )
             self.assertEqual(summary["sample_count"], 3)
-            self.assertEqual(summary["class_names"], ["car", "person", "traffic_light"])
+            self.assertEqual(summary["include_labels"], ["car", "person"])
+            self.assertEqual(summary["class_names"], ["car", "person"])
             self.assertEqual(summary["split_strategy"], "coverage")
             self.assertIn("train_indices", summary)
             self.assertIn("eval_indices", summary)
@@ -177,6 +179,8 @@ class AuxDNNExportTest(unittest.TestCase):
                 output_dir=Path(tmp) / "dense_eval",
             )
             self.assertEqual(direct["sample_count"], len(summary["eval_indices"]))
+            self.assertEqual(direct["eval_labels"], ["car", "person"])
+            self.assertTrue(all(sample["gt_count"] == 2 for sample in direct["samples"]))
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
             self.assertTrue((Path(tmp) / "dense_eval" / "index.html").exists())
