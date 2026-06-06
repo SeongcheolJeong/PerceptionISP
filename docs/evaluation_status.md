@@ -400,6 +400,9 @@ without rerunning CameraE2E or YOLO:
 
 ```text
 reports/perception_proposal_calibration_kitti_val_1496_detector_log/index.html
+reports/perception_proposal_calibration_kitti_val_1496_detector_log/proposal_calibration_model.json
+reports/perception_calibrated_fusion_kitti_val_1496_detector_log_eval/index.html
+reports/perception_calibrated_fusion_kitti_val_1496_detector_log/index.html
 ```
 
 Setup:
@@ -425,6 +428,24 @@ Best low-recall-loss calibration point against the original fusion input:
 | Feature set | Threshold | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Delta P vs Original | Delta R vs Original | Delta FP vs Original |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `score_label_aux` | 0.02 | 0.6334 | 0.4492 | 0.2802 | 0.2672 | 1.0306 | +0.0307 | -0.0002 | -0.2516 |
+
+The model artifact can now be applied back to a comparison report as
+`perception_calibrated_fusion_rgb_aux`. The held-out apply report uses only the
+457 eval samples from the calibration split and reproduces the calibration
+metrics exactly. The full 1,496-sample apply report is useful to inspect the
+operating point across all available samples, but it includes training samples
+and should not be treated as held-out evidence.
+
+Applied report results:
+
+| Report split | Input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Eval 457 | HumanISP RGB | 0.6084 | 0.4573 | 0.2850 | 0.2641 | 1.2867 | 3.7593 |
+| Eval 457 | RGB+Aux Fusion | 0.6027 | 0.4495 | 0.2802 | 0.2672 | 1.2823 | 3.7221 |
+| Eval 457 | Calibrated RGB+Aux Fusion | 0.6334 | 0.4492 | 0.2802 | 0.2672 | 1.0306 | 3.4683 |
+| All 1,496 | HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 | 3.8135 |
+| All 1,496 | RGB+Aux Fusion | 0.6063 | 0.4639 | 0.3030 | 0.2795 | 1.3235 | 3.7627 |
+| All 1,496 | Calibrated RGB+Aux Fusion | 0.6370 | 0.4633 | 0.3027 | 0.2795 | 1.0729 | 3.5094 |
 
 This is useful progress, but it is not a HumanISP superiority result. On the
 same eval split, the calibrated result is still `-0.0081` R50 versus HumanISP.

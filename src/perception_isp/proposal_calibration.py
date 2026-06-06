@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
-from .eval_types import BoundingBox, Detection
+from .eval_types import BoundingBox, Detection, DetectorResult
 from .metrics import aggregate_metric_rows, box_iou, evaluate_detections
 from .threshold_sweep import parse_thresholds
 from .types import json_ready
@@ -201,9 +201,148 @@ def write_proposal_calibration(summary: Mapping[str, Any], output_dir: str | Pat
     destination = Path(output_dir).expanduser()
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "proposal_calibration_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
+    artifact = proposal_calibration_model_artifact(summary)
+    if artifact:
+        (destination / "proposal_calibration_model.json").write_text(json.dumps(json_ready(artifact), indent=2) + "\n")
     html_path = destination / "index.html"
     html_path.write_text(_render_html(summary))
     return html_path
+
+
+def proposal_calibration_model_artifact(
+    summary: Mapping[str, Any],
+    *,
+    selector: str | None = None,
+    output_input_name: str = "perception_calibrated_fusion_rgb_aux",
+) -> Dict[str, Any]:
+    best = summary.get("best", {}) if isinstance(summary.get("best", {}), Mapping) else {}
+    selector_order = (
+        str(selector),
+    ) if selector else (
+        "max_precision_vs_original_with_recall_floor",
+        "max_precision_with_recall_floor",
+        "min_fp_with_recall_floor",
+        "max_recall_delta",
+    )
+    selected_name = ""
+    selected: Mapping[str, Any] = {}
+    for name in selector_order:
+        item = best.get(name, {}) if isinstance(best, Mapping) else {}
+        if item:
+            selected_name = str(name)
+            selected = item
+            break
+    if not selected:
+        return {}
+    feature_set = str(selected.get("feature_set", ""))
+    model = next((item for item in summary.get("models", ()) if str(item.get("feature_set")) == feature_set), None)
+    if not isinstance(model, Mapping):
+        return {}
+    return {
+        "model_type": "proposal_calibration_v1",
+        "selector": selected_name,
+        "source_report": str(summary.get("source_report", "")),
+        "input": str(summary.get("input", "perception_fusion_rgb_aux")),
+        "output_input": str(output_input_name),
+        "threshold": float(selected.get("threshold", 0.0)),
+        "feature_set": feature_set,
+        "feature_names": list(model.get("feature_names", ())),
+        "train_gt_labels": list(summary.get("train_gt_labels", ())),
+        "train_indices": [int(index) for index in summary.get("train_indices", ())],
+        "eval_indices": [int(index) for index in summary.get("eval_indices", ())],
+        "model": {
+            "feature_set": feature_set,
+            "feature_names": list(model.get("feature_names", ())),
+            "weights": list(model.get("weights", ())),
+            "bias": float(model.get("bias", 0.0)),
+            "mean": list(model.get("mean", ())),
+            "std": list(model.get("std", ())),
+        },
+        "selected_metrics": dict(selected.get("metrics", {})),
+        "selected_delta_vs_baseline": dict(selected.get("delta_vs_baseline", {})),
+        "selected_delta_vs_original": dict(selected.get("delta_vs_original", {})),
+    }
+
+
+def apply_proposal_calibration_to_report(
+    report: Mapping[str, Any],
+    artifact: Mapping[str, Any],
+    *,
+    output_input_name: str | None = None,
+    indices: Sequence[int] | None = None,
+) -> Dict[str, Any]:
+    from .comparison import _aggregate_breakdown, _input_names_from_samples, _sample_breakdown
+
+    if str(artifact.get("model_type", "")) != "proposal_calibration_v1":
+        raise ValueError("unsupported proposal calibration artifact")
+    input_name = str(artifact.get("input", "perception_fusion_rgb_aux"))
+    output_name = str(output_input_name or artifact.get("output_input", "perception_calibrated_fusion_rgb_aux"))
+    threshold = float(artifact.get("threshold", 0.0))
+    model = dict(artifact.get("model", {}))
+    feature_names = tuple(str(name) for name in artifact.get("feature_names") or model.get("feature_names", ()))
+    train_gt_labels = tuple(str(label) for label in artifact.get("train_gt_labels", ()))
+    label_agnostic = bool(report.get("run_config", {}).get("label_agnostic", True))
+    sample_results: List[Dict[str, Any]] = []
+    source_samples = tuple(report.get("samples", ()))
+    selected_indices = tuple(range(len(source_samples))) if indices is None else tuple(int(index) for index in indices)
+    for sample_index in selected_indices:
+        sample = source_samples[int(sample_index)]
+        sample_out = dict(sample)
+        detectors = [dict(item) for item in sample.get("detectors", ())]
+        calibrated = []
+        for detection in _detections_for_sample(sample, input_name):
+            score = _predict_detection_score(detection, sample, model, feature_names=feature_names, train_gt_labels=train_gt_labels)
+            if score < threshold:
+                continue
+            metadata = dict(detection.metadata)
+            metadata["proposal_calibration"] = {
+                "source_input": input_name,
+                "source_score": float(detection.score),
+                "calibrated_score": float(score),
+                "threshold": threshold,
+                "feature_set": str(artifact.get("feature_set", model.get("feature_set", ""))),
+                "selector": str(artifact.get("selector", "")),
+            }
+            calibrated.append(Detection(detection.box, score=float(score), metadata=metadata))
+        detector_payload = {
+            "detector_name": "proposal_calibration",
+            "input_name": output_name,
+            "elapsed_ms": 0.0,
+            "detections": [item.to_dict() for item in sorted(calibrated, key=lambda det: float(det.score), reverse=True)],
+        }
+        detectors = [item for item in detectors if str(item.get("input_name")) != output_name]
+        detectors.append(detector_payload)
+        sample_out["detectors"] = detectors
+        ground_truth = _ground_truth_for_sample(sample)
+        metrics = dict(sample.get("metrics", {}))
+        metrics[output_name] = evaluate_detections(tuple(calibrated), ground_truth, label_agnostic=label_agnostic)
+        sample_out["metrics"] = metrics
+        detector_results = tuple(_detector_result_from_dict(item) for item in detectors)
+        sample_out["breakdown"] = _sample_breakdown(detector_results, ground_truth, label_agnostic=label_agnostic)
+        sample_results.append(sample_out)
+
+    aggregate: Dict[str, Any] = {}
+    for name in _input_names_from_samples(sample_results):
+        rows = [sample["metrics"][name] for sample in sample_results if name in sample.get("metrics", {})]
+        aggregate[name] = aggregate_metric_rows(rows)
+    run_config = dict(report.get("run_config", {}))
+    run_config["proposal_calibration"] = {
+        "model_type": artifact.get("model_type"),
+        "selector": artifact.get("selector"),
+        "input": input_name,
+        "output_input": output_name,
+        "threshold": threshold,
+        "feature_set": artifact.get("feature_set"),
+        "source_report": artifact.get("source_report"),
+        "applied_sample_count": int(len(selected_indices)),
+    }
+    result = {str(key): value for key, value in report.items() if str(key) not in {"samples", "aggregate", "breakdown", "run_config"}}
+    result["sample_count"] = int(len(sample_results))
+    result["run_config"] = run_config
+    result["aggregate"] = aggregate
+    result["breakdown"] = _aggregate_breakdown(sample_results)
+    result["samples"] = sample_results
+    return result
 
 
 def split_sample_indices(
@@ -600,6 +739,15 @@ def _detection_from_dict(payload: Mapping[str, Any]) -> Detection:
         box=_box_from_dict(payload.get("box", {})),
         score=float(payload.get("score", 0.0)),
         metadata=dict(payload.get("metadata", {})),
+    )
+
+
+def _detector_result_from_dict(payload: Mapping[str, Any]) -> DetectorResult:
+    return DetectorResult(
+        detector_name=str(payload.get("detector_name", "")),
+        input_name=str(payload.get("input_name", "")),
+        detections=tuple(_detection_from_dict(item) for item in payload.get("detections", ())),
+        elapsed_ms=float(payload.get("elapsed_ms", 0.0)),
     )
 
 

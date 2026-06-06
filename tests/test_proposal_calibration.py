@@ -5,7 +5,9 @@ import unittest
 from pathlib import Path
 
 from perception_isp.proposal_calibration import (
+    apply_proposal_calibration_to_report,
     build_proposal_calibration,
+    proposal_calibration_model_artifact,
     split_sample_indices,
     write_proposal_calibration,
 )
@@ -46,6 +48,18 @@ class ProposalCalibrationTest(unittest.TestCase):
         self.assertAlmostEqual(row["metrics"]["precision@0.50_mean"], 1.0)
         self.assertAlmostEqual(row["metrics"]["recall@0.50_mean"], 1.0)
         self.assertAlmostEqual(row["metrics"]["fp@0.50_mean"], 0.0)
+        artifact = proposal_calibration_model_artifact(summary)
+        applied = apply_proposal_calibration_to_report(report, artifact)
+        self.assertIn("perception_calibrated_fusion_rgb_aux", applied["aggregate"])
+        self.assertAlmostEqual(applied["aggregate"]["perception_calibrated_fusion_rgb_aux"]["precision@0.50_mean"], 1.0)
+        self.assertIn("proposal_calibration", applied["run_config"])
+        self.assertIn(
+            "perception_calibrated_fusion_rgb_aux",
+            {item["input_name"] for item in applied["samples"][0]["detectors"]},
+        )
+        eval_applied = apply_proposal_calibration_to_report(report, artifact, indices=artifact["eval_indices"])
+        self.assertEqual(eval_applied["sample_count"], 2)
+        self.assertEqual(eval_applied["run_config"]["proposal_calibration"]["applied_sample_count"], 2)
 
     def test_write_proposal_calibration_outputs_json_and_html(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -67,6 +81,31 @@ class ProposalCalibrationTest(unittest.TestCase):
             )
             self.assertTrue(html_path.exists())
             self.assertTrue((Path(tmp) / "proposal_calibration_summary.json").exists())
+            self.assertFalse((Path(tmp) / "proposal_calibration_model.json").exists())
+
+    def test_write_proposal_calibration_outputs_model_artifact_when_best_exists(self) -> None:
+        report = {
+            "sample_count": 4,
+            "run_config": {"label_agnostic": False},
+            "samples": [_sample(index) for index in range(4)],
+        }
+        summary = build_proposal_calibration(
+            report,
+            input_name="perception_fusion_rgb_aux",
+            feature_sets=("score_label_aux",),
+            thresholds=(0.50,),
+            baseline_input="human_rgb",
+            train_fraction=0.5,
+            split_strategy="sequential",
+            epochs=250,
+            learning_rate=0.05,
+            l2=0.0,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            write_proposal_calibration(summary, Path(tmp))
+            model_path = Path(tmp) / "proposal_calibration_model.json"
+            self.assertTrue(model_path.exists())
+            self.assertIn("proposal_calibration_v1", model_path.read_text())
 
 
 def _sample(index: int) -> dict:

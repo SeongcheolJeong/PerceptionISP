@@ -20,7 +20,15 @@ from .pipeline import PerceptionISPPipeline
 from .types import PerceptionISPConfig, json_ready
 
 
-INPUT_ORDER = ("reference_rgb", "human_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_rgb_aux_dnn", "perception_aux_rgb")
+INPUT_ORDER = (
+    "reference_rgb",
+    "human_rgb",
+    "perception_rgb",
+    "perception_fusion_rgb_aux",
+    "perception_calibrated_fusion_rgb_aux",
+    "perception_rgb_aux_dnn",
+    "perception_aux_rgb",
+)
 PIPELINE_INPUT_NAMES = ("human_rgb", "perception_rgb", "perception_aux_rgb")
 AREA_BUCKETS = ("small", "medium", "large")
 
@@ -589,7 +597,14 @@ def _render_delta_rows(aggregate: Mapping[str, Any]) -> str:
     if not human:
         return ""
     rows = []
-    for input_name in ("reference_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_rgb_aux_dnn", "perception_aux_rgb"):
+    for input_name in (
+        "reference_rgb",
+        "perception_rgb",
+        "perception_fusion_rgb_aux",
+        "perception_calibrated_fusion_rgb_aux",
+        "perception_rgb_aux_dnn",
+        "perception_aux_rgb",
+    ):
         if input_name not in aggregate or input_name == "human_rgb":
             continue
         metrics = aggregate.get(input_name, {})

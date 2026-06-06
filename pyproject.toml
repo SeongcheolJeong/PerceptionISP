@@ -24,6 +24,7 @@ perception-isp-merge-comparison-reports = "perception_isp.merge_comparison_repor
 perception-isp-isp-sweep = "perception_isp.isp_sweep:main"
 perception-isp-threshold-sweep = "perception_isp.threshold_sweep:main"
 perception-isp-proposal-calibration = "perception_isp.proposal_calibration:main"
+perception-isp-apply-proposal-calibration = "perception_isp.proposal_calibration_apply:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
