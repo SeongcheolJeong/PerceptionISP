@@ -62,6 +62,8 @@ def main(argv: Any = None) -> int:
                 {
                     "report": str(html_path),
                     "status": summary["status"],
+                    "coverage_status": summary["coverage_status"],
+                    "metric_claim_status": summary["metric_claim_status"],
                     "missing_required": summary["missing_required"],
                     "missing_raw_claim": summary["missing_raw_claim"],
                 }
@@ -91,15 +93,28 @@ def build_protocol_coverage(
     requirements = _requirements(evidence, min_samples=int(min_samples))
     missing_required = [row["id"] for row in requirements if row["scope"] == "claim_required" and row["status"] != "covered"]
     missing_raw_claim = [row["id"] for row in requirements if row["scope"] == "raw_claim_required" and row["status"] != "covered"]
-    status = "claim_ready" if not missing_required and not missing_raw_claim else "not_claim_ready"
+    coverage_complete = not missing_required and not missing_raw_claim
+    coverage_status = "coverage_complete" if coverage_complete else "coverage_incomplete"
+    # Keep the historical status string for compatibility with older reports and tests.
+    status = "claim_ready" if coverage_complete else "not_claim_ready"
+    gate_outcomes = _claim_gate_outcomes(evidence.get("claim_gates", ()))
+    metric_claim_status = _metric_claim_status(gate_outcomes)
     return {
         "status": status,
+        "coverage_status": coverage_status,
+        "metric_claim_status": metric_claim_status,
+        "claim_gate_outcomes": gate_outcomes,
         "min_samples": int(min_samples),
         "missing_required": missing_required,
         "missing_raw_claim": missing_raw_claim,
         "requirements": requirements,
         "evidence": evidence,
-        "interpretation": _interpretation(status, missing_required=missing_required, missing_raw_claim=missing_raw_claim),
+        "interpretation": _interpretation(
+            coverage_status,
+            metric_claim_status=metric_claim_status,
+            missing_required=missing_required,
+            missing_raw_claim=missing_raw_claim,
+        ),
     }
 
 
@@ -398,6 +413,33 @@ def _gate_evidence(gates: Sequence[Any]) -> str:
     return ", ".join(rows) if rows else "missing"
 
 
+def _claim_gate_outcomes(gates: Sequence[Any]) -> Dict[str, Any]:
+    broad_gates = [gate for gate in gates if isinstance(gate, Mapping) and str(gate.get("profile", "")) == "broad_superiority"]
+    fp_gates = [gate for gate in gates if isinstance(gate, Mapping) and str(gate.get("profile", "")) == "fp_reducer"]
+    return {
+        "broad_superiority_evaluated": bool(broad_gates),
+        "broad_superiority_pass": any(bool(gate.get("pass")) for gate in broad_gates),
+        "fp_reducer_evaluated": bool(fp_gates),
+        "fp_reducer_pass": any(bool(gate.get("pass")) for gate in fp_gates),
+        "ci_gate_present": _has_ci_gate(gates),
+        "gate_count": len([gate for gate in gates if isinstance(gate, Mapping)]),
+    }
+
+
+def _metric_claim_status(outcomes: Mapping[str, Any]) -> str:
+    if bool(outcomes.get("broad_superiority_pass")):
+        return "broad_superiority_supported"
+    if bool(outcomes.get("broad_superiority_evaluated")):
+        if bool(outcomes.get("fp_reducer_pass")):
+            return "fp_reducer_only"
+        return "broad_superiority_not_supported"
+    if bool(outcomes.get("fp_reducer_pass")):
+        return "fp_reducer_only"
+    if bool(outcomes.get("gate_count")):
+        return "metric_claim_not_supported"
+    return "metric_claim_not_evaluated"
+
+
 def _has_aux_ablation(training: Mapping[str, Any]) -> bool:
     modes = {str(value) for value in training.get("channel_modes", ())}
     return {"rgb_aux", "rgb_only", "aux_only"}.issubset(modes)
@@ -441,9 +483,24 @@ def _sibling_html(summary_path: Path) -> str | None:
     return str(html_path) if html_path.exists() else None
 
 
-def _interpretation(status: str, *, missing_required: Sequence[str], missing_raw_claim: Sequence[str]) -> str:
-    if status == "claim_ready":
-        return "The provided evidence covers the configured minimum benchmark protocol."
+def _interpretation(
+    coverage_status: str,
+    *,
+    metric_claim_status: str,
+    missing_required: Sequence[str],
+    missing_raw_claim: Sequence[str],
+) -> str:
+    if coverage_status == "coverage_complete":
+        if metric_claim_status == "broad_superiority_supported":
+            return "The provided evidence covers the configured benchmark protocol and the broad-superiority gate passed."
+        if metric_claim_status == "fp_reducer_only":
+            return (
+                "The provided evidence covers the configured benchmark protocol, but the metric evidence supports only the narrower "
+                "recall-budgeted FP-reduction claim, not broad HumanISP superiority."
+            )
+        if metric_claim_status == "broad_superiority_not_supported":
+            return "The provided evidence covers the configured benchmark protocol, but the broad-superiority gate did not pass."
+        return "The provided evidence covers the configured benchmark protocol. Metric claim support still depends on a passing claim gate."
     missing = list(missing_required) + list(missing_raw_claim)
     return "The provided evidence is not sufficient for a broad HumanISP-vs-PerceptionISP or RAW/sensor-native claim. Missing: " + ", ".join(missing)
 
@@ -481,8 +538,12 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   <table>
     <tbody>
       <tr><th>Inputs</th><td>{html_lib.escape(', '.join(str(value) for value in evidence.get('input_names', ())) or 'none')}</td></tr>
+      <tr><th>Coverage status</th><td><code>{html_lib.escape(str(summary.get('coverage_status', summary.get('status', ''))))}</code></td></tr>
+      <tr><th>Metric claim status</th><td><code>{html_lib.escape(str(summary.get('metric_claim_status', 'unknown')))}</code></td></tr>
+      <tr><th>Legacy status</th><td><code>{html_lib.escape(str(summary.get('status', '')))}</code></td></tr>
       <tr><th>Max samples</th><td>{int(evidence.get('sample_count_max', 0))}</td></tr>
       <tr><th>Run config consistency</th><td>{html_lib.escape(str(evidence.get('run_config_consistency', {}).get('summary', '')))}</td></tr>
+      <tr><th>Claim gates</th><td>{html_lib.escape(_gate_outcome_text(summary.get('claim_gate_outcomes', {})))}</td></tr>
       <tr><th>Training</th><td>{_optional_link(training, destination)} {html_lib.escape(str(training.get('summary', 'missing')))}</td></tr>
       <tr><th>Task metrics</th><td>{_optional_link(task, destination)} {html_lib.escape(str(task.get('summary', 'missing')))}</td></tr>
     </tbody>
@@ -503,6 +564,17 @@ def _requirement_row(row: Mapping[str, Any]) -> str:
         f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('missing_reason', '')))}</td>"
         "</tr>"
+    )
+
+
+def _gate_outcome_text(value: Any) -> str:
+    outcomes = value if isinstance(value, Mapping) else {}
+    return (
+        f"broad_evaluated={bool(outcomes.get('broad_superiority_evaluated'))}, "
+        f"broad_pass={bool(outcomes.get('broad_superiority_pass'))}, "
+        f"fp_evaluated={bool(outcomes.get('fp_reducer_evaluated'))}, "
+        f"fp_pass={bool(outcomes.get('fp_reducer_pass'))}, "
+        f"ci_gate_present={bool(outcomes.get('ci_gate_present'))}"
     )
 
 

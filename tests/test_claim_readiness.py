@@ -40,6 +40,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("task_metrics", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
+            self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
+            self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -59,6 +61,8 @@ class ClaimReadinessTest(unittest.TestCase):
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(dashboard_summary["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
+            self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
+            self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
 
     def test_claim_readiness_cli_outputs_compact_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -106,9 +110,13 @@ class ClaimReadinessTest(unittest.TestCase):
             )
 
             self.assertEqual(summary["benchmark_protocol"]["status"], "claim_ready")
+            self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_complete")
+            self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
             self.assertIn(str(naive_dir), summary["protocol_comparison_reports"])
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "claim_ready")
+            self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_complete")
+            self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
 
 
 def _write_comparison_report(

@@ -222,10 +222,11 @@ The extended-inclusive benchmark protocol report is:
 reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 ```
 
-It reports `claim_ready` for evidence coverage, including the recommended
-`extended_sensor_native_tensor` row. That means the configured protocol has the
-expected rows, not that the target wins every metric. The corresponding
-dashboard keeps the decision narrow:
+It reports `coverage_status=coverage_complete` for evidence coverage, including
+the recommended `extended_sensor_native_tensor` row, while the metric side
+stays narrow as `metric_claim_status=fp_reducer_only`. That means the configured
+protocol has the expected rows, not that the target wins every metric. The
+corresponding dashboard keeps the decision narrow:
 
 ```text
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
@@ -473,7 +474,7 @@ The same evidence can be rebuilt as one bundle with `perception_isp.claim_readin
 The current bundle that includes the 1496-image naive RAW-like baseline is:
 
 ```text
-reports/perception_claim_readiness_with_naive/dashboard/index.html
+reports/perception_claim_readiness_with_naive_extended/dashboard/index.html
 ```
 
 It intentionally separates claim decisions from evidence-coverage decisions:
@@ -484,13 +485,14 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
 | Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
-| Benchmark protocol coverage | Supported for the configured KITTI evidence bundle; this only means the matrix is covered |
+| Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
+| Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
 The readiness bundle also writes:
 
 ```text
-reports/perception_claim_readiness_with_naive/benchmark_protocol/index.html
-reports/perception_claim_readiness_with_naive/benchmark_protocol/protocol_coverage_summary.json
+reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/index.html
+reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/protocol_coverage_summary.json
 ```
 
 This protocol coverage is a blocker checklist, not a metric result. It checks

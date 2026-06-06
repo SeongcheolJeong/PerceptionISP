@@ -29,6 +29,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
 
             rows = {row["id"]: row for row in summary["requirements"]}
             self.assertEqual(summary["status"], "not_claim_ready")
+            self.assertEqual(summary["coverage_status"], "coverage_incomplete")
+            self.assertEqual(summary["metric_claim_status"], "broad_superiority_not_supported")
             self.assertEqual(rows["paired_human_baseline"]["status"], "covered")
             self.assertEqual(rows["classical_lightweight_transform"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
@@ -58,6 +60,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             )
 
             self.assertEqual(summary["status"], "claim_ready")
+            self.assertEqual(summary["coverage_status"], "coverage_complete")
+            self.assertEqual(summary["metric_claim_status"], "broad_superiority_not_supported")
+            self.assertFalse(summary["claim_gate_outcomes"]["broad_superiority_pass"])
             self.assertEqual(summary["missing_required"], [])
             self.assertEqual(summary["missing_raw_claim"], [])
 
@@ -86,6 +91,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
             printed = json.loads(stdout.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(printed["status"], "not_claim_ready")
+            self.assertEqual(printed["coverage_status"], "coverage_incomplete")
+            self.assertEqual(printed["metric_claim_status"], "broad_superiority_not_supported")
             self.assertIn("naive_raw_baseline", printed["missing_raw_claim"])
             self.assertTrue((root / "protocol" / "protocol_coverage_summary.json").exists())
 

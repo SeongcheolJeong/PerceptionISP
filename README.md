@@ -892,10 +892,11 @@ reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
 ```
 
-It marks benchmark protocol coverage as complete, including the recommended
-extended sensor-native tensor row. That is an evidence-coverage result, not a
-broad-superiority result; the dashboard still says broad HumanISP superiority is
-not supported, while recall-budgeted FP reduction versus HumanISP is supported.
+It marks `coverage_status=coverage_complete`, including the recommended
+extended sensor-native tensor row, while `metric_claim_status=fp_reducer_only`.
+That is an evidence-coverage result, not a broad-superiority result; the
+dashboard still says broad HumanISP superiority is not supported, while
+recall-budgeted FP reduction versus HumanISP is supported.
 
 The current 1496-image naive RAW-like baseline is:
 

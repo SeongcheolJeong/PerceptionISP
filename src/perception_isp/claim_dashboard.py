@@ -195,6 +195,9 @@ def _load_protocol_coverage(spec: str | Path) -> Dict[str, Any]:
         "summary_path": str(summary_path),
         "html_path": _sibling_html(summary_path),
         "status": str(data.get("status", "")),
+        "coverage_status": str(data.get("coverage_status", "")),
+        "metric_claim_status": str(data.get("metric_claim_status", "")),
+        "claim_gate_outcomes": dict(data.get("claim_gate_outcomes", {})) if isinstance(data.get("claim_gate_outcomes"), Mapping) else {},
         "missing_required": list(data.get("missing_required", ())),
         "missing_raw_claim": list(data.get("missing_raw_claim", ())),
         "missing_count": len(missing),
@@ -317,8 +320,11 @@ def _claim_decisions(
             decisions.append({"status": "needs_eval", "claim": "Task-group evidence is incomplete, so task-level claims are not ready."})
     if protocol_coverage is not None:
         status = str(protocol_coverage.get("status", "unknown"))
-        if status == "claim_ready":
-            decisions.append({"status": "supported", "claim": "The configured benchmark protocol coverage is complete."})
+        coverage_status = str(protocol_coverage.get("coverage_status") or ("coverage_complete" if status == "claim_ready" else "coverage_incomplete"))
+        if coverage_status == "coverage_complete":
+            metric_status = str(protocol_coverage.get("metric_claim_status", "unknown"))
+            suffix = "" if metric_status in {"", "unknown"} else f" Metric claim status: {metric_status}."
+            decisions.append({"status": "supported", "claim": "The configured benchmark protocol evidence coverage is complete." + suffix})
         else:
             missing = list(protocol_coverage.get("missing_required", ())) + list(protocol_coverage.get("missing_raw_claim", ()))
             suffix = "" if not missing else f" Missing: {', '.join(str(value) for value in missing)}."
@@ -613,9 +619,14 @@ def _protocol_html(protocol: Mapping[str, Any], destination: Path) -> str:
     if not rows:
         rows = '<tr><td colspan="5">No protocol coverage rows were available.</td></tr>'
     status = str(protocol.get("status", ""))
-    status_class = "supported" if status == "claim_ready" else "not_supported"
+    coverage_status = str(protocol.get("coverage_status") or ("coverage_complete" if status == "claim_ready" else "coverage_incomplete"))
+    metric_status = str(protocol.get("metric_claim_status", "unknown"))
+    status_class = "supported" if coverage_status == "coverage_complete" else "not_supported"
     return (
-        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(status)}</code>. {html_lib.escape(str(protocol.get('interpretation', '')))}</p>"
+        f"<p>Coverage status: <code class=\"{status_class}\">{html_lib.escape(coverage_status)}</code>. "
+        f"Metric claim status: <code>{html_lib.escape(metric_status)}</code>. "
+        f"Legacy status: <code>{html_lib.escape(status)}</code>. "
+        f"{html_lib.escape(str(protocol.get('interpretation', '')))}</p>"
         "<table>"
         "<thead><tr><th>Report</th><th>Missing Required</th><th>Missing RAW Claim</th><th>Missing Rows</th></tr></thead>"
         "<tbody><tr>"
