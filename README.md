@@ -565,6 +565,9 @@ PYTHONPATH=src \
   --include-source-report-in-rollup
 ```
 
+The rollup names calibrated runs by proposal feature set and adds the report
+directory when two calibrated runs would otherwise have the same display name.
+
 Use `--split eval` for held-out evidence from the original calibration split.
 Use `--split all` only as an operational full-report application, because it
 includes samples used to fit the calibrator.

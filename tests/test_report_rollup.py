@@ -52,6 +52,7 @@ class ReportRollupTest(unittest.TestCase):
             )
             rollup = build_rollup([report_dir])
             self.assertEqual(rollup["run_count"], 1)
+            self.assertEqual(rollup["runs"][0]["name"], "synthetic 2")
             perception = rollup["runs"][0]["inputs"]["perception_rgb"]
             self.assertAlmostEqual(perception["delta_precision@0.50_mean"], 0.1)
             self.assertAlmostEqual(perception["delta_recall@0.50_mean"], 0.05)
@@ -62,6 +63,66 @@ class ReportRollupTest(unittest.TestCase):
             self.assertTrue(html_path.exists())
             self.assertIn("PerceptionISP Comparison Rollup", html_path.read_text())
             self.assertTrue((html_path.parent / "rollup_summary.json").exists())
+
+    def test_rollup_names_proposal_calibration_feature_sets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_dir = root / "score_label_aux"
+            report_dir.mkdir()
+            (report_dir / "comparison_summary.json").write_text(
+                json.dumps(
+                    {
+                        "sample_count": 2,
+                        "run_config": {
+                            "source": "synthetic",
+                            "count": 2,
+                            "proposal_calibration": {
+                                "feature_set": "score_label_aux",
+                                "output_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
+                            },
+                        },
+                        "aggregate": {
+                            "human_rgb": {"precision@0.50_mean": 0.5},
+                            "perception_calibrated_score_label_aux_fusion_rgb_aux": {"precision@0.50_mean": 0.7},
+                        },
+                    }
+                )
+                + "\n"
+            )
+            rollup = build_rollup([report_dir])
+            self.assertEqual(rollup["runs"][0]["name"], "synthetic 2 - calibrated score_label_aux")
+
+    def test_rollup_disambiguates_duplicate_run_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            paths = []
+            for dirname in ("source_harness", "score_label_aux"):
+                report_dir = root / dirname
+                report_dir.mkdir()
+                paths.append(report_dir)
+                (report_dir / "comparison_summary.json").write_text(
+                    json.dumps(
+                        {
+                            "sample_count": 2,
+                            "run_config": {
+                                "source": "synthetic",
+                                "count": 2,
+                                "proposal_calibration": {"feature_set": "score_label_aux"},
+                            },
+                            "aggregate": {"human_rgb": {"precision@0.50_mean": 0.5}},
+                        }
+                    )
+                    + "\n"
+                )
+            rollup = build_rollup(paths)
+            names = [run["name"] for run in rollup["runs"]]
+            self.assertEqual(
+                names,
+                [
+                    "synthetic 2 - calibrated score_label_aux (source_harness)",
+                    "synthetic 2 - calibrated score_label_aux (score_label_aux)",
+                ],
+            )
 
 
 if __name__ == "__main__":

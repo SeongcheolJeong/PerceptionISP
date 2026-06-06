@@ -62,6 +62,7 @@ def build_rollup(paths: Sequence[str | Path]) -> Dict[str, Any]:
                 "inputs": inputs,
             }
         )
+    _disambiguate_run_names(runs)
     return {
         "run_count": int(len(runs)),
         "metric_keys": list(METRIC_KEYS),
@@ -91,9 +92,40 @@ def _summary_path(path: str | Path) -> Path:
 def _run_name(summary_path: Path, run_config: Mapping[str, Any]) -> str:
     count = run_config.get("count")
     source = run_config.get("source")
+    suffix = _calibration_name_suffix(run_config)
     if count is not None and source:
-        return f"{source} {count}"
-    return summary_path.parent.name
+        base = f"{source} {count}"
+    else:
+        base = summary_path.parent.name
+    return f"{base} - {suffix}" if suffix else base
+
+
+def _calibration_name_suffix(run_config: Mapping[str, Any]) -> str:
+    calibration = run_config.get("proposal_calibration", {})
+    if not isinstance(calibration, Mapping):
+        return ""
+    feature_set = str(calibration.get("feature_set", "") or "")
+    output_input = str(calibration.get("output_input", "") or "")
+    if feature_set:
+        return f"calibrated {feature_set}"
+    if output_input:
+        return output_input
+    return ""
+
+
+def _disambiguate_run_names(runs: Sequence[Dict[str, Any]]) -> None:
+    counts: Dict[str, int] = {}
+    for run in runs:
+        name = str(run.get("name", ""))
+        counts[name] = counts.get(name, 0) + 1
+    for run in runs:
+        name = str(run.get("name", ""))
+        if counts.get(name, 0) <= 1:
+            continue
+        summary_path = Path(str(run.get("summary_path", "")))
+        qualifier = summary_path.parent.name if summary_path.name else ""
+        if qualifier:
+            run["name"] = f"{name} ({qualifier})"
 
 
 def _input_names(aggregate: Mapping[str, Any]) -> Tuple[str, ...]:
