@@ -38,6 +38,12 @@ auxiliary-map detector is a deterministic baseline rather than a trained
 perception model, and the RGB+aux fusion adapter is only a reference integration
 path until a detector is trained to consume those auxiliary channels.
 
+`docs/literature_basis.md` captures the current research-driven boundary. The
+important correction is that RAW or sensor-native data should not be advertised
+as automatically better than sRGB. The defensible path is task-aware adaptation:
+preserve sensor-native information, normalize it for the detector, train or
+adapt the DNN, and keep naive RAW as a negative baseline.
+
 ## Aux Map DNN Training Status
 
 Auxiliary maps are not automatically used by existing RGB DNNs. A pretrained
@@ -128,16 +134,35 @@ The compact RGB+aux dense detector then trained on MPS:
 | `aux_only_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 8.1 s | 59.3 | 1.2003 |
 
 The timing and direct eval summaries are now collected in one reproducible
-rollup:
+rollup. The latest extended-inclusive rollup is:
 
 ```text
-reports/perception_rgb_aux_training_rollup_kitti_val128/index.html
+reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended/index.html
 ```
 
 That rollup is a resource/diagnostic report, not a performance-claim report. It
 combines export time, train time, generated training-time planning scenarios,
 and the direct dense-detector metrics below so the cost/performance tradeoff is
 visible in one place.
+
+The extended sensor-native tensor path was also exercised end to end on the
+same 128-sample KITTI subset:
+
+| Evidence | Value |
+| --- | --- |
+| Export | `exports/perception_rgb_aux_kitti_val128_detector_log_extended/index.html` |
+| Tensor key | `rgb_aux_extended_chw` |
+| Tensor shape | 13 channels, verified in the exported NPZ files |
+| RAW provenance | 128 true CFA mosaics, source/target `GRBG`, no remap |
+| Train run | 96 train / 32 eval, 5 epochs, 36.6 sample-epochs/s |
+| Loss | `2.2398 -> 0.4899` train, best eval loss `0.9939` |
+| Direct eval | `reports/perception_rgb_aux_dense_kitti_val128_extended_rgb_aux_eval_conf050/index.html` |
+| Direct eval result | P50 `0.0032`, R50 `0.0642`, FP/sample `96.4063` |
+
+This closes the data-path question for 13-channel aux tensors: the maps can be
+exported, loaded, trained, checkpointed, and evaluated by the current compact
+DNN path. It does not close the performance question because the compact direct
+detector is still weak.
 
 The timing answer is therefore favorable for this compact path: on this Mac
 with MPS, the observed compact dense median is about `59.3 sample-epochs/s`.
@@ -190,6 +215,25 @@ operating point because FP and precision remain worse. `aux_only` is clearly
 weaker. Therefore the current compact dense architecture is not a usable proof
 that auxiliary maps improve detector performance; it is only a fast engineering
 path for testing tensor export, training, checkpoint loading, and ablations.
+
+The extended-inclusive benchmark protocol report is:
+
+```text
+reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
+```
+
+It reports `claim_ready` for evidence coverage, including the recommended
+`extended_sensor_native_tensor` row. That means the configured protocol has the
+expected rows, not that the target wins every metric. The corresponding
+dashboard keeps the decision narrow:
+
+```text
+reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
+```
+
+It supports recall-budgeted FP reduction versus HumanISP, rejects broad
+HumanISP superiority, rejects VRU/person recall improvement, and marks the
+learned RGB+aux DNN path as implemented but not claim-quality.
 
 ### KITTI Train-Subset to Val Calibration
 

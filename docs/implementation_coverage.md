@@ -1,6 +1,8 @@
 # Implementation Coverage
 
 This implementation is deliberately broad rather than hardware-optimized.
+See `docs/literature_basis.md` for the RAW/sensor-native perception evidence
+boundary used by the benchmark protocol and claim gates.
 
 | Architecture Block | Software implementation |
 | --- | --- |
@@ -28,6 +30,8 @@ Known limits:
 - The Bayer demosaic block is an edge-aware numpy reference, not a production ISP demosaic.
 - The RGB+aux compact dense detector is still a learning-path benchmark, not a claim-quality detector.
 - The RGB+aux smoke checkpoint predicts one generic box and is not a useful trained detector.
+- The extended 13-channel RGB+aux tensor has export/train/eval evidence, but
+  the direct dense metrics remain diagnostic and weak.
 - The benchmark-protocol checklist is a claim blocker/coverage tool; it does not create missing real-RAW or adverse-condition evidence by itself.
 - CameraE2E integration is optional and environment-dependent.
 - Latency values are engineering estimates, not measured hardware evidence.

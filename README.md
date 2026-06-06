@@ -8,6 +8,9 @@ This repo follows the design notes in `camera_sim_perception_isp_full_conversati
 - Sensor-native auxiliary maps are preserved: noise, SNR, saturation, HDR source, edge, color confidence, IR/Clear, blur/focus, flicker, timing.
 - Fast safety path and accurate autonomy path are separate outputs.
 - CameraE2E under `/Users/seongcheoljeong/Documents/CameraE2E` can be used opportunistically, with synthetic RAW fallback.
+- `docs/literature_basis.md` records the current RAW/sensor-native perception
+  claim boundary: task-aware adaptation can help, but naive RAW and untrained
+  aux maps are not performance claims.
 
 ## Quick Run
 
@@ -194,7 +197,7 @@ for training only, 50 epochs is about 1.4 hours, and 100 epochs is about
 training is about 41.6 minutes for 5,985 images.
 
 Roll up export, training, and dense-eval summaries into one timing/diagnostic
-report:
+report, including the extended 13-channel sensor-native tensor run:
 
 ```bash
 PYTHONPATH=src \
@@ -207,14 +210,20 @@ PYTHONPATH=src \
   reports/perception_rgb_aux_dense_kitti_val128_rgb_aux_ablation_eval_conf050 \
   reports/perception_rgb_aux_dense_kitti_val128_rgb_only_ablation_eval_conf050 \
   reports/perception_rgb_aux_dense_kitti_val128_aux_only_ablation_eval_conf050 \
-  --output-dir reports/perception_rgb_aux_training_rollup_kitti_val128
+  exports/perception_rgb_aux_kitti_val128_detector_log_extended \
+  exports/perception_rgb_aux_kitti_val128_detector_log_dense_extended_rgb_aux \
+  reports/perception_rgb_aux_dense_kitti_val128_extended_rgb_aux_eval_conf050 \
+  --output-dir reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended
 ```
 
 The rollup is a resource and diagnostic view. It now includes a Training-Time
 Plan derived from observed sample-epochs/sec and export samples/sec, making
 compact KITTI-sized timing scenarios reproducible. It also makes clear that the
 compact dense path trains quickly, while its direct detector metrics are still
-too weak for a HumanISP-vs-PerceptionISP performance claim.
+too weak for a HumanISP-vs-PerceptionISP performance claim. The extended run
+verifies that `rgb_aux_extended_chw` can be exported, trained, and evaluated as
+a 13-channel DNN input, but its direct dense-detector metrics are diagnostic
+only.
 
 Run the trained smoke checkpoint through the normal comparison harness:
 
@@ -842,9 +851,12 @@ PYTHONPATH=src \
   --training-summary reports/perception_rgb_aux_dense_kitti_val128_rgb_aux_ablation_eval_conf050 \
   --training-summary reports/perception_rgb_aux_dense_kitti_val128_rgb_only_ablation_eval_conf050 \
   --training-summary reports/perception_rgb_aux_dense_kitti_val128_aux_only_ablation_eval_conf050 \
+  --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_extended \
+  --training-summary exports/perception_rgb_aux_kitti_val128_detector_log_dense_extended_rgb_aux \
+  --training-summary reports/perception_rgb_aux_dense_kitti_val128_extended_rgb_aux_eval_conf050 \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --protocol-comparison-report reports/perception_compare_kitti_val1496_naive_raw_like \
-  --output-dir reports/perception_claim_readiness_with_naive
+  --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
@@ -865,13 +877,25 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --comparison-report reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
   --comparison-report reports/perception_compare_kitti_val1496_naive_raw_like \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
-  --training-rollup reports/perception_claim_readiness_with_naive/rgb_aux_training_rollup \
-  --claim-gate reports/perception_claim_readiness_with_naive/broad_superiority_vs_human \
-  --claim-gate reports/perception_claim_readiness_with_naive/fp_reducer_vs_fusion \
-  --task-metrics reports/perception_claim_readiness_with_naive/task_metrics \
+  --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended \
+  --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_broad_vs_human \
+  --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
+  --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --min-samples 1000 \
-  --output-dir reports/perception_benchmark_protocol
+  --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
+
+The latest extended-inclusive protocol report is:
+
+```text
+reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
+reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
+```
+
+It marks benchmark protocol coverage as complete, including the recommended
+extended sensor-native tensor row. That is an evidence-coverage result, not a
+broad-superiority result; the dashboard still says broad HumanISP superiority is
+not supported, while recall-budgeted FP reduction versus HumanISP is supported.
 
 The current 1496-image naive RAW-like baseline is:
 
