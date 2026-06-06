@@ -109,6 +109,7 @@ PYTHONPATH=src \
   --manifest exports/perception_rgb_aux_coco8_smoke/manifest.jsonl \
   --epochs 3 \
   --device auto \
+  --eval-fraction 0.5 \
   --estimate-samples 10,100,1000,10000 \
   --output-dir exports/perception_rgb_aux_coco8_train_benchmark
 ```
@@ -116,8 +117,9 @@ PYTHONPATH=src \
 This smoke training is not a detector-performance claim. It only verifies the
 data path needed before real RGB+aux detector training. The summary includes
 elapsed time, sample-epochs/sec, and simple time estimates for the requested
-sample counts. These estimates apply to the tiny RGB+aux stem only; full
-detector fine-tuning will be much slower.
+sample counts. With `--eval-fraction`, it also records a deterministic
+train/eval split and eval loss. These estimates apply to the tiny RGB+aux stem
+only; full detector fine-tuning will be much slower.
 
 ## Validation
 

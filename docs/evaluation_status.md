@@ -53,7 +53,8 @@ The repository now includes a DNN-facing export path:
 - `perception_isp.aux_export`: writes `manifest.jsonl`, `labels/*.json`, and
   `tensors/*.npz`.
 - `perception_isp.aux_train_smoke`: runs a tiny PyTorch optimization loop on
-  the exported six-channel tensors.
+  the exported six-channel tensors, with optional deterministic train/eval
+  split reporting.
 
 Current local resource check:
 
@@ -66,21 +67,24 @@ to make strong perception performance claims from large-scale detector
 retraining. The current verified smoke run exported two COCO8 CameraE2E-backed
 samples in about 6 seconds.
 
-A tiny RGB+aux stem benchmark on the exported COCO8 smoke manifest ran on MPS
-at about 26.6 sample-epochs/sec:
+A tiny RGB+aux stem benchmark on the exported COCO8 smoke manifest with
+`--eval-fraction 0.5` ran on MPS at about 9.4 train sample-epochs/sec. The
+same run recorded train and eval loss (`1.021 -> 1.005` train, `0.906 -> 0.903`
+eval):
 
 | Samples | Epochs | Estimated time |
 | ---: | ---: | ---: |
-| 10 | 3 | 1.1 s |
-| 100 | 3 | 11.3 s |
-| 1,000 | 3 | 1.9 min |
-| 10,000 | 3 | 18.8 min |
+| 10 | 3 | 3.2 s |
+| 100 | 3 | 32.0 s |
+| 1,000 | 3 | 5.3 min |
+| 10,000 | 3 | 53.4 min |
 
 This benchmark is a lower-bound smoke path for a tiny stem, not a full YOLO
 fine-tuning estimate. Full detector training with a backbone, feature pyramid,
 loss matching, and validation will be much slower and should use a CUDA GPU for
-claim-quality experiments. The current result proves the data path and basic
-optimization only, not detector superiority.
+claim-quality experiments. The train-smoke path can record eval loss with
+`--eval-fraction`, but the current result still proves only the data path and
+basic optimization, not detector superiority.
 
 ## CameraE2E Resolution Finding
 
