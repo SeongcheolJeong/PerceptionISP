@@ -20,6 +20,7 @@ TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 TASK_GATE_SUMMARY = "task_gate_summary.json"
 CONDITION_METRICS_SUMMARY = "condition_metrics_summary.json"
 CONDITION_GATE_SUMMARY = "condition_gate_summary.json"
+MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 
 HUMAN_INPUTS = {"human_rgb"}
 PERCEPTION_INPUTS = {
@@ -49,6 +50,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--task-gate", default=None, help="task_gate_summary.json path/dir.")
     parser.add_argument("--condition-metrics", default=None, help="condition_metrics_summary.json path/dir.")
     parser.add_argument("--condition-gate", default=None, help="condition_gate_summary.json path/dir.")
+    parser.add_argument("--mechanism-validation", default=None, help="mechanism_validation_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
     parser.add_argument("--output-dir", default="reports/perception_benchmark_protocol")
     args = parser.parse_args(argv)
@@ -62,6 +64,7 @@ def main(argv: Any = None) -> int:
         task_gate=args.task_gate,
         condition_metrics=args.condition_metrics,
         condition_gate=args.condition_gate,
+        mechanism_validation=args.mechanism_validation,
         min_samples=int(args.min_samples),
     )
     html_path = write_protocol_coverage(summary, args.output_dir)
@@ -93,6 +96,7 @@ def build_protocol_coverage(
     task_gate: str | Path | None = None,
     condition_metrics: str | Path | None = None,
     condition_gate: str | Path | None = None,
+    mechanism_validation: str | Path | None = None,
     min_samples: int = 1000,
 ) -> Dict[str, Any]:
     evidence = _collect_evidence(
@@ -104,6 +108,7 @@ def build_protocol_coverage(
         task_gate=task_gate,
         condition_metrics=condition_metrics,
         condition_gate=condition_gate,
+        mechanism_validation=mechanism_validation,
     )
     requirements = _requirements(evidence, min_samples=int(min_samples))
     missing_required = [row["id"] for row in requirements if row["scope"] == "claim_required" and row["status"] != "covered"]
@@ -152,6 +157,7 @@ def _collect_evidence(
     task_gate: str | Path | None,
     condition_metrics: str | Path | None,
     condition_gate: str | Path | None,
+    mechanism_validation: str | Path | None,
 ) -> Dict[str, Any]:
     input_names: set[str] = set()
     run_configs: list[Dict[str, Any]] = []
@@ -193,6 +199,7 @@ def _collect_evidence(
     task_gate_data = _load_task_gate(task_gate)
     condition = _load_condition_metrics(condition_metrics)
     condition_gate_data = _load_condition_gate(condition_gate)
+    mechanism = _load_mechanism_validation(mechanism_validation)
 
     return {
         "comparison_reports": comparison_paths,
@@ -210,6 +217,7 @@ def _collect_evidence(
         "task_gate": task_gate_data,
         "condition_metrics": condition,
         "condition_gate": condition_gate_data,
+        "mechanism_validation": mechanism,
     }
 
 
@@ -223,6 +231,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     task_gate = evidence.get("task_gate", {}) if isinstance(evidence.get("task_gate"), Mapping) else {}
     condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     condition_gate = evidence.get("condition_gate", {}) if isinstance(evidence.get("condition_gate"), Mapping) else {}
+    mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
 
     return [
         _row(
@@ -296,6 +305,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(condition_gate.get("available")) and bool(condition_gate.get("pass")),
             str(condition_gate.get("summary", "missing")),
             "Condition-specific metrics need a robustness gate before promotion because coverage alone does not prove the target is acceptable on adverse slices.",
+        ),
+        _row(
+            "front_end_mechanism_validation",
+            "Front-end mechanism validation passed",
+            "raw_claim_required",
+            bool(mechanism.get("available")) and bool(mechanism.get("pass")),
+            str(mechanism.get("summary", "missing")),
+            "Sensor-native map claims need controlled low-light, glare/HDR, MTF, and CFA-response evidence before detector results are interpreted.",
         ),
         _row(
             "naive_raw_baseline",
@@ -470,6 +487,28 @@ def _load_condition_gate(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _load_mechanism_validation(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, MECHANISM_VALIDATION_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    mechanisms = [row for row in data.get("mechanisms", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in mechanisms if str(row.get("status", "")) != "pass"]
+    cfas = ", ".join(str(value) for value in data.get("cfa_patterns", ()))
+    status = str(data.get("status", ""))
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass" and not failed,
+        "status": status,
+        "mechanism_count": len(mechanisms),
+        "failed_mechanisms": failed,
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "summary": f"{status}, mechanisms={len(mechanisms)}, failed={len(failed)}, cfa={cfas or 'none'}",
+    }
+
+
 def _sample_count(report: Mapping[str, Any]) -> int:
     if report.get("sample_count") is not None:
         return int(report.get("sample_count", 0))
@@ -630,6 +669,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     task_gate = evidence.get("task_gate", {}) if isinstance(evidence.get("task_gate"), Mapping) else {}
     condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     condition_gate = evidence.get("condition_gate", {}) if isinstance(evidence.get("condition_gate"), Mapping) else {}
+    mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
     return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -669,6 +709,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Task gate</th><td>{_optional_link(task_gate, destination)} {html_lib.escape(str(task_gate.get('summary', 'missing')))}</td></tr>
       <tr><th>Condition metrics</th><td>{_optional_link(condition, destination)} {html_lib.escape(str(condition.get('summary', 'missing')))}</td></tr>
       <tr><th>Condition gate</th><td>{_optional_link(condition_gate, destination)} {html_lib.escape(str(condition_gate.get('summary', 'missing')))}</td></tr>
+      <tr><th>Mechanism validation</th><td>{_optional_link(mechanism, destination)} {html_lib.escape(str(mechanism.get('summary', 'missing')))}</td></tr>
     </tbody>
   </table>
   <p>Raw JSON: <code>protocol_coverage_summary.json</code></p>

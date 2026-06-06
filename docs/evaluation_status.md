@@ -223,17 +223,19 @@ reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 ```
 
 It reports `coverage_status=coverage_complete` for evidence coverage, including
-the recommended `extended_sensor_native_tensor` row, while the metric side
-stays narrow as `metric_claim_status=fp_reducer_only`. That means the configured
-protocol has the expected rows, not that the target wins every metric. The
-protocol now also includes a task gate, condition-specific metrics, and a
-condition robustness gate:
+front-end mechanism validation and the recommended
+`extended_sensor_native_tensor` row, while the metric side stays narrow as
+`metric_claim_status=fp_reducer_only`. That means the configured protocol has
+the expected rows, not that the target wins every metric. The protocol now also
+includes a task gate, condition-specific metrics, a condition robustness gate,
+and mechanism validation:
 
 ```text
 reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
+reports/perception_mechanism_validation_synthetic/index.html
 ```
 
 The current condition report has 9 slices from explicit/sample-derived
@@ -528,6 +530,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Task-level recall improvement | `task_gate_fail` for `vru`, `person`, `cyclist`, `vehicle`, and `small_all`; current evidence supports only the narrower FP-reduction claim |
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |
+| Front-end mechanism validation | `pass` for low-light, glare, low-MTF, and CFA-support checks; this is signal feasibility evidence, not detector performance evidence |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
@@ -542,9 +545,9 @@ This protocol coverage is a blocker checklist, not a metric result. It checks
 whether the evidence includes the minimum matrix needed for broad claims:
 paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
 detector recipe, CI-backed gates, task metrics, a task gate,
-condition-specific metrics, a condition robustness gate, naive RAW/minimal
-adaptation, classical lightweight RAW transform, and task-aware/aux-assisted
-paths.
+condition-specific metrics, a condition robustness gate, front-end mechanism
+validation, naive RAW/minimal adaptation, classical lightweight RAW transform,
+and task-aware/aux-assisted paths.
 
 The current naive RAW-like KITTI val baseline is:
 

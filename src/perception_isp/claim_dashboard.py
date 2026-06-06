@@ -18,6 +18,7 @@ COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 TASK_GATE_SUMMARY = "task_gate_summary.json"
 PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
+MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -27,6 +28,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
     parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
+    parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -37,6 +39,7 @@ def main(argv: Any = None) -> int:
         task_metrics=args.task_metrics,
         task_gate=args.task_gate,
         protocol_coverage=args.protocol_coverage,
+        mechanism_validation=args.mechanism_validation,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -63,6 +66,7 @@ def build_claim_dashboard(
     task_metrics: str | Path | None = None,
     task_gate: str | Path | None = None,
     protocol_coverage: str | Path | None = None,
+    mechanism_validation: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
@@ -70,14 +74,16 @@ def build_claim_dashboard(
     task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
     task_gate_data = _load_task_gate(task_gate) if task_gate is not None else None
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
+    mechanism = _load_mechanism_validation(mechanism_validation) if mechanism_validation is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol)
+    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism)
     return {
         "claims": claims,
         "training": training,
         "task_metrics": task,
         "task_gate": task_gate_data,
         "protocol_coverage": protocol,
+        "mechanism_validation": mechanism,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
@@ -235,6 +241,26 @@ def _load_protocol_coverage(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_mechanism_validation(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, MECHANISM_VALIDATION_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    mechanisms = [row for row in data.get("mechanisms", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in mechanisms if str(row.get("status", "")) != "pass"]
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "mechanism_count": len(mechanisms),
+        "failed_mechanisms": failed,
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "interpretation": str(data.get("interpretation", "")),
+    }
+
+
 def _select_task_target(data: Mapping[str, Any], *, claims: Sequence[Mapping[str, Any]], baseline_input: str) -> str:
     available = {str(value) for value in data.get("inputs", ())}
     for profile in ("fp_reducer", "broad_superiority"):
@@ -317,6 +343,7 @@ def _claim_decisions(
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
+    mechanism_validation: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -340,6 +367,12 @@ def _claim_decisions(
             decisions.append({"status": "needs_gate", "claim": "The learned RGB+Aux DNN path has candidate metrics, but still needs a held-out claim gate."})
         elif status == "training_path_only":
             decisions.append({"status": "needs_eval", "claim": "The RGB+Aux DNN training path exists, but direct held-out detector evaluation is still missing."})
+    if mechanism_validation is not None:
+        if bool(mechanism_validation.get("pass")):
+            decisions.append({"status": "supported", "claim": "PerceptionISP front-end mechanism validation passed; aux/confidence maps respond to controlled sensor stressors."})
+        else:
+            failed = ", ".join(str(value) for value in mechanism_validation.get("failed_mechanisms", ())) or "configured mechanism checks"
+            decisions.append({"status": "not_supported", "claim": f"PerceptionISP front-end mechanism validation failed for {failed}; do not use aux maps as feasibility evidence yet."})
     if task_gate is not None:
         profile = str(task_gate.get("profile", "task"))
         if bool(task_gate.get("pass")):
@@ -507,6 +540,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     task_metrics_html = _task_metrics_html(task_metrics, destination) if isinstance(task_metrics, Mapping) else "<p>No task metrics summary was provided.</p>"
     task_gate = dashboard.get("task_gate")
     task_gate_html = _task_gate_html(task_gate, destination) if isinstance(task_gate, Mapping) else "<p>No task gate summary was provided.</p>"
+    mechanism = dashboard.get("mechanism_validation")
+    mechanism_html = _mechanism_html(mechanism, destination) if isinstance(mechanism, Mapping) else "<p>No mechanism validation summary was provided.</p>"
     protocol = dashboard.get("protocol_coverage")
     protocol_html = _protocol_html(protocol, destination) if isinstance(protocol, Mapping) else "<p>No benchmark protocol coverage summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
@@ -550,6 +585,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {task_metrics_html}
   <h2>Task Gate</h2>
   {task_gate_html}
+  <h2>Mechanism Validation</h2>
+  {mechanism_html}
   <h2>Benchmark Protocol Coverage</h2>
   {protocol_html}
   <h2>Supporting Rollups</h2>
@@ -674,6 +711,24 @@ def _task_gate_html(task_gate: Mapping[str, Any], destination: Path) -> str:
         f"<td>{int(task_gate.get('skipped_group_count', 0))}</td>"
         f"<td>{html_lib.escape(failed)}</td>"
         f"<td>{html_lib.escape(skipped)}</td>"
+        "</tr></tbody></table>"
+    )
+
+
+def _mechanism_html(mechanism: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(mechanism.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in mechanism.get("failed_mechanisms", ())) or "none"
+    cfas = ", ".join(str(value) for value in mechanism.get("cfa_patterns", ())) or "none"
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(mechanism.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(mechanism.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Mechanisms</th><th>CFA Patterns</th><th>Failed</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(mechanism, destination)}</td>"
+        f"<td>{int(mechanism.get('mechanism_count', 0))}</td>"
+        f"<td>{html_lib.escape(cfas)}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
         "</tr></tbody></table>"
     )
 

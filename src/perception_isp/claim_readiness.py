@@ -38,6 +38,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-rollup", default=None, help="Existing training rollup summary path/dir. Ignored when --training-summary is used.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Existing comparison rollup path/dir, optionally name=path.")
     parser.add_argument("--protocol-comparison-report", action="append", default=[], help="Additional comparison report used only for benchmark-protocol coverage, for example a naive RAW baseline.")
+    parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir used for RAW/sensor-native claim coverage.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
 
@@ -55,6 +56,7 @@ def main(argv: Any = None) -> int:
         training_rollup=args.training_rollup,
         comparison_rollups=args.comparison_rollup,
         protocol_comparison_reports=args.protocol_comparison_report,
+        mechanism_validation=args.mechanism_validation,
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -76,6 +78,7 @@ def run_claim_readiness(
     training_rollup: str | Path | None = None,
     comparison_rollups: Sequence[str | Path] = (),
     protocol_comparison_reports: Sequence[str | Path] = (),
+    mechanism_validation: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
     destination = Path(output_dir).expanduser()
@@ -178,6 +181,7 @@ def run_claim_readiness(
         task_gate=task_gate_dir,
         condition_metrics=condition_metrics_dir,
         condition_gate=condition_gate_dir,
+        mechanism_validation=mechanism_validation,
         min_samples=int(min_samples),
     )
     protocol_html = write_protocol_coverage(protocol_summary, protocol_dir)
@@ -192,6 +196,7 @@ def run_claim_readiness(
         task_metrics=task_metrics_dir,
         task_gate=task_gate_dir,
         protocol_coverage=protocol_dir,
+        mechanism_validation=mechanism_validation,
         comparison_rollup_specs=comparison_rollups,
     )
     dashboard_html = write_claim_dashboard(dashboard, dashboard_dir)
@@ -257,6 +262,7 @@ def run_claim_readiness(
                 if isinstance(row, Mapping) and row.get("status") == "fail"
             ],
         },
+        "mechanism_validation": _mechanism_validation_summary(mechanism_validation),
         "benchmark_protocol": {
             "report": str(protocol_html),
             "summary_json": str(protocol_html.parent / "protocol_coverage_summary.json"),
@@ -305,6 +311,28 @@ def _comparison_summary_path(path: str | Path) -> Path:
     return candidate
 
 
+def _mechanism_validation_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "mechanism_validation_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"mechanism validation summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    mechanisms = [row for row in data.get("mechanisms", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in mechanisms if str(row.get("status", "")) != "pass"]
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "failed_mechanisms": failed,
+        "mechanism_count": len(mechanisms),
+    }
+
+
 def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "summary_json": summary.get("summary_json"),
@@ -315,6 +343,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "task_gate": summary.get("task_gate"),
         "condition_metrics": summary.get("condition_metrics"),
         "condition_gate": summary.get("condition_gate"),
+        "mechanism_validation": summary.get("mechanism_validation"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],

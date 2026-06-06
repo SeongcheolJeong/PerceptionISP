@@ -20,7 +20,8 @@ not portable outside the Codex session.
   stream, a perception stream, auxiliary confidence maps, and sensor metadata.
 - Strong claims need paired or matched evaluation, fixed detector recipe,
   task-specific metrics with a task gate, condition-specific metrics plus a
-  robustness gate, confidence intervals, and compute/latency/memory reporting.
+  robustness gate, controlled front-end mechanism validation, confidence
+  intervals, and compute/latency/memory reporting.
 
 ## Evaluation Requirements
 

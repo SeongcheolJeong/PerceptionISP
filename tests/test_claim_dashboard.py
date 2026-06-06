@@ -19,6 +19,7 @@ class ClaimDashboardTest(unittest.TestCase):
             training = _write_training_rollup(root / "training")
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
+            mechanism = _write_mechanism_validation(root / "mechanism")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -26,6 +27,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 training_rollup=training,
                 task_metrics=task_metrics,
                 protocol_coverage=protocol,
+                mechanism_validation=mechanism,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -36,9 +38,14 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["training"]["status"], "diagnostic_only")
             self.assertEqual(dashboard["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(dashboard["protocol_coverage"]["status"], "not_claim_ready")
+            self.assertTrue(dashboard["mechanism_validation"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
                 "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "PerceptionISP front-end mechanism validation passed; aux/confidence maps respond to controlled sensor stressors.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertTrue(
@@ -55,6 +62,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Broad HumanISP superiority gate failed", html)
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
             self.assertIn("Task Metrics", html)
+            self.assertIn("Mechanism Validation", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
@@ -65,6 +73,7 @@ class ClaimDashboardTest(unittest.TestCase):
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
+            mechanism = _write_mechanism_validation(root / "mechanism")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -75,6 +84,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(task_metrics),
                         "--protocol-coverage",
                         str(protocol),
+                        "--mechanism-validation",
+                        str(mechanism),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -85,6 +96,7 @@ class ClaimDashboardTest(unittest.TestCase):
             summary = json.loads((root / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(summary["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
+            self.assertTrue(summary["mechanism_validation"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -324,6 +336,28 @@ def _write_protocol_coverage(path: Path) -> Path:
                     }
                 ],
                 "interpretation": "Protocol evidence is incomplete.",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_mechanism_validation(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "mechanism_validation_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "cfa_patterns": ["RGGB", "GRBG", "RCCB", "RGBIR"],
+                "mechanisms": [
+                    {"id": "low_light_noise_response", "status": "pass"},
+                    {"id": "glare_saturation_response", "status": "pass"},
+                    {"id": "low_mtf_edge_confidence_response", "status": "pass"},
+                    {"id": "cfa_variant_support", "status": "pass"},
+                ],
+                "interpretation": "unit mechanism validation",
             }
         )
         + "\n"

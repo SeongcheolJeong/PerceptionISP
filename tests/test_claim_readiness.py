@@ -18,6 +18,7 @@ class ClaimReadinessTest(unittest.TestCase):
             train_dir = _write_train_summary(root / "train")
             eval_dir = _write_eval_summary(root / "eval")
             rollup_dir = _write_comparison_rollup(root / "rollup")
+            mechanism = _write_mechanism_validation(root / "mechanism")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -26,6 +27,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 bootstrap_seed="unit",
                 training_summaries=[train_dir, eval_dir],
                 comparison_rollups=[f"Calibration={rollup_dir}"],
+                mechanism_validation=mechanism,
                 output_dir=root / "readiness",
             )
 
@@ -44,6 +46,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("task_gate", summary)
             self.assertIn("condition_metrics", summary)
             self.assertIn("condition_gate", summary)
+            self.assertIn("mechanism_validation", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -65,6 +68,7 @@ class ClaimReadinessTest(unittest.TestCase):
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(dashboard_summary["task_metrics"]["status"], "candidate_needs_gate")
             self.assertEqual(dashboard_summary["task_gate"]["verdict"], "task_gate_pass")
+            self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -106,6 +110,7 @@ class ClaimReadinessTest(unittest.TestCase):
             naive_dir = _write_comparison_report(root / "naive", tone_mapping="linear", demosaic_method="bilinear", denoise_strength=0.0)
             train_dir = _write_train_summary(root / "train")
             eval_dir = _write_eval_summary(root / "eval")
+            mechanism = _write_mechanism_validation(root / "mechanism")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -114,6 +119,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 bootstrap_seed="unit",
                 training_summaries=[train_dir, eval_dir],
                 protocol_comparison_reports=[naive_dir],
+                mechanism_validation=mechanism,
                 output_dir=root / "readiness",
             )
 
@@ -125,6 +131,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_complete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
+            self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
 
 
 def _write_comparison_report(
@@ -263,6 +270,23 @@ def _write_eval_summary(path: Path) -> Path:
 def _write_comparison_rollup(path: Path) -> Path:
     path.mkdir()
     (path / "rollup_summary.json").write_text(json.dumps({"run_count": 1, "baseline_input": "human_rgb", "runs": []}) + "\n")
+    return path
+
+
+def _write_mechanism_validation(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cfa_patterns": ["RGGB", "GRBG", "RCCB", "RGBIR"],
+        "mechanisms": [
+            {"id": "low_light_noise_response", "status": "pass"},
+            {"id": "glare_saturation_response", "status": "pass"},
+            {"id": "low_mtf_edge_confidence_response", "status": "pass"},
+            {"id": "cfa_variant_support", "status": "pass"},
+        ],
+    }
+    (path / "mechanism_validation_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

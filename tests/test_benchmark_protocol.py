@@ -21,6 +21,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             task_gate = _write_task_gate(root / "task_gate")
             condition = _write_condition_metrics(root / "condition")
             condition_gate = _write_condition_gate(root / "condition_gate")
+            mechanism = _write_mechanism_validation(root / "mechanism")
 
             summary = build_protocol_coverage(
                 comparison_reports=[report],
@@ -30,6 +31,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 task_gate=task_gate,
                 condition_metrics=condition,
                 condition_gate=condition_gate,
+                mechanism_validation=mechanism,
                 min_samples=3,
             )
 
@@ -39,6 +41,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(summary["metric_claim_status"], "broad_superiority_not_supported")
             self.assertEqual(rows["paired_human_baseline"]["status"], "covered")
             self.assertEqual(rows["classical_lightweight_transform"]["status"], "covered")
+            self.assertEqual(rows["front_end_mechanism_validation"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
             self.assertIn("naive_raw_baseline", summary["missing_raw_claim"])
 
@@ -58,6 +61,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             task_gate = _write_task_gate(root / "task_gate")
             condition = _write_condition_metrics(root / "condition")
             condition_gate = _write_condition_gate(root / "condition_gate")
+            mechanism = _write_mechanism_validation(root / "mechanism")
 
             summary = build_protocol_coverage(
                 comparison_reports=[classical, naive],
@@ -68,6 +72,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 task_gate=task_gate,
                 condition_metrics=condition,
                 condition_gate=condition_gate,
+                mechanism_validation=mechanism,
                 min_samples=3,
             )
 
@@ -87,6 +92,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             condition = _write_condition_metrics(root / "condition")
             condition_gate = _write_condition_gate(root / "condition_gate")
             gate = _write_claim_gate(root / "gate")
+            mechanism = _write_mechanism_validation(root / "mechanism")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = protocol_main(
@@ -103,6 +109,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(condition),
                         "--condition-gate",
                         str(condition_gate),
+                        "--mechanism-validation",
+                        str(mechanism),
                         "--min-samples",
                         "3",
                         "--output-dir",
@@ -231,6 +239,23 @@ def _write_condition_gate(path: Path) -> Path:
         "skipped_condition_count": 1,
     }
     (path / "condition_gate_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_mechanism_validation(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cfa_patterns": ["RGGB", "GRBG", "RCCB", "RGBIR"],
+        "mechanisms": [
+            {"id": "low_light_noise_response", "status": "pass"},
+            {"id": "glare_saturation_response", "status": "pass"},
+            {"id": "low_mtf_edge_confidence_response", "status": "pass"},
+            {"id": "cfa_variant_support", "status": "pass"},
+        ],
+    }
+    (path / "mechanism_validation_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 
