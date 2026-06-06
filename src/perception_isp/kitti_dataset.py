@@ -52,6 +52,7 @@ def load_kitti_detection_samples(
     *,
     split: str = "training",
     limit: Optional[int] = None,
+    offset: int = 0,
     width: int = 320,
     height: int = 240,
     cfa_pattern: str = "auto",
@@ -63,6 +64,9 @@ def load_kitti_detection_samples(
     root = Path(dataset).expanduser().resolve()
     image_dir, label_dir = _resolve_kitti_dirs(root, split)
     image_paths = sorted(path for path in image_dir.rglob("*") if path.suffix.lower() in IMAGE_EXTENSIONS)
+    start = max(int(offset), 0)
+    if start:
+        image_paths = image_paths[start:]
     if limit is not None:
         image_paths = image_paths[: max(int(limit), 0)]
 
@@ -83,8 +87,8 @@ def load_kitti_detection_samples(
         )
         raw.metadata = replace(
             raw.metadata,
-            frame_counter=index,
-            timestamp_us=33333.0 * index,
+            frame_counter=start + index,
+            timestamp_us=33333.0 * (start + index),
             camera_id="camerae2e_kitti_bridge" if use_camerae2e else "direct_kitti_bridge",
             module_serial=str(image_path),
         )
@@ -104,6 +108,8 @@ def load_kitti_detection_samples(
                     "requested_cfa_pattern": cfa_pattern,
                     "cfa_pattern": raw.metadata.cfa_pattern,
                     "split": split,
+                    "offset": int(start),
+                    "dataset_index": int(start + index),
                     "use_camerae2e": bool(use_camerae2e),
                     "include_dontcare": bool(include_dontcare),
                     "raw_provenance": dict(raw.provenance),

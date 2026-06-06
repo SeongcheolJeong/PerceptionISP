@@ -92,6 +92,34 @@ class YoloDatasetAdapterTest(unittest.TestCase):
             self.assertEqual(len(samples), 1)
             self.assertEqual(samples[0].metadata["image_path"].count("coco128"), 1)
 
+    def test_offset_skips_images_before_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image_dir = root / "images" / "val"
+            label_dir = root / "labels" / "val"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            for name, class_id in (("a", 0), ("b", 1)):
+                Image.fromarray(rgb).save(image_dir / f"{name}.jpg")
+                (label_dir / f"{name}.txt").write_text(f"{class_id} 0.5 0.5 0.25 0.25\n")
+            (root / "data.yaml").write_text("path: .\nval: images/val\nnames: ['car', 'person']\n")
+
+            samples = load_yolo_detection_samples(
+                root / "data.yaml",
+                split="val",
+                offset=1,
+                limit=1,
+                width=64,
+                height=48,
+                use_camerae2e=False,
+            )
+
+            self.assertEqual(len(samples), 1)
+            self.assertEqual(samples[0].sample_id, "b")
+            self.assertEqual(samples[0].metadata["dataset_index"], 1)
+            self.assertEqual(samples[0].ground_truth[0].label, "person")
+
 
 if __name__ == "__main__":
     unittest.main()

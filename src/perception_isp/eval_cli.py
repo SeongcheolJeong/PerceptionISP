@@ -21,6 +21,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--split", default="val", help="Dataset split for --source yolo-dataset.")
     parser.add_argument("--no-camerae2e", action="store_true", help="Use direct RGB remosaic instead of CameraE2E for dataset sources.")
     parser.add_argument("--count", type=int, default=4)
+    parser.add_argument("--offset", type=int, default=0, help="Skip this many dataset images before applying --count.")
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--height", type=int, default=90)
     parser.add_argument("--cfa", default="auto", help="auto uses CameraE2E sensor-native CFA when available.")
@@ -87,6 +88,7 @@ def main(argv: Any = None) -> int:
             args.dataset,
             split=args.split,
             limit=args.count,
+            offset=int(args.offset),
             width=args.width,
             height=args.height,
             cfa_pattern=args.cfa,
@@ -101,6 +103,7 @@ def main(argv: Any = None) -> int:
             args.dataset,
             split=args.split,
             limit=args.count,
+            offset=int(args.offset),
             width=args.width,
             height=args.height,
             cfa_pattern=args.cfa,
@@ -140,6 +143,7 @@ def main(argv: Any = None) -> int:
     result["run_config"] = {
         "source": args.source,
         "count": int(args.count),
+        "offset": int(args.offset),
         "width": int(args.width),
         "height": int(args.height),
         "cfa": str(args.cfa),

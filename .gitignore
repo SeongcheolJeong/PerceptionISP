@@ -29,6 +29,8 @@ data/**/labels/
 data/**/LICENSE
 data/**/README.txt
 data/sample_images/
+data/.cache/
+data/coco_val*/
 
 # Model weights and large ML artifacts
 *.pt

@@ -527,6 +527,7 @@ def _render_run_config_rows(run_config: Mapping[str, Any]) -> str:
         "dataset",
         "split",
         "count",
+        "offset",
         "width",
         "height",
         "use_camerae2e",
