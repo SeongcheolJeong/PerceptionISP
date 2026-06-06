@@ -313,6 +313,20 @@ This supports only a bounded FP-reduction claim against the current fusion
 baseline. It does not support saying that PerceptionISP broadly outperforms
 HumanISP.
 
+The consolidated claim-readiness dashboard is:
+
+```text
+reports/perception_claim_readiness_dashboard/index.html
+```
+
+It intentionally separates three decisions:
+
+| Decision | Current status |
+| --- | --- |
+| Broad HumanISP superiority | Not supported |
+| Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
+| Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
+
 ## CameraE2E Resolution Finding
 
 CameraE2E itself follows the expected path: RGB scene to spectral scene, sensor

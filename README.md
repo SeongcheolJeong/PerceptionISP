@@ -696,4 +696,22 @@ loss on R50/R75/small R50, and at least `0.10` fewer FP/sample. This supports a
 bounded FP-reduction claim only; it does not convert the result into a broad
 HumanISP superiority claim.
 
+Create a consolidated readiness dashboard from the claim gates, RGB+aux
+training rollup, and calibration rollup:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.claim_dashboard \
+  --claim-gate 'Human broad superiority=reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human' \
+  --claim-gate 'FP reducer vs RGB+Aux Fusion=reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_fp_reducer_vs_fusion' \
+  --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128 \
+  --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
+  --output-dir reports/perception_claim_readiness_dashboard
+```
+
+The dashboard currently says: broad HumanISP superiority is not supported,
+bounded FP reduction is supported, and the learned RGB+aux DNN path is
+trainable but not yet claim-quality.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

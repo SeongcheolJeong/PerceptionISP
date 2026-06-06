@@ -19,6 +19,7 @@ This implementation is deliberately broad rather than hardware-optimized.
 | DNN Export | RGB+aux six-channel tensor export, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
+| Evidence / Claiming | paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, RGB+aux training rollup, claim-readiness dashboard |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
