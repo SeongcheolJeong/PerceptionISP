@@ -35,6 +35,9 @@ class AuxDNNExportTest(unittest.TestCase):
             root = Path(tmp)
             manifest_path = root / "manifest.jsonl"
             self.assertEqual(summary["sample_count"], 2)
+            self.assertGreater(summary["elapsed_seconds"], 0.0)
+            self.assertGreater(summary["samples_per_second"], 0.0)
+            self.assertGreater(summary["seconds_per_sample"], 0.0)
             self.assertTrue(manifest_path.exists())
             rows = [json.loads(line) for line in manifest_path.read_text().splitlines() if line.strip()]
             self.assertEqual(len(rows), 2)

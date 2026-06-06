@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence
 
@@ -86,6 +87,7 @@ def export_aux_dataset(
     config: PerceptionISPConfig | None = None,
     run_config: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
+    start_time = time.perf_counter()
     destination = Path(output_dir).expanduser()
     tensor_dir = destination / "tensors"
     label_dir = destination / "labels"
@@ -142,7 +144,8 @@ def export_aux_dataset(
 
     manifest_path = destination / "manifest.jsonl"
     manifest_path.write_text("".join(json.dumps(json_ready(row)) + "\n" for row in manifest_rows))
-    summary = _summary(manifest_rows, run_config=run_config)
+    elapsed_seconds = max(time.perf_counter() - start_time, 1.0e-9)
+    summary = _summary(manifest_rows, run_config=run_config, elapsed_seconds=elapsed_seconds)
     (destination / "summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
     (destination / "index.html").write_text(_render_html(summary, manifest_rows))
     return summary
@@ -196,15 +199,20 @@ def _load_samples(
     )
 
 
-def _summary(rows: Sequence[Mapping[str, Any]], *, run_config: Mapping[str, Any] | None) -> Dict[str, Any]:
+def _summary(rows: Sequence[Mapping[str, Any]], *, run_config: Mapping[str, Any] | None, elapsed_seconds: float) -> Dict[str, Any]:
     raw = [row.get("raw_provenance", {}) for row in rows]
+    sample_count = int(len(rows))
+    seconds = max(float(elapsed_seconds), 1.0e-9)
     return {
-        "sample_count": int(len(rows)),
+        "sample_count": sample_count,
         "channels": list(RGB_AUX_CHANNELS),
         "tensor_layouts": ["rgb_aux_hwc", "rgb_aux_chw"],
         "manifest": "manifest.jsonl",
         "run_config": dict(run_config or {}),
         "total_boxes": int(sum(int(row.get("box_count", 0)) for row in rows)),
+        "elapsed_seconds": seconds,
+        "samples_per_second": float(sample_count / seconds) if sample_count else 0.0,
+        "seconds_per_sample": float(seconds / sample_count) if sample_count else None,
         "raw_provenance": {
             "true_sensor_cfa_mosaic_count": sum(1 for item in raw if isinstance(item, Mapping) and item.get("true_sensor_cfa_mosaic")),
             "pattern_remapped_count": sum(1 for item in raw if isinstance(item, Mapping) and item.get("pattern_remapped")),
@@ -248,7 +256,7 @@ def _render_html(summary: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) 
 <body>
   <h1>PerceptionISP RGB+Aux DNN Export</h1>
   <div class=\"note\">This export is the DNN-facing path: six channels are stored as both HWC and CHW tensors. Channels: <code>{html_lib.escape(channels)}</code>.</div>
-  <p>Samples: {int(summary.get('sample_count', 0))}, boxes: {int(summary.get('total_boxes', 0))}. Manifest: <code>manifest.jsonl</code>.</p>
+  <p>Samples: {int(summary.get('sample_count', 0))}, boxes: {int(summary.get('total_boxes', 0))}, export: {float(summary.get('elapsed_seconds', 0.0)):.2f}s ({float(summary.get('samples_per_second', 0.0)):.2f} samples/s). Manifest: <code>manifest.jsonl</code>.</p>
   <table>
     <thead><tr><th>Sample</th><th>Shape</th><th>Boxes</th><th>Source CFA</th><th>Target CFA</th><th>Remapped</th><th>Tensor</th></tr></thead>
     <tbody>{''.join(table_rows)}</tbody>
