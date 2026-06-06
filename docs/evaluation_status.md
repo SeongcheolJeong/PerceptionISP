@@ -214,12 +214,13 @@ The claim gate makes this explicit:
 reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human/index.html
 ```
 
-The gate compares `perception_calibrated_score_label_aux_fusion_rgb_aux`
-against `human_rgb` and requires P50, R50, R75, small-object R50, and FP/sample
-to be no worse than HumanISP. The current train512-to-val gate verdict is
-`metric_gate_fail`; the failing metrics are `recall@0.50_mean`,
-`recall@0.75_mean`, and `small_recall@0.50_mean`. With `--fail-on-fail`, this
-same gate returns exit code `1` while still writing the HTML/JSON report.
+The gate uses the `broad_superiority` profile, compares
+`perception_calibrated_score_label_aux_fusion_rgb_aux` against `human_rgb`, and
+requires P50, R50, R75, small-object R50, and FP/sample to be no worse than
+HumanISP. The current train512-to-val gate verdict is `metric_gate_fail`; the
+failing metrics are `recall@0.50_mean`, `recall@0.75_mean`, and
+`small_recall@0.50_mean`. With `--fail-on-fail`, this same gate returns exit
+code `1` while still writing the HTML/JSON report.
 
 The latest gate also records paired sample-level bootstrap intervals with
 `--require-ci --bootstrap-samples 2000`. The precision and FP gains pass the CI
@@ -227,11 +228,11 @@ check, but recall does not:
 
 | Metric delta vs HumanISP | Mean delta | 95% paired bootstrap CI | Gate |
 | --- | ---: | ---: | --- |
-| P50 | +0.0294 | [+0.0207, +0.0378] | pass |
-| R50 | -0.0108 | [-0.0148, -0.0069] | fail |
-| R75 | -0.0045 | [-0.0087, -0.0002] | fail |
-| Small R50 | -0.0025 | [-0.0064, +0.0015] | fail |
-| FP/sample | -0.3309 | [-0.3703, -0.2928] | pass |
+| P50 | +0.0294 | [+0.0212, +0.0378] | pass |
+| R50 | -0.0108 | [-0.0148, -0.0068] | fail |
+| R75 | -0.0045 | [-0.0086, +0.0001] | fail |
+| Small R50 | -0.0025 | [-0.0065, +0.0016] | fail |
+| FP/sample | -0.3309 | [-0.3690, -0.2934] | pass |
 
 The train512 calibrator was also applied to the same 1,496-sample val report
 with feature-set-specific artifacts:
@@ -276,6 +277,30 @@ calibration path. Compared with score+label calibration alone, adding aux gives
 another `+0.0054` P50 and `-0.0622` FP/sample, but also costs `-0.0022` R50 and
 `-0.0018` small-object R50. The main gain still comes from proposal/label score
 calibration, not from aux maps alone.
+
+Because the broad HumanISP gate fails, the defensible claim is narrower:
+recall-budgeted FP reduction versus the uncalibrated RGB+Aux fusion path. The
+claim gate has a separate `fp_reducer` profile for that:
+
+```text
+reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_fp_reducer_vs_fusion/index.html
+```
+
+`fp_reducer` requires non-worse precision, R50/R75/small-R50 loss no worse than
+`-0.01`, and at least `-0.10` FP/sample reduction. On the train512-to-val
+score+label+aux calibration result, it passes with paired CI enabled:
+
+| Metric delta vs RGB+Aux Fusion | Mean delta | 95% paired bootstrap CI | Threshold | Gate |
+| --- | ---: | ---: | ---: | --- |
+| P50 | +0.0304 | [+0.0239, +0.0368] | +0.0000 | pass |
+| R50 | -0.0052 | [-0.0072, -0.0033] | -0.0100 | pass |
+| R75 | -0.0037 | [-0.0057, -0.0019] | -0.0100 | pass |
+| Small R50 | -0.0026 | [-0.0047, -0.0009] | -0.0100 | pass |
+| FP/sample | -0.3135 | [-0.3476, -0.2787] | -0.1000 | pass |
+
+This supports only a bounded FP-reduction claim against the current fusion
+baseline. It does not support saying that PerceptionISP broadly outperforms
+HumanISP.
 
 ## CameraE2E Resolution Finding
 

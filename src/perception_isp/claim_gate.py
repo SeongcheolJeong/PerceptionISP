@@ -30,17 +30,41 @@ SAMPLE_METRIC_MAP = {
     "fp@0.50_mean": "fp@0.50",
 }
 
+CLAIM_PROFILES = {
+    "broad_superiority": {
+        "min_precision_delta": 0.0,
+        "min_recall_delta": 0.0,
+        "min_recall75_delta": 0.0,
+        "min_small_recall_delta": 0.0,
+        "max_fp_delta": 0.0,
+    },
+    "fp_reducer": {
+        "min_precision_delta": 0.0,
+        "min_recall_delta": -0.01,
+        "min_recall75_delta": -0.01,
+        "min_small_recall_delta": -0.01,
+        "max_fp_delta": -0.10,
+    },
+}
+
+CLAIM_PROFILE_DESCRIPTIONS = {
+    "broad_superiority": "Conservative metric gate: target must be no worse than baseline on precision, recall, small-object recall, and FP/sample.",
+    "fp_reducer": "Recall-budgeted FP reducer gate: target must reduce FP/sample substantially while keeping precision non-worse and recall losses within budget.",
+    "custom": "Custom metric gate assembled from explicit threshold arguments.",
+}
+
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluate whether a target input passes a conservative comparison claim gate.")
     parser.add_argument("report", help="Report directory or comparison_summary.json")
+    parser.add_argument("--profile", default="broad_superiority", choices=sorted(CLAIM_PROFILES), help="Named metric gate profile.")
     parser.add_argument("--target-input", default="perception_calibrated_fusion_rgb_aux")
     parser.add_argument("--baseline-input", default="human_rgb")
-    parser.add_argument("--min-precision-delta", type=float, default=0.0)
-    parser.add_argument("--min-recall-delta", type=float, default=0.0)
-    parser.add_argument("--min-recall75-delta", type=float, default=0.0)
-    parser.add_argument("--min-small-recall-delta", type=float, default=0.0)
-    parser.add_argument("--max-fp-delta", type=float, default=0.0)
+    parser.add_argument("--min-precision-delta", type=float, default=None)
+    parser.add_argument("--min-recall-delta", type=float, default=None)
+    parser.add_argument("--min-recall75-delta", type=float, default=None)
+    parser.add_argument("--min-small-recall-delta", type=float, default=None)
+    parser.add_argument("--max-fp-delta", type=float, default=None)
     parser.add_argument("--min-samples", type=int, default=1)
     parser.add_argument("--bootstrap-samples", type=int, default=1000, help="Paired bootstrap resamples for sample-level delta confidence intervals.")
     parser.add_argument("--bootstrap-confidence", type=float, default=0.95)
@@ -52,22 +76,12 @@ def main(argv: Any = None) -> int:
 
     report_path = _summary_path(args.report)
     report = json.loads(report_path.read_text())
+    thresholds = _cli_thresholds(args)
     summary = build_claim_gate(
         report,
         target_input=str(args.target_input),
         baseline_input=str(args.baseline_input),
-        thresholds={
-            "min_precision_delta": float(args.min_precision_delta),
-            "min_recall_delta": float(args.min_recall_delta),
-            "min_recall75_delta": float(args.min_recall75_delta),
-            "min_small_recall_delta": float(args.min_small_recall_delta),
-            "max_fp_delta": float(args.max_fp_delta),
-            "min_samples": int(args.min_samples),
-            "bootstrap_samples": int(args.bootstrap_samples),
-            "bootstrap_confidence": float(args.bootstrap_confidence),
-            "bootstrap_seed": str(args.bootstrap_seed),
-            "require_ci": bool(args.require_ci),
-        },
+        thresholds=thresholds,
         source_report=report_path,
     )
     destination = Path(args.output_dir).expanduser() if args.output_dir else report_path.parent / f"claim_gate_{_safe_name(args.target_input)}_vs_{_safe_name(args.baseline_input)}"
@@ -78,6 +92,7 @@ def main(argv: Any = None) -> int:
                 {
                     "report": str(html_path),
                     "summary_json": str(html_path.parent / "claim_gate_summary.json"),
+                    "profile": summary["profile"],
                     "pass": summary["pass"],
                     "verdict": summary["verdict"],
                     "failed": [item["metric"] for item in summary["criteria"] if not item["pass"]],
@@ -97,7 +112,8 @@ def build_claim_gate(
     thresholds: Mapping[str, Any] | None = None,
     source_report: str | Path | None = None,
 ) -> Dict[str, Any]:
-    threshold_values = dict(thresholds or {})
+    threshold_values = _resolve_thresholds(thresholds)
+    profile = str(threshold_values.pop("profile", "custom"))
     bootstrap_samples = max(int(threshold_values.get("bootstrap_samples", 1000)), 0)
     bootstrap_confidence = float(threshold_values.get("bootstrap_confidence", 0.95))
     bootstrap_seed = str(threshold_values.get("bootstrap_seed", "claim_gate"))
@@ -165,6 +181,8 @@ def build_claim_gate(
     verdict = "metric_gate_pass" if passed else "metric_gate_fail"
     return {
         "source_report": "" if source_report is None else str(source_report),
+        "profile": profile,
+        "profile_description": _profile_description(profile),
         "target_input": str(target_input),
         "baseline_input": str(baseline_input),
         "sample_count": int(sample_count),
@@ -185,8 +203,42 @@ def build_claim_gate(
         "criteria": criteria,
         "pass": bool(passed),
         "verdict": verdict,
-        "interpretation": _interpretation(passed),
+        "interpretation": _interpretation(passed, profile),
     }
+
+
+def _cli_thresholds(args: Any) -> Dict[str, Any]:
+    thresholds: Dict[str, Any] = {"profile": str(args.profile), **CLAIM_PROFILES[str(args.profile)]}
+    for key, value in (
+        ("min_precision_delta", args.min_precision_delta),
+        ("min_recall_delta", args.min_recall_delta),
+        ("min_recall75_delta", args.min_recall75_delta),
+        ("min_small_recall_delta", args.min_small_recall_delta),
+        ("max_fp_delta", args.max_fp_delta),
+    ):
+        if value is not None:
+            thresholds[key] = float(value)
+    thresholds.update(
+        {
+            "min_samples": int(args.min_samples),
+            "bootstrap_samples": int(args.bootstrap_samples),
+            "bootstrap_confidence": float(args.bootstrap_confidence),
+            "bootstrap_seed": str(args.bootstrap_seed),
+            "require_ci": bool(args.require_ci),
+        }
+    )
+    return thresholds
+
+
+def _resolve_thresholds(thresholds: Mapping[str, Any] | None) -> Dict[str, Any]:
+    raw = dict(thresholds or {})
+    profile = str(raw.get("profile", "custom"))
+    if profile != "custom" and profile not in CLAIM_PROFILES:
+        raise ValueError(f"unknown claim profile: {profile}")
+    values: Dict[str, Any] = dict(CLAIM_PROFILES.get(profile, {}))
+    values.update({key: value for key, value in raw.items() if key != "profile"})
+    values["profile"] = profile
+    return values
 
 
 def _metric_value(metrics: Mapping[str, Any], key: str) -> float | None:
@@ -282,10 +334,18 @@ def _summary_path(value: str | Path) -> Path:
     return path
 
 
-def _interpretation(passed: bool) -> str:
+def _profile_description(profile: str) -> str:
+    return CLAIM_PROFILE_DESCRIPTIONS.get(str(profile), CLAIM_PROFILE_DESCRIPTIONS["custom"])
+
+
+def _interpretation(passed: bool, profile: str) -> str:
+    if profile == "fp_reducer":
+        if passed:
+            return "The target passes the recall-budgeted FP-reduction gate. This does not support a broad HumanISP superiority claim by itself."
+        return "The target does not pass the recall-budgeted FP-reduction gate."
     if passed:
-        return "The target passes this metric-only gate. This is still not a safety or product claim by itself."
-    return "The target does not pass this metric-only gate, so a broad superiority claim is not supported."
+        return "The target passes this conservative metric-only gate. This is still not a safety or product claim by itself."
+    return "The target does not pass this conservative metric-only gate, so a broad superiority claim is not supported."
 
 
 def _render_html(summary: Mapping[str, Any]) -> str:
@@ -324,6 +384,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
 <body>
   <h1>PerceptionISP Claim Gate</h1>
   <p>Target <code>{html_lib.escape(str(summary.get('target_input', '')))}</code> vs baseline <code>{html_lib.escape(str(summary.get('baseline_input', '')))}</code>.</p>
+  <p><strong>Profile:</strong> <code>{html_lib.escape(str(summary.get('profile', '')))}</code> - {html_lib.escape(str(summary.get('profile_description', '')))}</p>
   <p><strong>Verdict:</strong> <code>{html_lib.escape(str(summary.get('verdict', '')))}</code></p>
   <p>{html_lib.escape(str(summary.get('interpretation', '')))}</p>
   <table>
