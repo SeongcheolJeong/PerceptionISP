@@ -31,6 +31,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--min-small-recall-delta", type=float, default=0.0)
     parser.add_argument("--max-fp-delta", type=float, default=0.0)
     parser.add_argument("--min-samples", type=int, default=1)
+    parser.add_argument("--fail-on-fail", action="store_true", help="Return exit code 1 when the metric gate fails.")
     parser.add_argument("--output-dir", default=None)
     args = parser.parse_args(argv)
 
@@ -66,7 +67,7 @@ def main(argv: Any = None) -> int:
             indent=2,
         )
     )
-    return 0
+    return 1 if bool(args.fail_on_fail) and not bool(summary["pass"]) else 0
 
 
 def build_claim_gate(

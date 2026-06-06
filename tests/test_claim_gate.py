@@ -85,6 +85,26 @@ class ClaimGateTest(unittest.TestCase):
             self.assertIn("recall@0.50_mean", printed["failed"])
             self.assertTrue((output_dir / "claim_gate_summary.json").exists())
 
+    def test_claim_gate_cli_can_return_nonzero_on_gate_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report_path = Path(tmp) / "comparison_summary.json"
+            output_dir = Path(tmp) / "claim"
+            report_path.write_text(
+                json.dumps(
+                    _report(
+                        human={"precision@0.50_mean": 0.60, "recall@0.50_mean": 0.47, "recall@0.75_mean": 0.30, "small_recall@0.50_mean": 0.28, "fp@0.50_mean": 1.30},
+                        target={"precision@0.50_mean": 0.64, "recall@0.50_mean": 0.46, "recall@0.75_mean": 0.29, "small_recall@0.50_mean": 0.27, "fp@0.50_mean": 1.00},
+                    )
+                )
+                + "\n"
+            )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = claim_gate_main([str(report_path), "--fail-on-fail", "--output-dir", str(output_dir)])
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(json.loads(stdout.getvalue())["pass"])
+            self.assertTrue((output_dir / "claim_gate_summary.json").exists())
+
 
 def _report(*, human: dict, target: dict) -> dict:
     return {

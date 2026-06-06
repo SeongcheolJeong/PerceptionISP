@@ -218,7 +218,8 @@ The gate compares `perception_calibrated_score_label_aux_fusion_rgb_aux`
 against `human_rgb` and requires P50, R50, R75, small-object R50, and FP/sample
 to be no worse than HumanISP. The current train512-to-val gate verdict is
 `metric_gate_fail`; the failing metrics are `recall@0.50_mean`,
-`recall@0.75_mean`, and `small_recall@0.50_mean`.
+`recall@0.75_mean`, and `small_recall@0.50_mean`. With `--fail-on-fail`, this
+same gate returns exit code `1` while still writing the HTML/JSON report.
 
 The train512 calibrator was also applied to the same 1,496-sample val report
 with feature-set-specific artifacts:

@@ -642,6 +642,8 @@ PYTHONPATH=src \
 
 The default gate requires the target to match or beat HumanISP on P50, R50,
 R75, small-object R50, and FP/sample. It is intentionally conservative and
-metric-only; passing it would still not be a product safety claim.
+metric-only; passing it would still not be a product safety claim. Add
+`--fail-on-fail` when using it as a CI/readiness gate that should return a
+non-zero exit code on failure.
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
