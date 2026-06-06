@@ -38,6 +38,10 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--denoise-strength", type=float, default=0.18)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"], help="Bayer demosaic method.")
     parser.add_argument("--demosaic-artifact-suppression", type=float, default=0.20)
+    parser.add_argument("--human-tone-mapping", default=None, help="Optional fixed HumanISP baseline tone mapping.")
+    parser.add_argument("--human-denoise-strength", type=float, default=None, help="Optional fixed HumanISP baseline denoise strength.")
+    parser.add_argument("--human-demosaic-method", default=None, choices=["edge_aware", "bilinear"], help="Optional fixed HumanISP baseline demosaic method.")
+    parser.add_argument("--human-demosaic-artifact-suppression", type=float, default=None, help="Optional fixed HumanISP baseline demosaic artifact suppression.")
     parser.add_argument("--output-dir", default="reports/perception_compare")
     parser.add_argument("--label-aware", action="store_true", help="Require exact class labels during metric matching.")
     parser.add_argument("--no-visuals", action="store_true", help="Skip overlay PNG generation in the HTML report.")
@@ -147,6 +151,7 @@ def main(argv: Any = None) -> int:
         demosaic_method=str(args.demosaic_method),
         demosaic_artifact_suppression=float(args.demosaic_artifact_suppression),
     )
+    human_config = human_config_from_args(args)
     fusion_options = {
         "low_score_threshold": float(args.fusion_low_score_threshold),
         "low_support_threshold": float(args.fusion_low_support_threshold),
@@ -159,6 +164,7 @@ def main(argv: Any = None) -> int:
         aux_detector=aux_detector,
         rgb_aux_detector=rgb_aux_detector,
         config=config,
+        human_config=human_config,
         label_agnostic=not bool(args.label_aware),
         include_images=not bool(args.no_visuals),
         include_fusion=not bool(args.no_fusion),
@@ -197,6 +203,7 @@ def main(argv: Any = None) -> int:
         "denoise_strength": float(args.denoise_strength),
         "demosaic_method": str(args.demosaic_method),
         "demosaic_artifact_suppression": float(args.demosaic_artifact_suppression),
+        "human_baseline_config": None if human_config is None else config_to_dict(human_config),
     }
     if proposal_calibration_artifact is not None:
         result["run_config"]["proposal_calibration"] = proposal_calibration_run_config(proposal_calibration_artifact)
@@ -232,6 +239,36 @@ def parse_label_map(value: str | None) -> dict[str, str]:
             raise ValueError("label map entries must have non-empty src and dst labels")
         mapping[source] = target
     return mapping
+
+
+def human_config_from_args(args: Any) -> PerceptionISPConfig | None:
+    if (
+        args.human_tone_mapping is None
+        and args.human_denoise_strength is None
+        and args.human_demosaic_method is None
+        and args.human_demosaic_artifact_suppression is None
+    ):
+        return None
+    defaults = PerceptionISPConfig()
+    return PerceptionISPConfig(
+        tone_mapping=str(args.human_tone_mapping or defaults.tone_mapping),
+        denoise_strength=float(defaults.denoise_strength if args.human_denoise_strength is None else args.human_denoise_strength),
+        demosaic_method=str(args.human_demosaic_method or defaults.demosaic_method),
+        demosaic_artifact_suppression=float(
+            defaults.demosaic_artifact_suppression
+            if args.human_demosaic_artifact_suppression is None
+            else args.human_demosaic_artifact_suppression
+        ),
+    )
+
+
+def config_to_dict(config: PerceptionISPConfig) -> dict[str, Any]:
+    return {
+        "tone_mapping": str(config.tone_mapping),
+        "denoise_strength": float(config.denoise_strength),
+        "demosaic_method": str(config.demosaic_method),
+        "demosaic_artifact_suppression": float(config.demosaic_artifact_suppression),
+    }
 
 
 def remap_sample_labels(samples: Sequence[EvaluationSample], label_map: Mapping[str, str]) -> tuple[EvaluationSample, ...]:

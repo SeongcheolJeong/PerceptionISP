@@ -546,9 +546,27 @@ PYTHONPATH=src \
   --source yolo-dataset \
   --dataset data/kitti/data.yaml \
   --split val \
+  --count 1496 \
+  --width 640 \
+  --height 192 \
+  --cfa auto \
   --rgb-detector yolo \
+  --rgb-detector-model yolo11n.pt \
+  --rgb-detector-confidence 0.25 \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --tone-mapping detector_log \
+  --denoise-strength 0.30 \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.20 \
+  --human-tone-mapping log \
+  --human-denoise-strength 0.18 \
+  --human-demosaic-method edge_aware \
+  --human-demosaic-artifact-suppression 0.20 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
   --proposal-calibration-model reports/perception_proposal_calibration_kitti_val_1496_detector_log/proposal_calibration_model.json \
-  --output-dir reports/perception_compare_kitti_val_calibrated
+  --output-dir reports/perception_compare_kitti_val_1496_detector_log_calibrated_harness
 ```
 
 `--proposal-calibration-model` requires fusion to stay enabled because the

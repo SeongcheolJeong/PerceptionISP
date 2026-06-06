@@ -601,6 +601,7 @@ def _render_run_config_rows(run_config: Mapping[str, Any]) -> str:
         "label_agnostic",
         "demosaic_method",
         "tone_mapping",
+        "human_baseline_config",
     ):
         if key not in run_config:
             continue

@@ -440,6 +440,19 @@ The normal comparison, ISP sweep, and resolution sweep CLIs now also accept
 `--proposal-calibration-model`, which applies the same artifact during the run
 instead of requiring a separate saved-report apply step.
 
+Live normal-harness verification:
+
+```text
+reports/perception_compare_kitti_val_1496_detector_log_calibrated_harness/index.html
+```
+
+This run uses the same KITTI val 1,496 samples, `detector_log` PerceptionISP
+config, fixed `log` HumanISP baseline, label-aware KITTI-to-COCO labels, true
+CameraE2E RAW cache, and the saved calibration artifact. The aggregate metrics
+match the full post-process apply report exactly for `human_rgb`,
+`perception_rgb`, `perception_fusion_rgb_aux`, and
+`perception_calibrated_fusion_rgb_aux`.
+
 Applied report results:
 
 | Report split | Input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
