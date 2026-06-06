@@ -720,6 +720,38 @@ loss on R50/R75/small R50, and at least `0.10` fewer FP/sample. This supports a
 bounded FP-reduction claim only; it does not convert the result into a broad
 HumanISP superiority claim.
 
+For an aux-including HumanISP-relative branch, use a lower threshold on the
+train512 `score_label_aux` artifact. The `0.04` artifact is a strong FP reducer
+against the fusion baseline, but its R50 loss is too large for the HumanISP
+`fp_reducer` gate. The `0.01` threshold keeps the paired-CI recall loss inside
+budget:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.proposal_calibration \
+  reports/perception_compare_kitti_train512_detector_log_harness \
+  --input perception_fusion_rgb_aux \
+  --feature-sets score_aux,score_label,score_label_aux \
+  --thresholds 0.00:0.30:0.01 \
+  --baseline-input human_rgb \
+  --train-fraction 0.67 \
+  --split-strategy hash \
+  --seed kitti_train512_calibration \
+  --recall-delta-floor -0.001 \
+  --artifact-feature-set score_label_aux \
+  --artifact-threshold 0.01 \
+  --artifact-output-input perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
+  --output-dir reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001
+```
+
+Applied to KITTI val 1496, this aux-assisted target passes the HumanISP
+`fp_reducer` gate:
+
+```text
+reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496/index.html
+reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
+reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human/index.html
+```
+
 A second detector-side calibration branch trains on `perception_rgb` proposals
 instead of the RGB+aux fusion proposals. It is useful because the uncalibrated
 Perception RGB stream is already near HumanISP recall parity, and the calibrator

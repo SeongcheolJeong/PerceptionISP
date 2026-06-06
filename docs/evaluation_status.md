@@ -322,6 +322,56 @@ This supports only a bounded FP-reduction claim against the current fusion
 baseline. It does not support saying that PerceptionISP broadly outperforms
 HumanISP.
 
+### Aux-including HumanISP FP reducer
+
+The original train512 `score_label_aux` artifact used threshold `0.04`. That is
+useful versus the uncalibrated fusion baseline, but it loses too much R50 for a
+HumanISP-relative `fp_reducer` claim. A lower threshold keeps the same aux-aware
+feature set while preserving more recall:
+
+```text
+reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001/index.html
+reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496/index.html
+```
+
+This target is:
+
+```text
+perception_calibrated_score_label_aux_fusion_rgb_aux_t001
+```
+
+On KITTI val 1496:
+
+| Input | P@0.50 | R@0.50 | R@0.75 | Small R@0.50 | FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 |
+| Aux score-label calibrated fusion, threshold 0.01 | 0.6314 | 0.4633 | 0.3028 | 0.2793 | 1.1163 |
+
+The HumanISP-relative `fp_reducer` gate passes with paired CI enabled:
+
+```text
+reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
+```
+
+| Metric delta vs HumanISP | Mean delta | 95% paired bootstrap CI | Threshold | Gate |
+| --- | ---: | ---: | ---: | --- |
+| P50 | +0.0241 | [+0.0179, +0.0308] | +0.0000 | pass |
+| R50 | -0.0062 | [-0.0097, -0.0028] | -0.0100 | pass |
+| R75 | -0.0010 | [-0.0049, +0.0030] | -0.0100 | pass |
+| Small R50 | -0.0002 | [-0.0035, +0.0032] | -0.0100 | pass |
+| FP/sample | -0.2246 | [-0.2574, -0.1932] | -0.1000 | pass |
+
+The consolidated dashboard for this aux-including claim is:
+
+```text
+reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human/index.html
+```
+
+This is a better-aligned PerceptionISP claim than the Perception-RGB-only
+calibration below because it uses aux evidence, but it is still a
+recall-budgeted FP-reduction claim. The broad HumanISP superiority gate still
+fails for this target.
+
 ### Perception RGB score-label calibration
 
 Because the uncalibrated `perception_rgb` stream is near HumanISP recall parity,
@@ -365,9 +415,9 @@ The consolidated dashboard for this narrower claim is:
 reports/perception_claim_readiness_perception_rgb_fp_vs_human/index.html
 ```
 
-This is currently the cleanest supported claim: **recall-budgeted false-positive
-reduction versus HumanISP**, not broad HumanISP superiority and not task-level
-VRU/person recall improvement.
+This is another supported detector-side claim: **recall-budgeted
+false-positive reduction versus HumanISP**, not broad HumanISP superiority and
+not task-level VRU/person recall improvement.
 
 The consolidated claim-readiness dashboard is:
 
