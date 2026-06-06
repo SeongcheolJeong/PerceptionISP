@@ -277,6 +277,45 @@ reports/perception_yolo_kitti_val_1496_camerae2e_fusion/index.html
 reports/perception_yolo_coco_kitti_rollup/index.html
 ```
 
+The detector-facing tone fix was rerun on the full KITTI val set:
+
+```text
+reports/perception_isp_sweep_kitti_val_1496_detector_log_denoise030/index.html
+reports/perception_yolo_kitti_detector_log_rollup/index.html
+```
+
+Full KITTI val with `tone=detector_log`, `denoise=0.30`, `edge_aware`,
+`artifact=0.20`:
+
+| Dataset | Samples | Input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| KITTI val | 1,496 | HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 |
+| KITTI val | 1,496 | PerceptionISP RGB, default raw `log` | 0.5991 | 0.4491 | 0.2890 | 0.2624 | 1.2400 |
+| KITTI val | 1,496 | PerceptionISP RGB, `detector_log` | 0.6022 | 0.4688 | 0.3057 | 0.2808 | 1.3750 |
+| KITTI val | 1,496 | RGB+Aux Fusion, `detector_log` | 0.6063 | 0.4639 | 0.3030 | 0.2795 | 1.3235 |
+
+Detector-log Perception RGB delta vs HumanISP:
+
+- Precision@0.50: `-0.0051`
+- Recall@0.50: `-0.0007`
+- Recall@0.75: `+0.0019`
+- Small Recall@0.50: `+0.0013`
+- FP@0.50: `+0.0341`
+
+Detector-log Perception RGB delta vs the previous default Perception RGB:
+
+- Precision@0.50: `+0.0031`
+- Recall@0.50: `+0.0197`
+- Recall@0.75: `+0.0167`
+- Small Recall@0.50: `+0.0184`
+- FP@0.50: `+0.1350`
+
+This changes the KITTI interpretation. The earlier negative result was largely
+a detector-facing tone mismatch: raw `log` made YOLO lose recall. With
+`detector_log`, PerceptionISP reaches near HumanISP recall parity and slightly
+improves high-IoU/small-object recall, but it still trades away precision and
+adds false positives. It is progress, not a broad superiority claim.
+
 ## KITTI ISP Tuning Sweep
 
 The first KITTI tuning pass keeps the HumanISP baseline fixed at the default

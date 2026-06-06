@@ -409,4 +409,30 @@ subset result as a candidate, then rerun it on the full validation set.
 For pretrained RGB detectors, include `detector_log`; it is the gamma-encoded
 log tone curve intended to preserve detector-facing contrast.
 
+Run the current full KITTI detector-facing candidate:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.isp_sweep \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 1496 \
+  --width 640 --height 192 \
+  --cfa auto \
+  --rgb-detector yolo \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --tone-mappings detector_log \
+  --denoise-strengths 0.30 \
+  --demosaic-methods edge_aware \
+  --demosaic-artifact-suppressions 0.20 \
+  --load-progress-interval 187 \
+  --progress-interval 374 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
+  --output-dir reports/perception_isp_sweep_kitti_val_1496_detector_log_denoise030
+```
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
