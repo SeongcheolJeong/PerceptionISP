@@ -171,6 +171,27 @@ expect roughly minutes for a 5-epoch compact KITTI run, about 1-2 hours for a
 YOLO-style RGB+aux fine-tune. Tensor export is separate from training and is
 currently about 0.33 s/sample on the cached 128-sample KITTI run.
 
+Roll up export, training, and dense-eval summaries into one timing/diagnostic
+report:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_training_rollup \
+  exports/perception_rgb_aux_kitti_val128_detector_log \
+  exports/perception_rgb_aux_kitti_val128_detector_log_dense_rgb_aux_ablation \
+  exports/perception_rgb_aux_kitti_val128_detector_log_dense_rgb_only_ablation \
+  exports/perception_rgb_aux_kitti_val128_detector_log_dense_aux_only_ablation \
+  reports/perception_rgb_aux_dense_kitti_val128_rgb_aux_ablation_eval_conf050 \
+  reports/perception_rgb_aux_dense_kitti_val128_rgb_only_ablation_eval_conf050 \
+  reports/perception_rgb_aux_dense_kitti_val128_aux_only_ablation_eval_conf050 \
+  --output-dir reports/perception_rgb_aux_training_rollup_kitti_val128
+```
+
+The rollup is a resource and diagnostic view. It makes clear that the compact
+dense path trains quickly, while its direct detector metrics are still too weak
+for a HumanISP-vs-PerceptionISP performance claim.
+
 Run the trained smoke checkpoint through the normal comparison harness:
 
 ```bash

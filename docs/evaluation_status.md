@@ -121,6 +121,17 @@ The compact RGB+aux dense detector then trained on MPS:
 | `rgb_only_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 8.2 s | 58.6 | 1.1785 |
 | `aux_only_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 8.1 s | 59.3 | 1.2003 |
 
+The timing and direct eval summaries are now collected in one reproducible
+rollup:
+
+```text
+reports/perception_rgb_aux_training_rollup_kitti_val128/index.html
+```
+
+That rollup is a resource/diagnostic report, not a performance-claim report. It
+combines export time, train time, time estimates, and the direct dense-detector
+metrics below so the cost/performance tradeoff is visible in one place.
+
 The timing answer is therefore favorable for this compact path: on this Mac
 with MPS, a 1,496-sample KITTI-val-sized run is estimated at about 2-3 minutes
 for 5 epochs, and the 5,985-sample KITTI train split is about 6-12 minutes for
