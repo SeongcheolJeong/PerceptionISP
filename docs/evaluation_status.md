@@ -218,6 +218,10 @@ reports/perception_calibrated_fusion_kitti_train512_to_val1496_score_label_aux/i
 reports/perception_train512_calibration_feature_ablation_rollup/index.html
 ```
 
+These feature-specific artifacts are reproducible from the calibration CLI with
+`--write-feature-artifacts`; each file keeps a distinct calibrated input name so
+the apply reports can be rolled up side by side.
+
 | Val input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 | 3.8135 |

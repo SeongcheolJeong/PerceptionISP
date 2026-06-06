@@ -520,6 +520,7 @@ PYTHONPATH=src \
   --epochs 800 \
   --lr 0.05 \
   --l2 0.001 \
+  --write-feature-artifacts \
   --output-dir reports/perception_proposal_calibration_kitti_val_1496_detector_log
 ```
 
@@ -527,8 +528,16 @@ This is a detector-side calibration branch over saved RGB proposals. It is a
 cheap way to test whether aux evidence can help score/filtering before training
 a full detector.
 
-The calibration report also writes `proposal_calibration_model.json`. Apply it
-back to a comparison report as a new calibrated input:
+The calibration report also writes `proposal_calibration_model.json`.
+`--write-feature-artifacts` additionally writes
+`proposal_calibration_model_score_aux.json`,
+`proposal_calibration_model_score_label.json`, and
+`proposal_calibration_model_score_label_aux.json`, so feature-set ablations can
+be applied back to the same comparison report with distinct output input names.
+Use `--artifact-feature-set`, `--artifact-threshold`, and
+`--artifact-output-input` when the primary `proposal_calibration_model.json`
+needs to target a specific row. Apply an artifact back to a comparison report as
+a new calibrated input:
 
 ```bash
 PYTHONPATH=src \

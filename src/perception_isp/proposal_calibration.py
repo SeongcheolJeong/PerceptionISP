@@ -43,15 +43,25 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--lr", type=float, default=0.05)
     parser.add_argument("--l2", type=float, default=1.0e-3)
     parser.add_argument("--recall-delta-floor", type=float, default=-0.001)
+    parser.add_argument("--artifact-selector", default=None, help="Best-row selector for proposal_calibration_model.json.")
+    parser.add_argument("--artifact-feature-set", default=None, help="Feature set to use for proposal_calibration_model.json.")
+    parser.add_argument("--artifact-threshold", type=float, default=None, help="Exact threshold to use for proposal_calibration_model.json.")
+    parser.add_argument("--artifact-output-input", default="perception_calibrated_fusion_rgb_aux", help="Output input name in proposal_calibration_model.json.")
+    parser.add_argument(
+        "--write-feature-artifacts",
+        action="store_true",
+        help="Also write proposal_calibration_model_<feature_set>.json for each calibrated feature set.",
+    )
     parser.add_argument("--output-dir", default=None)
     args = parser.parse_args(argv)
 
     report_path = _summary_path(args.report)
     report = json.loads(report_path.read_text())
+    feature_sets = parse_csv(args.feature_sets)
     summary = build_proposal_calibration(
         report,
         input_name=str(args.input),
-        feature_sets=parse_csv(args.feature_sets),
+        feature_sets=feature_sets,
         thresholds=parse_thresholds(args.thresholds),
         baseline_input=str(args.baseline_input),
         train_fraction=float(args.train_fraction),
@@ -64,13 +74,30 @@ def main(argv: Any = None) -> int:
         source_report=report_path,
     )
     destination = Path(args.output_dir).expanduser() if args.output_dir else report_path.parent / "proposal_calibration"
-    html_path = write_proposal_calibration(summary, destination)
+    html_path = write_proposal_calibration(
+        summary,
+        destination,
+        artifact_selector=args.artifact_selector,
+        artifact_feature_set=args.artifact_feature_set,
+        artifact_threshold=args.artifact_threshold,
+        artifact_output_input=args.artifact_output_input,
+        feature_artifact_sets=feature_sets if bool(args.write_feature_artifacts) else (),
+    )
+    feature_artifacts = [
+        str(html_path.parent / f"proposal_calibration_model_{_safe_name(feature_set)}.json")
+        for feature_set in feature_sets
+        if (html_path.parent / f"proposal_calibration_model_{_safe_name(feature_set)}.json").exists()
+    ]
     print(
         json.dumps(
             json_ready(
                 {
                     "report": str(html_path),
                     "summary_json": str(html_path.parent / "proposal_calibration_summary.json"),
+                    "model_json": str(html_path.parent / "proposal_calibration_model.json")
+                    if (html_path.parent / "proposal_calibration_model.json").exists()
+                    else None,
+                    "feature_model_json": feature_artifacts,
                     "best": summary.get("best", {}),
                     "models": _compact_models(summary.get("models", [])),
                 }
@@ -197,16 +224,44 @@ def build_proposal_calibration(
     }
 
 
-def write_proposal_calibration(summary: Mapping[str, Any], output_dir: str | Path) -> Path:
+def write_proposal_calibration(
+    summary: Mapping[str, Any],
+    output_dir: str | Path,
+    *,
+    artifact_selector: str | None = None,
+    artifact_feature_set: str | None = None,
+    artifact_threshold: float | None = None,
+    artifact_output_input: str = "perception_calibrated_fusion_rgb_aux",
+    feature_artifact_sets: Sequence[str] = (),
+) -> Path:
     destination = Path(output_dir).expanduser()
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "proposal_calibration_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
-    artifact = proposal_calibration_model_artifact(summary)
+    artifact = proposal_calibration_model_artifact(
+        summary,
+        selector=artifact_selector,
+        feature_set=artifact_feature_set,
+        threshold=artifact_threshold,
+        output_input_name=artifact_output_input,
+    )
     if artifact:
         (destination / "proposal_calibration_model.json").write_text(json.dumps(json_ready(artifact), indent=2) + "\n")
+    for feature_set in feature_artifact_sets:
+        feature_artifact = proposal_calibration_model_artifact(
+            summary,
+            feature_set=str(feature_set),
+            output_input_name=f"perception_calibrated_{_safe_name(feature_set)}_fusion_rgb_aux",
+        )
+        if feature_artifact:
+            artifact_path = destination / f"proposal_calibration_model_{_safe_name(feature_set)}.json"
+            artifact_path.write_text(json.dumps(json_ready(feature_artifact), indent=2) + "\n")
     html_path = destination / "index.html"
     html_path.write_text(_render_html(summary))
     return html_path
+
+
+def _safe_name(value: str) -> str:
+    return "".join(char if char.isalnum() or char == "_" else "_" for char in str(value))
 
 
 def proposal_calibration_model_artifact(
