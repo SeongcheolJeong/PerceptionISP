@@ -87,8 +87,37 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("benchmark_protocol", printed)
             self.assertTrue((root / "readiness" / "claim_readiness_summary.json").exists())
 
+    def test_claim_readiness_accepts_protocol_only_comparison_reports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_dir = _write_comparison_report(root / "comparison")
+            naive_dir = _write_comparison_report(root / "naive", tone_mapping="linear", demosaic_method="bilinear", denoise_strength=0.0)
+            train_dir = _write_train_summary(root / "train")
+            eval_dir = _write_eval_summary(root / "eval")
 
-def _write_comparison_report(path: Path) -> Path:
+            summary = run_claim_readiness(
+                comparison_report=report_dir,
+                min_samples=3,
+                bootstrap_samples=16,
+                bootstrap_seed="unit",
+                training_summaries=[train_dir, eval_dir],
+                protocol_comparison_reports=[naive_dir],
+                output_dir=root / "readiness",
+            )
+
+            self.assertEqual(summary["benchmark_protocol"]["status"], "claim_ready")
+            self.assertIn(str(naive_dir), summary["protocol_comparison_reports"])
+            dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
+            self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "claim_ready")
+
+
+def _write_comparison_report(
+    path: Path,
+    *,
+    tone_mapping: str = "log",
+    demosaic_method: str = "edge_aware",
+    denoise_strength: float = 0.18,
+) -> Path:
     path.mkdir()
     samples = []
     for index in range(3):
@@ -134,7 +163,24 @@ def _write_comparison_report(path: Path) -> Path:
             [sample["metrics"]["perception_calibrated_score_label_aux_fusion_rgb_aux"] for sample in samples]
         ),
     }
-    payload = {"sample_count": len(samples), "samples": samples, "aggregate": aggregate}
+    payload = {
+        "sample_count": len(samples),
+        "samples": samples,
+        "aggregate": aggregate,
+        "run_config": {
+            "source": "yolo-dataset",
+            "dataset": "KITTI",
+            "split": "val",
+            "count": len(samples),
+            "rgb_detector": "ultralytics_yolo",
+            "rgb_detector_model": "yolo11n.pt",
+            "rgb_detector_confidence": 0.25,
+            "label_agnostic": False,
+            "tone_mapping": tone_mapping,
+            "demosaic_method": demosaic_method,
+            "denoise_strength": denoise_strength,
+        },
+    }
     (path / "comparison_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 

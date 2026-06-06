@@ -781,7 +781,8 @@ PYTHONPATH=src \
   --training-summary reports/perception_rgb_aux_dense_kitti_val128_rgb_only_ablation_eval_conf050 \
   --training-summary reports/perception_rgb_aux_dense_kitti_val128_aux_only_ablation_eval_conf050 \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
-  --output-dir reports/perception_claim_readiness_repro
+  --protocol-comparison-report reports/perception_compare_kitti_val1496_naive_raw_like \
+  --output-dir reports/perception_claim_readiness_with_naive
 ```
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
@@ -800,11 +801,23 @@ The protocol checker can also be run directly when assembling evidence by hand:
 ```bash
 PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --comparison-report reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  --comparison-report reports/perception_compare_kitti_val1496_naive_raw_like \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
-  --training-rollup reports/perception_claim_readiness_repro/rgb_aux_training_rollup \
-  --claim-gate reports/perception_claim_readiness_repro/broad_superiority_vs_human \
-  --claim-gate reports/perception_claim_readiness_repro/fp_reducer_vs_fusion \
-  --task-metrics reports/perception_claim_readiness_repro/task_metrics \
+  --training-rollup reports/perception_claim_readiness_with_naive/rgb_aux_training_rollup \
+  --claim-gate reports/perception_claim_readiness_with_naive/broad_superiority_vs_human \
+  --claim-gate reports/perception_claim_readiness_with_naive/fp_reducer_vs_fusion \
+  --task-metrics reports/perception_claim_readiness_with_naive/task_metrics \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol
 ```
+
+The current 1496-image naive RAW-like baseline is:
+
+```text
+reports/perception_compare_kitti_val1496_naive_raw_like/index.html
+```
+
+It uses the same KITTI val split, YOLO11n detector, CameraE2E raw cache, and
+HumanISP baseline, but sets the PerceptionISP path to linear tone mapping,
+bilinear demosaic, and no denoise. It is expected to be weak; it exists to make
+the RAW/perception-ISP ablation matrix honest.

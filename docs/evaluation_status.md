@@ -328,11 +328,11 @@ The consolidated claim-readiness dashboard is:
 reports/perception_claim_readiness_dashboard/index.html
 ```
 
-The same evidence can be rebuilt as one bundle with `perception_isp.claim_readiness`;
-the current reproduced output is:
+The same evidence can be rebuilt as one bundle with `perception_isp.claim_readiness`.
+The current bundle that includes the 1496-image naive RAW-like baseline is:
 
 ```text
-reports/perception_claim_readiness_repro/dashboard/index.html
+reports/perception_claim_readiness_with_naive/dashboard/index.html
 ```
 
 It intentionally separates claim decisions from evidence-coverage decisions:
@@ -343,13 +343,13 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
 | Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
-| Benchmark protocol coverage | Not supported until the minimum RAW/perception ablation matrix is covered |
+| Benchmark protocol coverage | Supported for the configured KITTI evidence bundle; this only means the matrix is covered |
 
 The readiness bundle also writes:
 
 ```text
-reports/perception_claim_readiness_repro/benchmark_protocol/index.html
-reports/perception_claim_readiness_repro/benchmark_protocol/protocol_coverage_summary.json
+reports/perception_claim_readiness_with_naive/benchmark_protocol/index.html
+reports/perception_claim_readiness_with_naive/benchmark_protocol/protocol_coverage_summary.json
 ```
 
 This protocol coverage is a blocker checklist, not a metric result. It checks
@@ -358,11 +358,32 @@ paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
 detector recipe, CI-backed gates, task metrics, naive RAW/minimal adaptation,
 classical lightweight RAW transform, and task-aware/aux-assisted paths.
 
+The current naive RAW-like KITTI val baseline is:
+
+```text
+reports/perception_compare_kitti_val1496_naive_raw_like/index.html
+```
+
+It uses `tone_mapping=linear`, `demosaic_method=bilinear`, and
+`denoise_strength=0.0` on the PerceptionISP path, with the same HumanISP
+baseline, YOLO11n detector, 1496 KITTI val samples, and CameraE2E RAW cache.
+The result is intentionally a weak/minimal baseline:
+
+| Input | R@0.50 | FP@0.50/sample |
+| --- | ---: | ---: |
+| HumanISP RGB | 0.4695 | 1.3409 |
+| Naive Perception RGB | 0.2802 | 0.5876 |
+| Naive RGB+Aux Fusion | 0.2783 | 0.5802 |
+
+This closes the protocol blocker but strengthens the caution: naive RAW-like
+processing loses substantial recall on this detector and dataset. It does not
+support a HumanISP superiority claim.
+
 Task-oriented group metrics are also generated from the same saved detections:
 
 ```text
 reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496/index.html
-reports/perception_claim_readiness_repro/task_metrics/index.html
+reports/perception_claim_readiness_with_naive/task_metrics/index.html
 ```
 
 The current task metrics show why the FP-reducer claim should stay narrow:

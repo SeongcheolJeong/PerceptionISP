@@ -34,6 +34,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-summary", action="append", default=[], help="RGB+aux export/train/eval summary path/dir. Repeat to build a training rollup.")
     parser.add_argument("--training-rollup", default=None, help="Existing training rollup summary path/dir. Ignored when --training-summary is used.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Existing comparison rollup path/dir, optionally name=path.")
+    parser.add_argument("--protocol-comparison-report", action="append", default=[], help="Additional comparison report used only for benchmark-protocol coverage, for example a naive RAW baseline.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
 
@@ -50,6 +51,7 @@ def main(argv: Any = None) -> int:
         training_summaries=args.training_summary,
         training_rollup=args.training_rollup,
         comparison_rollups=args.comparison_rollup,
+        protocol_comparison_reports=args.protocol_comparison_report,
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -70,6 +72,7 @@ def run_claim_readiness(
     training_summaries: Sequence[str | Path] = (),
     training_rollup: str | Path | None = None,
     comparison_rollups: Sequence[str | Path] = (),
+    protocol_comparison_reports: Sequence[str | Path] = (),
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
     destination = Path(output_dir).expanduser()
@@ -129,8 +132,9 @@ def run_claim_readiness(
         training_rollup_path = Path(training_rollup).expanduser()
 
     protocol_dir = destination / "benchmark_protocol"
+    protocol_reports = [report_path, *[Path(path).expanduser() for path in protocol_comparison_reports]]
     protocol_summary = build_protocol_coverage(
-        comparison_reports=[report_path],
+        comparison_reports=protocol_reports,
         comparison_rollups=comparison_rollups,
         training_rollup=training_rollup_path,
         claim_gates=[broad_dir, fp_dir],
@@ -155,6 +159,7 @@ def run_claim_readiness(
     summary = {
         "summary_json": str(destination / "claim_readiness_summary.json"),
         "comparison_report": str(report_path),
+        "protocol_comparison_reports": [str(path) for path in protocol_reports],
         "target_input": str(target_input),
         "human_baseline_input": str(human_baseline_input),
         "fusion_baseline_input": str(fusion_baseline_input),
@@ -235,6 +240,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "fp_reducer": summary.get("fp_reducer"),
         "task_metrics": summary.get("task_metrics"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
+        "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],
     }
 
