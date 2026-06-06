@@ -19,6 +19,15 @@ RGB_AUX_CHANNELS = (
     "aux_saturation",
     "aux_reliability",
 )
+RGB_AUX_EXTENDED_CHANNELS = RGB_AUX_CHANNELS + (
+    "aux_noise_risk",
+    "aux_clipping_distance",
+    "aux_demosaic_confidence",
+    "aux_hdr_confidence",
+    "aux_lens_gain",
+    "aux_color_confidence",
+    "aux_blur_focus_confidence",
+)
 CHANNEL_MODES = ("rgb_aux", "rgb_only", "aux_only")
 
 
@@ -27,6 +36,7 @@ def build_rgb_aux_tensor(
     *,
     layout: str = "hwc",
     dtype: Any = np.float32,
+    channels: Sequence[str] | None = None,
 ) -> np.ndarray:
     """Return a DNN-ready tensor from Perception RGB and aux maps."""
 
@@ -38,7 +48,8 @@ def build_rgb_aux_tensor(
         raise ValueError("perception_aux_rgb must be HxWx3")
     if rgb.shape[:2] != aux.shape[:2]:
         raise ValueError("perception_rgb and perception_aux_rgb must have the same HxW shape")
-    tensor = np.concatenate([rgb[:, :, :3], aux[:, :, :3]], axis=2)
+    channel_names = tuple(channels or RGB_AUX_CHANNELS)
+    tensor = np.stack([_dnn_channel(name, rgb=rgb, aux=aux, aux_maps=images.aux_maps) for name in channel_names], axis=2)
     tensor = np.nan_to_num(tensor, nan=0.0, posinf=1.0, neginf=0.0)
     tensor = np.clip(tensor, 0.0, 1.0).astype(dtype, copy=False)
     normalized_layout = str(layout or "hwc").lower()
@@ -47,6 +58,73 @@ def build_rgb_aux_tensor(
     if normalized_layout == "chw":
         return np.transpose(tensor, (2, 0, 1))
     raise ValueError("layout must be 'hwc' or 'chw'")
+
+
+def build_rgb_aux_extended_tensor(
+    images: PipelineImageSet,
+    *,
+    layout: str = "hwc",
+    dtype: Any = np.float32,
+) -> np.ndarray:
+    """Return the sensor-native extended RGB+aux tensor without changing the 6-channel default path."""
+
+    return build_rgb_aux_tensor(images, layout=layout, dtype=dtype, channels=RGB_AUX_EXTENDED_CHANNELS)
+
+
+def _dnn_channel(name: str, *, rgb: np.ndarray, aux: np.ndarray, aux_maps: Mapping[str, Any]) -> np.ndarray:
+    normalized = str(name)
+    if normalized == "rgb_r":
+        return rgb[:, :, 0]
+    if normalized == "rgb_g":
+        return rgb[:, :, 1]
+    if normalized == "rgb_b":
+        return rgb[:, :, 2]
+    shape = rgb.shape[:2]
+    fallback_zero = np.zeros(shape, dtype=np.float64)
+    if normalized == "aux_edge_strength":
+        return _map_or_fallback(aux_maps, "edge_strength", aux[:, :, 0], shape)
+    if normalized == "aux_saturation":
+        return _map_or_fallback(aux_maps, "saturation", aux[:, :, 1], shape)
+    if normalized in {"aux_reliability", "aux_snr"}:
+        return _map_or_fallback(aux_maps, "snr_map", aux[:, :, 2], shape)
+    if normalized == "aux_noise_risk":
+        return _noise_risk(_map_or_fallback(aux_maps, "noise_variance", fallback_zero, shape))
+    if normalized == "aux_clipping_distance":
+        saturation = _map_or_fallback(aux_maps, "saturation", aux[:, :, 1], shape)
+        return _map_or_fallback(aux_maps, "clipping_distance", 1.0 - saturation, shape)
+    if normalized == "aux_demosaic_confidence":
+        return _map_or_fallback(aux_maps, "demosaic_confidence", np.ones(shape, dtype=np.float64), shape)
+    if normalized == "aux_hdr_confidence":
+        return _map_or_fallback(aux_maps, "hdr_confidence", np.ones(shape, dtype=np.float64), shape)
+    if normalized == "aux_lens_gain":
+        return _unit_map(_map_or_fallback(aux_maps, "lens_gain", np.ones(shape, dtype=np.float64), shape))
+    if normalized == "aux_color_confidence":
+        return _map_or_fallback(aux_maps, "color_confidence", np.ones(shape, dtype=np.float64), shape)
+    if normalized == "aux_blur_focus_confidence":
+        return _map_or_fallback(aux_maps, "blur_focus_confidence", np.ones(shape, dtype=np.float64), shape)
+    raise ValueError(f"unsupported RGB+aux channel: {name!r}")
+
+
+def _map_or_fallback(aux_maps: Mapping[str, Any], key: str, fallback: Any, shape: tuple[int, int]) -> np.ndarray:
+    value = aux_maps.get(key, fallback) if isinstance(aux_maps, Mapping) else fallback
+    arr = np.asarray(value, dtype=np.float64)
+    if arr.ndim == 0:
+        arr = np.full(shape, float(arr), dtype=np.float64)
+    if arr.shape != shape:
+        raise ValueError(f"aux map {key!r} has shape {arr.shape}, expected {shape}")
+    return np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
+
+
+def _noise_risk(value: np.ndarray) -> np.ndarray:
+    arr = np.maximum(np.asarray(value, dtype=np.float64), 0.0)
+    if not bool(np.any(arr > 0.0)):
+        return np.zeros_like(arr)
+    scale = max(float(np.percentile(arr, 95.0)), 1.0e-12)
+    return np.clip(arr / scale, 0.0, 1.0)
+
+
+def _unit_map(value: np.ndarray) -> np.ndarray:
+    return np.clip(np.asarray(value, dtype=np.float64), 0.0, 1.0)
 
 
 def normalize_channel_mode(value: str | None) -> str:
@@ -244,19 +322,20 @@ def labels_from_manifest(manifest_path: str | Path) -> Tuple[str, ...]:
     return tuple(sorted(labels)) or ("object",)
 
 
-def tensor_stats(tensor: np.ndarray) -> Mapping[str, Any]:
+def tensor_stats(tensor: np.ndarray, *, channels: Sequence[str] | None = None) -> Mapping[str, Any]:
+    channel_names = tuple(channels or RGB_AUX_CHANNELS)
     arr = np.asarray(tensor, dtype=np.float64)
-    if arr.ndim == 3 and arr.shape[0] == len(RGB_AUX_CHANNELS):
+    if arr.ndim == 3 and arr.shape[0] == len(channel_names):
         channel_axis = 0
-    elif arr.ndim == 3 and arr.shape[-1] == len(RGB_AUX_CHANNELS):
+    elif arr.ndim == 3 and arr.shape[-1] == len(channel_names):
         channel_axis = 2
     else:
-        raise ValueError("expected a 6-channel RGB+aux tensor")
+        raise ValueError(f"expected a {len(channel_names)}-channel RGB+aux tensor")
     means = np.mean(arr, axis=(1, 2)) if channel_axis == 0 else np.mean(arr, axis=(0, 1))
     mins = np.min(arr, axis=(1, 2)) if channel_axis == 0 else np.min(arr, axis=(0, 1))
     maxs = np.max(arr, axis=(1, 2)) if channel_axis == 0 else np.max(arr, axis=(0, 1))
     return {
-        "channels": list(RGB_AUX_CHANNELS),
+        "channels": list(channel_names),
         "shape": [int(value) for value in arr.shape],
         "mean": [float(value) for value in means],
         "min": [float(value) for value in mins],

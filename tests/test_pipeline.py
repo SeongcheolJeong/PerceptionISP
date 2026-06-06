@@ -16,8 +16,12 @@ class PerceptionISPPipelineTest(unittest.TestCase):
         self.assertEqual(result.accurate.tensor.shape[2], len(result.accurate.channels))
         self.assertEqual(result.fast.tensor.shape[2], len(result.fast.channels))
         self.assertIn("noise_variance", result.maps)
+        self.assertIn("snr_map", result.maps)
+        self.assertIn("clipping_distance", result.maps)
+        self.assertIn("demosaic_confidence", result.maps)
         self.assertIn("edge_confidence", result.maps)
         self.assertIn("hdr_exposure_source", result.maps)
+        self.assertIn("clipping_distance", result.accurate.channels)
         self.assertGreaterEqual(result.fast.estimated_latency_us, 0.0)
         self.assertGreater(len(result.accurate.channels), 6)
 

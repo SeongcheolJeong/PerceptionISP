@@ -100,10 +100,16 @@ class PerceptionISPPipeline:
         metadata_packet = self._metadata_packet(metadata, calibration, geometry_payload, health, runtime, provenance)
         metadata_packet["_accurate_maps"] = {
             "noise_variance": np.asarray(noise_payload["noise_variance"], dtype=np.float64),
+            "snr_map": np.asarray(noise_payload["snr_map"], dtype=np.float64),
             "saturation": np.asarray(hdr_payload["saturation"], dtype=np.float64),
+            "clipping_distance": np.asarray(hdr_payload["clipping_distance"], dtype=np.float64),
+            "hdr_confidence": np.asarray(hdr_payload["hdr_confidence"], dtype=np.float64),
             "edge_strength": np.asarray(edge_payload["edge_strength"], dtype=np.float64),
             "edge_confidence": np.asarray(edge_payload["edge_confidence"], dtype=np.float64),
+            "demosaic_confidence": np.asarray(edge_payload["demosaic_confidence"], dtype=np.float64),
             "hdr_exposure_source": np.asarray(hdr_payload["exposure_source"], dtype=np.float64),
+            "lens_gain": np.asarray(normalized_payload["lens_gain"], dtype=np.float64),
+            "color_confidence": np.asarray(color_payload["color_confidence"], dtype=np.float64),
             "ir_or_clear": np.maximum(
                 np.asarray(color_payload["ir_channel"], dtype=np.float64),
                 np.asarray(color_payload["clear_channel"], dtype=np.float64),
@@ -280,6 +286,11 @@ class PerceptionISPPipeline:
         source = np.where(weight_sum > EPS, source, fallback_index.astype(np.float64))
         fused = np.clip(fused, 0.0, 4.0)
         any_saturation = np.any(saturation, axis=0).astype(np.float64)
+        clipping_distance = np.clip(
+            (float(self.config.hdr_saturation_threshold) - np.max(exposures, axis=0)) / max(float(self.config.hdr_saturation_threshold), EPS),
+            0.0,
+            1.0,
+        )
         confidence = np.clip(weight_sum / max(float(count), 1.0), 0.0, 1.0)
         led_flicker_confidence = np.clip(ghost_map * any_saturation, 0.0, 1.0)
         return {
@@ -288,6 +299,7 @@ class PerceptionISPPipeline:
             "weights": weights,
             "exposure_source": source,
             "saturation": any_saturation,
+            "clipping_distance": clipping_distance,
             "per_exposure_saturation": saturation.astype(np.float64),
             "hdr_confidence": confidence,
             "ghost_motion_artifact": np.clip(ghost_map, 0.0, 1.0),
@@ -825,6 +837,7 @@ class PerceptionISPPipeline:
             "defect_confidence": np.asarray(normalized_payload["defect_confidence"], dtype=np.float64),
             "hdr_exposure_source": np.asarray(hdr_payload["exposure_source"], dtype=np.float64),
             "saturation": np.asarray(hdr_payload["saturation"], dtype=np.float64),
+            "clipping_distance": np.asarray(hdr_payload["clipping_distance"], dtype=np.float64),
             "hdr_confidence": np.asarray(hdr_payload["hdr_confidence"], dtype=np.float64),
             "ghost_motion_artifact": np.asarray(hdr_payload["ghost_motion_artifact"], dtype=np.float64),
             "luma": np.asarray(cfa_payload["luma"], dtype=np.float64),

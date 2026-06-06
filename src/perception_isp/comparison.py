@@ -59,6 +59,7 @@ def build_pipeline_images(
         fast_tensor_preview=fast_preview,
         metadata=result.metadata,
         human_metadata=human_result.metadata,
+        aux_maps={key: np.asarray(value, dtype=np.float64) for key, value in result.maps.items()},
     )
 
 

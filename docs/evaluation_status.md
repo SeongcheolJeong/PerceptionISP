@@ -17,9 +17,9 @@ This project now has an end-to-end perception comparison path:
 - Native KITTI `image_2` + `label_2` loader.
 - Conservative RGB+aux fusion adapter that keeps RGB detector labels and adds
   aux-map support metadata from edge, saturation, and reliability channels.
-- RGB+aux DNN export that writes six-channel tensors and labels for downstream
-  training.
-- Tiny PyTorch smoke training loop proving the exported six-channel tensors can
+- RGB+aux DNN export that writes a stable six-channel tensor, an extended
+  sensor-native aux tensor, and labels for downstream training.
+- Tiny PyTorch smoke training loop proving the stable six-channel tensors can
   be consumed by a DNN stem and optimized.
 - HTML visual evidence: green boxes are ground truth, red boxes are detector outputs.
 
@@ -44,7 +44,8 @@ Auxiliary maps are not automatically used by existing RGB DNNs. A pretrained
 YOLO-style RGB detector expects three channels, so PerceptionISP aux maps become
 useful only after one of these downstream changes:
 
-- Train or fine-tune a detector with a six-channel RGB+aux input stem.
+- Train or fine-tune a detector with the stable six-channel RGB+aux input stem,
+  or with the extended sensor-native aux tensor.
 - Add a separate aux branch and fuse features with the RGB branch.
 - Train a score/proposal calibration head that consumes aux evidence.
 
@@ -53,8 +54,8 @@ The repository now includes a DNN-facing export path:
 - `perception_isp.aux_export`: writes `manifest.jsonl`, `labels/*.json`, and
   `tensors/*.npz`.
 - `perception_isp.aux_train_smoke`: runs a tiny PyTorch optimization loop on
-  the exported six-channel tensors, with optional deterministic train/eval
-  split reporting.
+  the exported stable six-channel tensors, with optional deterministic
+  train/eval split reporting.
 - `RGBAuxTorchSmokeDetector`: loads the tiny checkpoint and feeds
   `perception_rgb_aux_dnn` metrics into the normal comparison harness.
 
@@ -97,7 +98,8 @@ is a useful detector yet.
 
 ### KITTI RGB+Aux Compact Dense Benchmark
 
-A KITTI val subset was exported as six-channel RGB+aux tensors using
+A KITTI val subset was exported as stable six-channel RGB+aux tensors plus the
+extended sensor-native aux tensor using
 `detector_log`, `denoise=0.30`, `edge_aware`, `artifact=0.20`, and the cached
 CameraE2E RAW samples:
 

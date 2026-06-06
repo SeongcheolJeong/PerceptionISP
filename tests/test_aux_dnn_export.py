@@ -11,7 +11,9 @@ import numpy as np
 
 from perception_isp.aux_dnn import (
     RGB_AUX_CHANNELS,
+    RGB_AUX_EXTENDED_CHANNELS,
     apply_channel_mask,
+    build_rgb_aux_extended_tensor,
     build_rgb_aux_tensor,
     channel_mask_for_mode,
     labels_from_manifest,
@@ -33,10 +35,15 @@ class AuxDNNExportTest(unittest.TestCase):
         images = build_pipeline_images(sample)
         hwc = build_rgb_aux_tensor(images, layout="hwc")
         chw = build_rgb_aux_tensor(images, layout="chw")
+        extended = build_rgb_aux_extended_tensor(images, layout="hwc")
         self.assertEqual(hwc.shape, (48, 64, 6))
         self.assertEqual(chw.shape, (6, 48, 64))
+        self.assertEqual(extended.shape, (48, 64, len(RGB_AUX_EXTENDED_CHANNELS)))
         self.assertEqual(tuple(RGB_AUX_CHANNELS[:3]), ("rgb_r", "rgb_g", "rgb_b"))
+        self.assertIn("aux_demosaic_confidence", RGB_AUX_EXTENDED_CHANNELS)
+        self.assertIn("clipping_distance", images.aux_maps)
         self.assertTrue(np.isfinite(hwc).all())
+        self.assertTrue(np.isfinite(extended).all())
         self.assertGreater(float(np.mean(hwc[:, :, 3])), 0.0)
 
     def test_channel_masks_zero_expected_groups(self) -> None:
@@ -68,9 +75,16 @@ class AuxDNNExportTest(unittest.TestCase):
             with np.load(tensor_path) as payload:
                 self.assertEqual(payload["rgb_aux_chw"].shape, (6, 48, 64))
                 self.assertEqual(payload["rgb_aux_hwc"].shape, (48, 64, 6))
+                self.assertEqual(payload["rgb_aux_extended_chw"].shape, (len(RGB_AUX_EXTENDED_CHANNELS), 48, 64))
+                self.assertEqual(payload["rgb_aux_extended_hwc"].shape, (48, 64, len(RGB_AUX_EXTENDED_CHANNELS)))
+                self.assertIn("aux_clipping_distance", [str(value) for value in payload["extended_channel_names"]])
                 self.assertEqual(payload["boxes_xyxy"].shape[1], 4)
+            self.assertEqual(rows[0]["extended_channels"], list(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertIn("extended_tensor_stats", rows[0])
             labels = json.loads(label_path.read_text())
             self.assertGreater(labels["box_count"], 0)
+            self.assertEqual(summary["extended_channels"], list(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertIn("rgb_aux_extended_chw", summary["tensor_layouts"])
             self.assertTrue((root / "summary.json").exists())
             self.assertTrue((root / "index.html").exists())
 

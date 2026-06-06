@@ -13,7 +13,9 @@ import numpy as np
 
 from .aux_dnn import (
     RGB_AUX_CHANNELS,
+    RGB_AUX_EXTENDED_CHANNELS,
     boxes_xyxy_array,
+    build_rgb_aux_extended_tensor,
     build_rgb_aux_tensor,
     label_payload,
     normalized_boxes_xyxy_array,
@@ -108,6 +110,8 @@ def export_aux_dataset(
         images = build_pipeline_images(sample, config=config)
         rgb_aux_hwc = build_rgb_aux_tensor(images, layout="hwc")
         rgb_aux_chw = build_rgb_aux_tensor(images, layout="chw")
+        rgb_aux_extended_hwc = build_rgb_aux_extended_tensor(images, layout="hwc")
+        rgb_aux_extended_chw = build_rgb_aux_extended_tensor(images, layout="chw")
         height, width = rgb_aux_hwc.shape[:2]
         safe_id = _safe_id(sample.sample_id, index)
         tensor_name = f"{index:05d}_{safe_id}.npz"
@@ -121,11 +125,14 @@ def export_aux_dataset(
             tensor_path,
             rgb_aux_hwc=rgb_aux_hwc,
             rgb_aux_chw=rgb_aux_chw,
+            rgb_aux_extended_hwc=rgb_aux_extended_hwc,
+            rgb_aux_extended_chw=rgb_aux_extended_chw,
             perception_rgb_hwc=np.asarray(images.perception_rgb, dtype=np.float32),
             perception_aux_hwc=np.asarray(images.perception_aux_rgb, dtype=np.float32),
             boxes_xyxy=boxes_xyxy,
             boxes_xyxy_normalized=boxes_xyxy_norm,
             channel_names=np.asarray(RGB_AUX_CHANNELS),
+            extended_channel_names=np.asarray(RGB_AUX_EXTENDED_CHANNELS),
         )
         labels = label_payload(sample.ground_truth)
         labels["boxes_xyxy"] = boxes_xyxy.tolist()
@@ -143,8 +150,10 @@ def export_aux_dataset(
             "width": int(width),
             "height": int(height),
             "channels": list(RGB_AUX_CHANNELS),
+            "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS),
             "box_count": int(len(sample.ground_truth)),
             "tensor_stats": tensor_stats(rgb_aux_chw),
+            "extended_tensor_stats": tensor_stats(rgb_aux_extended_chw, channels=RGB_AUX_EXTENDED_CHANNELS),
             "raw_provenance": raw_provenance,
             "metadata": dict(sample.metadata),
             "isp_processing": dict(images.metadata.get("processing", {})) if isinstance(images.metadata, Mapping) else {},
@@ -226,7 +235,8 @@ def _summary(rows: Sequence[Mapping[str, Any]], *, run_config: Mapping[str, Any]
     return {
         "sample_count": sample_count,
         "channels": list(RGB_AUX_CHANNELS),
-        "tensor_layouts": ["rgb_aux_hwc", "rgb_aux_chw"],
+        "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS),
+        "tensor_layouts": ["rgb_aux_hwc", "rgb_aux_chw", "rgb_aux_extended_hwc", "rgb_aux_extended_chw"],
         "manifest": "manifest.jsonl",
         "run_config": dict(run_config or {}),
         "total_boxes": int(sum(int(row.get("box_count", 0)) for row in rows)),
@@ -258,6 +268,7 @@ def _render_html(summary: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) 
             "</tr>"
         )
     channels = ", ".join(str(value) for value in summary.get("channels", ()))
+    extended_channels = ", ".join(str(value) for value in summary.get("extended_channels", ()))
     return f"""<!doctype html>
 <html lang=\"ko\">
 <head>
@@ -275,7 +286,7 @@ def _render_html(summary: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) 
 </head>
 <body>
   <h1>PerceptionISP RGB+Aux DNN Export</h1>
-  <div class=\"note\">This export is the DNN-facing path: six channels are stored as both HWC and CHW tensors. Channels: <code>{html_lib.escape(channels)}</code>.</div>
+  <div class=\"note\">This export is the DNN-facing path. The stable six-channel tensor is stored as HWC/CHW for existing checkpoints: <code>{html_lib.escape(channels)}</code>. A sensor-native extended tensor is also stored for new aux-aware experiments: <code>{html_lib.escape(extended_channels)}</code>.</div>
   <p>Samples: {int(summary.get('sample_count', 0))}, boxes: {int(summary.get('total_boxes', 0))}, export: {float(summary.get('elapsed_seconds', 0.0)):.2f}s ({float(summary.get('samples_per_second', 0.0)):.2f} samples/s). Manifest: <code>manifest.jsonl</code>.</p>
   <table>
     <thead><tr><th>Sample</th><th>Shape</th><th>Boxes</th><th>Source CFA</th><th>Target CFA</th><th>Remapped</th><th>Tensor</th></tr></thead>

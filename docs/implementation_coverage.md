@@ -16,7 +16,7 @@ This implementation is deliberately broad rather than hardware-optimized.
 | LED / Temporal | temporal difference, consistency, flicker confidence, light-source confidence |
 | Task Image Formation | human RGB, vision RGB, raw-like tensor |
 | Output Formatter | accurate full tensor, fast stripe tensor, sparse edge packets |
-| DNN Export | RGB+aux six-channel tensor export, labels, manifest, PyTorch dataset adapter |
+| DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
 | Evidence / Claiming | paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, RGB+aux training rollup, claim-readiness dashboard, one-shot readiness orchestration |

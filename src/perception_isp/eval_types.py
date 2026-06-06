@@ -75,6 +75,7 @@ class PipelineImageSet:
     fast_tensor_preview: np.ndarray
     metadata: Mapping[str, Any]
     human_metadata: Mapping[str, Any] = field(default_factory=dict)
+    aux_maps: Mapping[str, np.ndarray] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

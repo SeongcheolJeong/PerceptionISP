@@ -59,8 +59,10 @@ The accurate tensor uses channels:
 
 ```text
 rgb_r, rgb_g, rgb_b,
-noise_variance, saturation, edge_strength, edge_confidence,
-hdr_exposure_source, ir_or_clear, blur_focus_confidence
+noise_variance, snr_map, saturation, clipping_distance, hdr_confidence,
+edge_strength, edge_confidence, demosaic_confidence,
+hdr_exposure_source, lens_gain, color_confidence,
+ir_or_clear, blur_focus_confidence
 ```
 
 The fast tensor uses channels:
@@ -74,11 +76,22 @@ temporal_difference, saturation, noise_variance
 
 Existing RGB detectors do not automatically use PerceptionISP auxiliary maps.
 To make aux maps useful, the downstream model must be adapted and trained or
-fine-tuned with aux channels. The export path writes a six-channel tensor:
+fine-tuned with aux channels. The export path writes a stable six-channel
+tensor for the current compact detector path:
 
 ```text
 rgb_r, rgb_g, rgb_b,
 aux_edge_strength, aux_saturation, aux_reliability
+```
+
+It also stores an extended sensor-native tensor for new aux-aware experiments:
+
+```text
+rgb_r, rgb_g, rgb_b,
+aux_edge_strength, aux_saturation, aux_reliability,
+aux_noise_risk, aux_clipping_distance, aux_demosaic_confidence,
+aux_hdr_confidence, aux_lens_gain, aux_color_confidence,
+aux_blur_focus_confidence
 ```
 
 Export a small CameraE2E-backed COCO8 smoke dataset:
