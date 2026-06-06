@@ -435,4 +435,23 @@ PYTHONPATH=src \
   --output-dir reports/perception_isp_sweep_kitti_val_1496_detector_log_denoise030
 ```
 
+After a detector run finishes, sweep saved detector scores without rerunning
+CameraE2E or YOLO:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.threshold_sweep \
+  reports/perception_isp_sweep_kitti_val_1496_detector_log_denoise030/001_tone-detector-log_denoise-0.30_demosaic-edge-aware_artifact-0.20 \
+  --inputs perception_rgb,perception_fusion_rgb_aux \
+  --thresholds 0.25:0.55:0.025 \
+  --baseline-input human_rgb \
+  --recall-delta-floor -0.001 \
+  --output-dir reports/perception_threshold_sweep_kitti_val_1496_detector_log
+```
+
+This only re-filters detections that already exist in the saved report. It is
+useful for checking whether PerceptionISP's FP/precision tradeoff can be fixed
+with detector score calibration before spending time on DNN training.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

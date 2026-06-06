@@ -316,6 +316,37 @@ a detector-facing tone mismatch: raw `log` made YOLO lose recall. With
 improves high-IoU/small-object recall, but it still trades away precision and
 adds false positives. It is progress, not a broad superiority claim.
 
+## KITTI Detector Score Threshold Sweep
+
+The detector-log KITTI run was also analyzed with a post-hoc score threshold
+sweep. This does not rerun CameraE2E or YOLO; it re-filters the saved detections
+from the full 1,496-sample report:
+
+```text
+reports/perception_threshold_sweep_kitti_val_1496_detector_log/index.html
+```
+
+The sweep shows that score calibration alone does not solve the tradeoff. At
+the default saved threshold, PerceptionISP RGB is within `-0.0007` R50 of
+HumanISP and improves R75/small recall slightly, but FP is higher. Raising the
+threshold reduces FP, but recall and small-object recall drop too quickly.
+
+| Input | Score threshold | Precision@0.50 | Recall@0.50 | Delta R50 | Small Recall@0.50 | Delta Small | FP@0.50 | Delta FP |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| PerceptionISP RGB | 0.250 | 0.6022 | 0.4688 | -0.0007 | 0.2808 | +0.0013 | 1.3750 | +0.0341 |
+| PerceptionISP RGB | 0.275 | 0.6202 | 0.4529 | -0.0166 | 0.2622 | -0.0173 | 1.1464 | -0.1945 |
+| PerceptionISP RGB | 0.300 | 0.6285 | 0.4347 | -0.0348 | 0.2403 | -0.0391 | 0.9753 | -0.3656 |
+| RGB+Aux Fusion | 0.250 | 0.6109 | 0.4573 | -0.0122 | 0.2726 | -0.0069 | 1.2413 | -0.0996 |
+| RGB+Aux Fusion | 0.275 | 0.6218 | 0.4411 | -0.0283 | 0.2526 | -0.0268 | 1.0648 | -0.2761 |
+| RGB+Aux Fusion | 0.300 | 0.6286 | 0.4255 | -0.0440 | 0.2362 | -0.0433 | 0.8997 | -0.4412 |
+
+With the recall floor set to `delta R50 >= -0.001`, the best option remains
+PerceptionISP RGB at `0.250`; no higher threshold satisfies the floor. If FP
+must be lower than HumanISP, the best-recall option is RGB+Aux Fusion at
+`0.250`, but it costs `-0.0122` R50. This makes a trained detector-side aux
+adapter more plausible than simple threshold tuning, but it also means any
+claim needs a trained and held-out validation result.
+
 ## KITTI ISP Tuning Sweep
 
 The first KITTI tuning pass keeps the HumanISP baseline fixed at the default
