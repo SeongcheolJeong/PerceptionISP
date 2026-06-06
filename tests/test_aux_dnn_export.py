@@ -75,11 +75,16 @@ class AuxDNNExportTest(unittest.TestCase):
                 manifest_path=Path(tmp) / "manifest.jsonl",
                 epochs=1,
                 device_name="cpu",
+                estimate_samples=(2, 20),
                 output_dir=Path(tmp) / "train",
             )
             self.assertEqual(summary["sample_count"], 2)
             self.assertEqual(summary["epochs"], 1)
             self.assertTrue(np.isfinite(summary["last_loss"]))
+            self.assertGreater(summary["elapsed_seconds"], 0.0)
+            self.assertGreater(summary["sample_epochs_per_second"], 0.0)
+            self.assertEqual(summary["time_estimates"][0]["samples"], 2)
+            self.assertEqual(summary["time_estimates"][1]["samples"], 20)
             self.assertTrue((Path(tmp) / "train" / "train_smoke_summary.json").exists())
 
 

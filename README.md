@@ -107,13 +107,17 @@ PYTHONPATH=src \
 /Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
   -m perception_isp.aux_train_smoke \
   --manifest exports/perception_rgb_aux_coco8_smoke/manifest.jsonl \
-  --epochs 1 \
+  --epochs 3 \
   --device auto \
-  --output-dir exports/perception_rgb_aux_coco8_train_smoke
+  --estimate-samples 10,100,1000,10000 \
+  --output-dir exports/perception_rgb_aux_coco8_train_benchmark
 ```
 
 This smoke training is not a detector-performance claim. It only verifies the
-data path needed before real RGB+aux detector training.
+data path needed before real RGB+aux detector training. The summary includes
+elapsed time, sample-epochs/sec, and simple time estimates for the requested
+sample counts. These estimates apply to the tiny RGB+aux stem only; full
+detector fine-tuning will be much slower.
 
 ## Validation
 

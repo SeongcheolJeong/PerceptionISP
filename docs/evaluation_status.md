@@ -64,8 +64,23 @@ Current local resource check:
 This is enough for smoke training and small subset fine-tuning, but not enough
 to make strong perception performance claims from large-scale detector
 retraining. The current verified smoke run exported two COCO8 CameraE2E-backed
-samples in about 6 seconds and ran one MPS training epoch in about 3 seconds.
-That proves the data path, not detector superiority.
+samples in about 6 seconds.
+
+A tiny RGB+aux stem benchmark on the exported COCO8 smoke manifest ran on MPS
+at about 26.6 sample-epochs/sec:
+
+| Samples | Epochs | Estimated time |
+| ---: | ---: | ---: |
+| 10 | 3 | 1.1 s |
+| 100 | 3 | 11.3 s |
+| 1,000 | 3 | 1.9 min |
+| 10,000 | 3 | 18.8 min |
+
+This benchmark is a lower-bound smoke path for a tiny stem, not a full YOLO
+fine-tuning estimate. Full detector training with a backbone, feature pyramid,
+loss matching, and validation will be much slower and should use a CUDA GPU for
+claim-quality experiments. The current result proves the data path and basic
+optimization only, not detector superiority.
 
 ## CameraE2E Resolution Finding
 
