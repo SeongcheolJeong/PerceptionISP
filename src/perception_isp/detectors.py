@@ -240,6 +240,118 @@ class RGBAuxTorchSmokeDetector(DetectorAdapter):
         return DetectorResult(self.name, input_name, tuple(detections), elapsed)
 
 
+class RGBAuxTorchDenseDetector(DetectorAdapter):
+    """Compact class-aware RGB+aux detector trained on exported tensors."""
+
+    name = "rgb_aux_torch_dense_detector"
+
+    def __init__(
+        self,
+        checkpoint_path: str,
+        *,
+        confidence: float = 0.30,
+        nms_iou: float = 0.50,
+        max_detections: int = 100,
+        device: str = "auto",
+    ) -> None:
+        try:
+            import torch
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("torch is not installed; install it to run RGB+aux dense detector") from exc
+        from .aux_dnn import make_aux_dense_detector_model
+
+        self.torch = torch
+        self.checkpoint_path = str(checkpoint_path)
+        self.confidence = float(confidence)
+        self.nms_iou = float(nms_iou)
+        self.max_detections = int(max_detections)
+        self.device = _torch_device(torch, device)
+        checkpoint = torch.load(self.checkpoint_path, map_location="cpu")
+        if not isinstance(checkpoint, Mapping):
+            raise ValueError("dense detector checkpoint must be a mapping")
+        self.class_names = tuple(str(value) for value in checkpoint.get("class_names", ("object",))) or ("object",)
+        grid_size = tuple(int(value) for value in checkpoint.get("grid_size", (15, 20)))
+        base_channels = int(checkpoint.get("base_channels", 24))
+        self.model = make_aux_dense_detector_model(
+            num_classes=len(self.class_names),
+            grid_size=(int(grid_size[0]), int(grid_size[1])),
+            base_channels=base_channels,
+        )
+        self.model.load_state_dict(checkpoint["model_state"])
+        self.model.to(self.device)
+        self.model.eval()
+
+    def detect(self, image: Any, *, input_name: str = "perception_rgb_aux_dnn") -> DetectorResult:
+        start = time.perf_counter()
+        tensor = _as_rgb_aux_chw(image)
+        rows, cols = int(tensor.shape[1]), int(tensor.shape[2])
+        with self.torch.no_grad():
+            x = self.torch.from_numpy(tensor[None, :, :, :]).to(self.device)
+            pred = self.model(x)[0].detach().cpu()
+            objectness = self.torch.sigmoid(pred[0]).numpy()
+            boxes = self.torch.sigmoid(pred[1:5]).numpy()
+            class_scores = self.torch.softmax(pred[5:], dim=0).numpy()
+
+        detections: List[Detection] = []
+        grid_rows, grid_cols = objectness.shape
+        for row in range(int(grid_rows)):
+            for col in range(int(grid_cols)):
+                class_index = int(np.argmax(class_scores[:, row, col]))
+                score = float(objectness[row, col] * class_scores[class_index, row, col])
+                if score < self.confidence:
+                    continue
+                x1n, y1n, x2n, y2n = [float(value) for value in boxes[:, row, col]]
+                x1n, x2n = sorted((x1n, x2n))
+                y1n, y2n = sorted((y1n, y2n))
+                x1, y1, x2, y2 = x1n * cols, y1n * rows, x2n * cols, y2n * rows
+                if x2 - x1 < 1.0 or y2 - y1 < 1.0:
+                    continue
+                detections.append(
+                    Detection(
+                        BoundingBox(
+                            (
+                                max(0.0, min(float(cols - 1), x1)),
+                                max(0.0, min(float(rows - 1), y1)),
+                                max(0.0, min(float(cols), x2)),
+                                max(0.0, min(float(rows), y2)),
+                            ),
+                            label=self.class_names[class_index],
+                        ),
+                        score=score,
+                        metadata={
+                            "checkpoint": self.checkpoint_path,
+                            "uses_rgb_aux_tensor": True,
+                            "class_trained": True,
+                            "grid_cell": [int(row), int(col)],
+                            "objectness": float(objectness[row, col]),
+                            "class_probability": float(class_scores[class_index, row, col]),
+                        },
+                    )
+                )
+        pruned = _nms_detections(detections, iou_threshold=self.nms_iou, max_detections=self.max_detections)
+        elapsed = (time.perf_counter() - start) * 1000.0
+        return DetectorResult(self.name, input_name, tuple(pruned), elapsed)
+
+
+def rgb_aux_detector_from_checkpoint(
+    checkpoint_path: str,
+    *,
+    confidence: Optional[float] = None,
+    device: str = "auto",
+) -> DetectorAdapter:
+    """Load the right RGB+aux detector adapter from checkpoint metadata."""
+
+    try:
+        import torch
+    except Exception as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError("torch is not installed; install it to run RGB+aux detector") from exc
+    checkpoint = torch.load(str(checkpoint_path), map_location="cpu")
+    model_type = str(checkpoint.get("model_type", "")) if isinstance(checkpoint, Mapping) else ""
+    if model_type == "rgb_aux_dense_detector_v1":
+        return RGBAuxTorchDenseDetector(str(checkpoint_path), confidence=0.30 if confidence is None else float(confidence), device=device)
+    return RGBAuxTorchSmokeDetector(str(checkpoint_path), confidence=0.10 if confidence is None else float(confidence), device=device)
+
+
 def fuse_rgb_aux_results(
     rgb_result: DetectorResult,
     aux_result: DetectorResult,
@@ -391,6 +503,26 @@ def _box_iou(a: BoundingBox, b: BoundingBox) -> float:
     inter = max(ix2 - ix1, 0.0) * max(iy2 - iy1, 0.0)
     union = a.area + b.area - inter
     return 0.0 if union <= 0.0 else float(inter / union)
+
+
+def _nms_detections(
+    detections: Sequence[Detection],
+    *,
+    iou_threshold: float,
+    max_detections: int,
+) -> Tuple[Detection, ...]:
+    kept: List[Detection] = []
+    for detection in sorted(detections, key=lambda item: item.score, reverse=True):
+        if len(kept) >= int(max_detections):
+            break
+        suppress = False
+        for selected in kept:
+            if selected.box.label == detection.box.label and _box_iou(selected.box, detection.box) > float(iou_threshold):
+                suppress = True
+                break
+        if not suppress:
+            kept.append(detection)
+    return tuple(kept)
 
 
 def _road_roi(rows: int, cols: int) -> np.ndarray:

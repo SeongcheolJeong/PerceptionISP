@@ -144,6 +144,60 @@ def make_aux_smoke_detector_model(*, stem_channels: int = 16):
     )
 
 
+def make_aux_dense_detector_model(
+    *,
+    num_classes: int,
+    grid_size: Tuple[int, int] = (15, 20),
+    base_channels: int = 24,
+):
+    """Create a compact class-aware RGB+aux grid detector."""
+
+    import torch.nn as nn
+
+    class RGBAuxDenseDetectorModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            channels = int(base_channels)
+            self.grid_size = (int(grid_size[0]), int(grid_size[1]))
+            self.num_classes = int(num_classes)
+            self.features = nn.Sequential(
+                nn.Conv2d(6, channels, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 2),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels * 2, channels * 4, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 4),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels * 4, channels * 4, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 4),
+                nn.SiLU(inplace=True),
+                nn.AdaptiveAvgPool2d(self.grid_size),
+            )
+            self.head = nn.Conv2d(channels * 4, 5 + self.num_classes, kernel_size=1)
+
+        def forward(self, value: Any) -> Any:
+            return self.head(self.features(value))
+
+    if int(num_classes) <= 0:
+        raise ValueError("num_classes must be positive")
+    return RGBAuxDenseDetectorModel()
+
+
+def labels_from_manifest(manifest_path: str | Path) -> Tuple[str, ...]:
+    """Return sorted class labels referenced by an exported RGB+aux manifest."""
+
+    manifest = load_manifest(manifest_path)
+    base = Path(manifest_path).expanduser().parent
+    labels = set()
+    for item in manifest:
+        label_path = base / str(item["label_path"])
+        payload = json.loads(label_path.read_text())
+        labels.update(str(value) for value in payload.get("labels", ()))
+    return tuple(sorted(labels)) or ("object",)
+
+
 def tensor_stats(tensor: np.ndarray) -> Mapping[str, Any]:
     arr = np.asarray(tensor, dtype=np.float64)
     if arr.ndim == 3 and arr.shape[0] == len(RGB_AUX_CHANNELS):

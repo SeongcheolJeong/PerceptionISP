@@ -8,11 +8,12 @@ from pathlib import Path
 
 import numpy as np
 
-from perception_isp.aux_dnn import RGB_AUX_CHANNELS, build_rgb_aux_tensor, make_aux_early_fusion_stem, make_torch_dataset
+from perception_isp.aux_dnn import RGB_AUX_CHANNELS, build_rgb_aux_tensor, labels_from_manifest, make_aux_early_fusion_stem, make_torch_dataset
 from perception_isp.aux_export import export_aux_dataset
+from perception_isp.aux_train_dense import train_dense
 from perception_isp.aux_train_smoke import train_smoke
 from perception_isp.comparison import build_pipeline_images, compare_dataset
-from perception_isp.detectors import RGBAuxTorchSmokeDetector
+from perception_isp.detectors import RGBAuxTorchDenseDetector, RGBAuxTorchSmokeDetector, rgb_aux_detector_from_checkpoint
 from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
 
 
@@ -115,6 +116,42 @@ class AuxDNNExportTest(unittest.TestCase):
                 samples[:1],
                 rgb_aux_detector=detector,
                 label_agnostic=True,
+                include_images=True,
+            )
+            self.assertIn("perception_rgb_aux_dnn", result["aggregate"])
+            self.assertIn("perception_rgb_aux_dnn", result["samples"][0]["metrics"])
+            self.assertIn("perception_rgb_aux_dnn", result["samples"][0]["_visuals"])
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_rgb_aux_detector_trains_and_integrates_with_comparison(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp)
+            manifest = Path(tmp) / "manifest.jsonl"
+            self.assertEqual(labels_from_manifest(manifest), ("car", "person", "traffic_light"))
+            summary = train_dense(
+                manifest_path=manifest,
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                eval_fraction=0.34,
+                estimate_samples=(3, 30),
+                output_dir=Path(tmp) / "dense",
+            )
+            self.assertEqual(summary["sample_count"], 3)
+            self.assertEqual(summary["class_names"], ["car", "person", "traffic_light"])
+            self.assertIn("train_class_names", summary)
+            self.assertIn("eval_class_names", summary)
+            self.assertIn("missing_eval_class_names", summary)
+            self.assertGreater(summary["sample_epochs_per_second"], 0.0)
+            self.assertTrue((Path(tmp) / "dense" / "rgb_aux_dense_detector.pt").exists())
+            detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
+            self.assertIsInstance(detector, RGBAuxTorchDenseDetector)
+            result = compare_dataset(
+                samples[:1],
+                rgb_aux_detector=detector,
+                label_agnostic=False,
                 include_images=True,
             )
             self.assertIn("perception_rgb_aux_dnn", result["aggregate"])
