@@ -706,13 +706,17 @@ PYTHONPATH=src \
   --claim-gate 'Human broad superiority=reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_vs_human' \
   --claim-gate 'FP reducer vs RGB+Aux Fusion=reports/perception_claim_gate_kitti_train512_score_label_aux_to_val1496_fp_reducer_vs_fusion' \
   --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128 \
+  --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496 \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_dashboard
 ```
 
 The dashboard currently says: broad HumanISP superiority is not supported,
 bounded FP reduction is supported, and the learned RGB+aux DNN path is
-trainable but not yet claim-quality.
+trainable but not yet claim-quality. When task metrics are provided, it also
+keeps the task-level claim narrow: VRU/person recall improvement versus
+HumanISP is not supported when those task recall deltas are negative, even if
+FP/sample is reduced.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -731,7 +735,8 @@ score+label+aux reduces FP/sample, but VRU recall is still lower than HumanISP
 (`dR50=-0.0138` for `vru`, `dR50=-0.0157` for `person`).
 
 For the current KITTI evidence bundle, the one-shot readiness command rebuilds
-both claim gates, task metrics, the RGB+aux training rollup, and the dashboard:
+both claim gates, task metrics, the RGB+aux training rollup, and a dashboard
+that includes the task-metric tradeoff decision:
 
 ```bash
 PYTHONPATH=src \

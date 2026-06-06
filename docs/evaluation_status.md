@@ -333,6 +333,7 @@ It intentionally separates three decisions:
 | Broad HumanISP superiority | Not supported |
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
+| Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
 
 Task-oriented group metrics are also generated from the same saved detections:
 

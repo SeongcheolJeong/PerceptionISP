@@ -17,11 +17,13 @@ class ClaimDashboardTest(unittest.TestCase):
             broad = _write_claim_gate(root / "broad", profile="broad_superiority", passed=False)
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             training = _write_training_rollup(root / "training")
+            task_metrics = _write_task_metrics(root / "task_metrics")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
                 claim_gate_specs=[f"Human superiority={broad}", f"FP reducer={fp}"],
                 training_rollup=training,
+                task_metrics=task_metrics,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -30,25 +32,35 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("supported", statuses)
             self.assertIn("not_supported", statuses)
             self.assertEqual(dashboard["training"]["status"], "diagnostic_only")
+            self.assertEqual(dashboard["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
+            self.assertIn(
+                "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
 
             html_path = write_claim_dashboard(dashboard, root / "dashboard")
             html = html_path.read_text()
             self.assertIn("PerceptionISP Claim Readiness Dashboard", html)
             self.assertIn("Broad HumanISP superiority gate failed", html)
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
+            self.assertIn("Task Metrics", html)
+            self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_cli_outputs_compact_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
+            task_metrics = _write_task_metrics(root / "task_metrics")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                exit_code = dashboard_main(["--claim-gate", str(fp), "--output-dir", str(root / "dashboard")])
+                exit_code = dashboard_main(["--claim-gate", str(fp), "--task-metrics", str(task_metrics), "--output-dir", str(root / "dashboard")])
             printed = json.loads(stdout.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(printed["claim_count"], 1)
+            summary = json.loads((root / "dashboard" / "claim_dashboard_summary.json").read_text())
+            self.assertEqual(summary["task_metrics"]["status"], "recall_tradeoff")
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
 
@@ -120,6 +132,88 @@ def _write_training_rollup(path: Path) -> Path:
                         },
                     },
                 ],
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_task_metrics(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "task_metrics_summary.json").write_text(
+        json.dumps(
+            {
+                "baseline_input": "human_rgb",
+                "inputs": [
+                    "human_rgb",
+                    "perception_fusion_rgb_aux",
+                    "perception_calibrated_score_label_aux_fusion_rgb_aux",
+                ],
+                "groups": [
+                    {"name": "vru", "kind": "label"},
+                    {"name": "person", "kind": "label"},
+                    {"name": "vehicle", "kind": "label"},
+                    {"name": "small_all", "kind": "area"},
+                ],
+                "label_agnostic": True,
+                "metrics": {
+                    "human_rgb": {
+                        "vru": {"recall@0.50": 0.30, "fp@0.50_per_sample": 0.24},
+                        "person": {"recall@0.50": 0.40, "fp@0.50_per_sample": 0.18},
+                    },
+                    "perception_calibrated_score_label_aux_fusion_rgb_aux": {
+                        "vru": {
+                            "gt_count": 100,
+                            "det_count": 70,
+                            "precision@0.50": 0.59,
+                            "recall@0.50": 0.29,
+                            "recall@0.75": 0.08,
+                            "fp@0.50_per_sample": 0.16,
+                            "delta_precision@0.50": 0.09,
+                            "delta_recall@0.50": -0.01,
+                            "delta_recall@0.75": -0.004,
+                            "delta_fp@0.50_per_sample": -0.08,
+                        },
+                        "person": {
+                            "gt_count": 80,
+                            "det_count": 60,
+                            "precision@0.50": 0.60,
+                            "recall@0.50": 0.38,
+                            "recall@0.75": 0.10,
+                            "fp@0.50_per_sample": 0.15,
+                            "delta_precision@0.50": 0.02,
+                            "delta_recall@0.50": -0.02,
+                            "delta_recall@0.75": -0.006,
+                            "delta_fp@0.50_per_sample": -0.03,
+                        },
+                        "vehicle": {
+                            "gt_count": 120,
+                            "det_count": 100,
+                            "precision@0.50": 0.72,
+                            "recall@0.50": 0.50,
+                            "recall@0.75": 0.33,
+                            "fp@0.50_per_sample": 0.85,
+                            "delta_precision@0.50": 0.03,
+                            "delta_recall@0.50": -0.01,
+                            "delta_recall@0.75": -0.003,
+                            "delta_fp@0.50_per_sample": -0.14,
+                        },
+                        "small_all": {
+                            "gt_count": 90,
+                            "det_count": 80,
+                            "precision@0.50": 0.50,
+                            "recall@0.50": 0.30,
+                            "recall@0.75": 0.08,
+                            "fp@0.50_per_sample": 0.80,
+                            "delta_precision@0.50": 0.05,
+                            "delta_recall@0.50": -0.002,
+                            "delta_recall@0.75": -0.001,
+                            "delta_fp@0.50_per_sample": -0.07,
+                        },
+                    },
+                },
             }
         )
         + "\n"

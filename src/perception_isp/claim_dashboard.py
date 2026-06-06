@@ -15,12 +15,14 @@ from .types import json_ready
 CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
+TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Create a consolidated PerceptionISP claim-readiness dashboard.")
     parser.add_argument("--claim-gate", action="append", default=[], help="Claim gate summary path/dir, optionally name=path.")
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
+    parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -28,6 +30,7 @@ def main(argv: Any = None) -> int:
     dashboard = build_claim_dashboard(
         claim_gate_specs=args.claim_gate,
         training_rollup=args.training_rollup,
+        task_metrics=args.task_metrics,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -51,15 +54,18 @@ def build_claim_dashboard(
     *,
     claim_gate_specs: Sequence[str | Path],
     training_rollup: str | Path | None = None,
+    task_metrics: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
+    task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training)
+    decisions = _claim_decisions(claims, training, task)
     return {
         "claims": claims,
         "training": training,
+        "task_metrics": task,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
@@ -149,7 +155,110 @@ def _load_comparison_rollup(spec: str | Path) -> Dict[str, Any]:
     }
 
 
-def _claim_decisions(claims: Sequence[Mapping[str, Any]], training: Mapping[str, Any] | None) -> list[Dict[str, Any]]:
+def _load_task_metrics(spec: str | Path, *, claims: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, TASK_METRICS_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    baseline_input = str(data.get("baseline_input", ""))
+    target_input = _select_task_target(data, claims=claims, baseline_input=baseline_input)
+    rows = _task_group_rows(data, target_input=target_input)
+    status = _task_metrics_status(rows, target_input=target_input)
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "baseline_input": baseline_input,
+        "target_input": target_input,
+        "input_count": len(data.get("inputs", ())),
+        "group_count": len(data.get("groups", ())),
+        "label_agnostic": bool(data.get("label_agnostic", True)),
+        "status": status,
+        "rows": rows,
+        "interpretation": _task_metrics_interpretation(status, baseline_input=baseline_input, target_input=target_input),
+    }
+
+
+def _select_task_target(data: Mapping[str, Any], *, claims: Sequence[Mapping[str, Any]], baseline_input: str) -> str:
+    available = {str(value) for value in data.get("inputs", ())}
+    for profile in ("fp_reducer", "broad_superiority"):
+        for claim in claims:
+            if str(claim.get("profile", "")) != profile:
+                continue
+            target = str(claim.get("target_input", ""))
+            if target in available and target != baseline_input:
+                return target
+    for input_name in reversed([str(value) for value in data.get("inputs", ())]):
+        if input_name and input_name != baseline_input:
+            return input_name
+    return ""
+
+
+def _task_group_rows(data: Mapping[str, Any], *, target_input: str) -> list[Dict[str, Any]]:
+    if not target_input:
+        return []
+    metrics_by_input = data.get("metrics", {}) if isinstance(data.get("metrics"), Mapping) else {}
+    target_metrics = metrics_by_input.get(target_input, {}) if isinstance(metrics_by_input.get(target_input), Mapping) else {}
+    group_specs = data.get("groups", ()) if isinstance(data.get("groups", ()), Sequence) else ()
+    group_names = [str(group.get("name", "")) for group in group_specs if isinstance(group, Mapping)]
+    ordered_names = [name for name in ("vru", "person", "cyclist", "vehicle", "traffic_light", "small_all") if name in group_names]
+    ordered_names.extend(name for name in group_names if name not in ordered_names)
+    rows = []
+    for group_name in ordered_names:
+        metrics = target_metrics.get(group_name, {}) if isinstance(target_metrics.get(group_name), Mapping) else {}
+        rows.append(
+            {
+                "group": group_name,
+                "gt_count": int(metrics.get("gt_count", 0)),
+                "det_count": int(metrics.get("det_count", 0)),
+                "precision@0.50": _maybe_float_or_none(metrics.get("precision@0.50")),
+                "recall@0.50": _maybe_float_or_none(metrics.get("recall@0.50")),
+                "recall@0.75": _maybe_float_or_none(metrics.get("recall@0.75")),
+                "fp@0.50_per_sample": _maybe_float_or_none(metrics.get("fp@0.50_per_sample")),
+                "delta_precision@0.50": _maybe_float_or_none(metrics.get("delta_precision@0.50")),
+                "delta_recall@0.50": _maybe_float_or_none(metrics.get("delta_recall@0.50")),
+                "delta_recall@0.75": _maybe_float_or_none(metrics.get("delta_recall@0.75")),
+                "delta_fp@0.50_per_sample": _maybe_float_or_none(metrics.get("delta_fp@0.50_per_sample")),
+            }
+        )
+    return rows
+
+
+def _task_metrics_status(rows: Sequence[Mapping[str, Any]], *, target_input: str) -> str:
+    if not target_input:
+        return "missing_target"
+    if not rows:
+        return "missing_groups"
+    priority_rows = [row for row in rows if row.get("group") in {"vru", "person", "vehicle", "small_all"}]
+    evaluated = priority_rows or list(rows)
+    recall_drops = [row for row in evaluated if _signed_metric(row, "delta_recall@0.50") is not None and (_signed_metric(row, "delta_recall@0.50") or 0.0) < 0.0]
+    if recall_drops:
+        return "recall_tradeoff"
+    fp_reductions = [row for row in evaluated if _signed_metric(row, "delta_fp@0.50_per_sample") is not None and (_signed_metric(row, "delta_fp@0.50_per_sample") or 0.0) < 0.0]
+    if fp_reductions:
+        return "candidate_needs_gate"
+    return "diagnostic_only"
+
+
+def _task_metrics_interpretation(status: str, *, baseline_input: str, target_input: str) -> str:
+    if status == "recall_tradeoff":
+        return (
+            f"Task groups for {target_input} show lower FP in places, but at least one priority recall group is below "
+            f"{baseline_input}; do not claim VRU/person/task recall improvement."
+        )
+    if status == "candidate_needs_gate":
+        return "Task-group metrics look directionally useful, but need a configured held-out task gate before promotion to a claim."
+    if status == "missing_target":
+        return "No non-baseline target input was available in the task metrics summary."
+    if status == "missing_groups":
+        return "No task groups were available for the selected target input."
+    return "Task metrics are diagnostic evidence only."
+
+
+def _claim_decisions(
+    claims: Sequence[Mapping[str, Any]],
+    training: Mapping[str, Any] | None,
+    task_metrics: Mapping[str, Any] | None,
+) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
     fp_claims = [claim for claim in claims if claim.get("profile") == "fp_reducer"]
@@ -169,6 +278,14 @@ def _claim_decisions(claims: Sequence[Mapping[str, Any]], training: Mapping[str,
             decisions.append({"status": "needs_gate", "claim": "The learned RGB+Aux DNN path has candidate metrics, but still needs a held-out claim gate."})
         elif status == "training_path_only":
             decisions.append({"status": "needs_eval", "claim": "The RGB+Aux DNN training path exists, but direct held-out detector evaluation is still missing."})
+    if task_metrics is not None:
+        status = str(task_metrics.get("status", "unknown"))
+        if status == "recall_tradeoff":
+            decisions.append({"status": "not_supported", "claim": "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim."})
+        elif status == "candidate_needs_gate":
+            decisions.append({"status": "needs_gate", "claim": "Task-group metrics are candidate evidence, but need a configured held-out task gate before a task-level claim."})
+        elif status in {"missing_target", "missing_groups"}:
+            decisions.append({"status": "needs_eval", "claim": "Task-group evidence is incomplete, so task-level claims are not ready."})
     return decisions
 
 
@@ -296,6 +413,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     claim_rows = "".join(_claim_row(item, destination) for item in dashboard.get("claims", ()))
     training = dashboard.get("training")
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
+    task_metrics = dashboard.get("task_metrics")
+    task_metrics_html = _task_metrics_html(task_metrics, destination) if isinstance(task_metrics, Mapping) else "<p>No task metrics summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
     comparison_body = comparison_rows if comparison_rows else '<tr><td colspan="4">No comparison rollups were provided.</td></tr>'
     return f"""<!doctype html>
@@ -314,6 +433,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     .supported {{ color: #047857; font-weight: 700; }}
     .not_supported {{ color: #b91c1c; font-weight: 700; }}
     .needs_gate, .needs_eval {{ color: #a16207; font-weight: 700; }}
+    .good_delta {{ color: #047857; }}
+    .bad_delta {{ color: #b91c1c; }}
   </style>
 </head>
 <body>
@@ -331,6 +452,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   </table>
   <h2>RGB+Aux DNN Training</h2>
   {training_html}
+  <h2>Task Metrics</h2>
+  {task_metrics_html}
   <h2>Supporting Rollups</h2>
   <table>
     <thead><tr><th>Name</th><th>Report</th><th>Runs</th><th>Baseline</th></tr></thead>
@@ -393,6 +516,47 @@ def _training_html(training: Mapping[str, Any], destination: Path) -> str:
     )
 
 
+def _task_metrics_html(task_metrics: Mapping[str, Any], destination: Path) -> str:
+    rows = "".join(_task_metric_row(row) for row in task_metrics.get("rows", ()))
+    if not rows:
+        rows = '<tr><td colspan="11">No task group rows were available.</td></tr>'
+    status = str(task_metrics.get("status", ""))
+    status_class = "not_supported" if status == "recall_tradeoff" else "needs_gate" if status == "candidate_needs_gate" else "needs_eval"
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(status)}</code>. {html_lib.escape(str(task_metrics.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Baseline</th><th>Target</th><th>Groups</th><th>Label Mode</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(task_metrics, destination)}</td>"
+        f"<td><code>{html_lib.escape(str(task_metrics.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(task_metrics.get('target_input', '')))}</code></td>"
+        f"<td>{int(task_metrics.get('group_count', 0))}</td>"
+        f"<td>{'label agnostic' if bool(task_metrics.get('label_agnostic', True)) else 'label aware'}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Group</th><th>GT</th><th>Det</th><th>P@0.50</th><th>R@0.50</th><th>R@0.75</th><th>FP/sample</th><th>dP@0.50</th><th>dR@0.50</th><th>dR@0.75</th><th>dFP/sample</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _task_metric_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{html_lib.escape(str(row.get('group', '')))}</td>"
+        f"<td>{int(row.get('gt_count', 0))}</td>"
+        f"<td>{int(row.get('det_count', 0))}</td>"
+        f"<td>{_fmt(row.get('precision@0.50'))}</td>"
+        f"<td>{_fmt(row.get('recall@0.50'))}</td>"
+        f"<td>{_fmt(row.get('recall@0.75'))}</td>"
+        f"<td>{_fmt(row.get('fp@0.50_per_sample'))}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_precision@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_recall@0.75'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_fp@0.50_per_sample'), lower_is_better=True)}</td>"
+        "</tr>"
+    )
+
+
 def _comparison_row(item: Mapping[str, Any], destination: Path) -> str:
     return (
         "<tr>"
@@ -414,6 +578,15 @@ def _metric_cell(item: Any) -> str:
     return f"<span class=\"{status}\">{_fmt(item.get('delta'), signed=True)}</span>{ci_text}"
 
 
+def _task_delta_cell(value: Any, *, lower_is_better: bool) -> str:
+    if value is None:
+        return ""
+    number = float(value)
+    good = number < 0.0 if lower_is_better else number >= 0.0
+    css_class = "good_delta" if good else "bad_delta"
+    return f"<span class=\"{css_class}\">{_fmt(number, signed=True)}</span>"
+
+
 def _report_link(item: Mapping[str, Any], destination: Path) -> str:
     html_path = item.get("html_path")
     if not html_path:
@@ -426,6 +599,17 @@ def _maybe_float(value: Any) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _maybe_float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
+def _signed_metric(row: Mapping[str, Any], metric: str) -> float | None:
+    value = row.get(metric)
+    return None if value is None else float(value)
 
 
 def _fmt(value: Any, *, signed: bool = False) -> str:

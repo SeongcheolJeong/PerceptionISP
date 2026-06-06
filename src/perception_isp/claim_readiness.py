@@ -134,6 +134,7 @@ def run_claim_readiness(
             f"FP reducer vs RGB+Aux Fusion={fp_dir}",
         ],
         training_rollup=training_rollup_path,
+        task_metrics=task_metrics_dir,
         comparison_rollup_specs=comparison_rollups,
     )
     dashboard_html = write_claim_dashboard(dashboard, dashboard_dir)

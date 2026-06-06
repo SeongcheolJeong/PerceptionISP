@@ -40,6 +40,14 @@ class ClaimReadinessTest(unittest.TestCase):
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
+            self.assertEqual(
+                decisions[
+                    "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim."
+                ],
+                "not_supported",
+            )
+            dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
+            self.assertEqual(dashboard_summary["task_metrics"]["status"], "recall_tradeoff")
 
     def test_claim_readiness_cli_outputs_compact_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -72,9 +80,16 @@ def _write_comparison_report(path: Path) -> Path:
     path.mkdir()
     samples = []
     for index in range(3):
+        target_detections = [_match_detection()] if index < 2 else []
         samples.append(
             {
                 "sample_id": str(index),
+                "ground_truth": [{"xyxy": [0.0, 0.0, 20.0, 20.0], "label": "person"}],
+                "detectors": [
+                    {"input_name": "human_rgb", "detections": [_match_detection(), _fp_detection()]},
+                    {"input_name": "perception_fusion_rgb_aux", "detections": [_match_detection(), _fp_detection()]},
+                    {"input_name": "perception_calibrated_score_label_aux_fusion_rgb_aux", "detections": target_detections},
+                ],
                 "metrics": {
                     "human_rgb": {
                         "precision@0.50": 0.60,
@@ -110,6 +125,14 @@ def _write_comparison_report(path: Path) -> Path:
     payload = {"sample_count": len(samples), "samples": samples, "aggregate": aggregate}
     (path / "comparison_summary.json").write_text(json.dumps(payload) + "\n")
     return path
+
+
+def _match_detection() -> dict:
+    return {"box": {"xyxy": [0.0, 0.0, 20.0, 20.0], "label": "person"}, "score": 0.9}
+
+
+def _fp_detection() -> dict:
+    return {"box": {"xyxy": [40.0, 40.0, 60.0, 60.0], "label": "person"}, "score": 0.4}
 
 
 def _aggregate(rows: list[dict]) -> dict:
