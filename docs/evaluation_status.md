@@ -55,6 +55,8 @@ The repository now includes a DNN-facing export path:
 - `perception_isp.aux_train_smoke`: runs a tiny PyTorch optimization loop on
   the exported six-channel tensors, with optional deterministic train/eval
   split reporting.
+- `RGBAuxTorchSmokeDetector`: loads the tiny checkpoint and feeds
+  `perception_rgb_aux_dnn` metrics into the normal comparison harness.
 
 Current local resource check:
 
@@ -85,6 +87,13 @@ loss matching, and validation will be much slower and should use a CUDA GPU for
 claim-quality experiments. The train-smoke path can record eval loss with
 `--eval-fraction`, but the current result still proves only the data path and
 basic optimization, not detector superiority.
+
+The trained smoke checkpoint has also been run through the normal comparison
+harness on two COCO8 CameraE2E-backed samples. The harness now reports a
+`perception_rgb_aux_dnn` input, but its recall@0.50 is currently 0.000. That is
+expected: this tiny checkpoint predicts one generic box and has no class head.
+It proves that a learned RGB+aux path can be loaded and evaluated, not that it
+is a useful detector yet.
 
 ## CameraE2E Resolution Finding
 
@@ -161,6 +170,9 @@ For a fair PerceptionISP claim, compare at least:
 - HumanISP RGB + pretrained RGB detector.
 - PerceptionISP RGB + the same pretrained RGB detector.
 - PerceptionISP RGB+aux + a detector or adapter trained to consume those maps.
+
+The current `RGBAuxTorchSmokeDetector` is not sufficient for that final bullet;
+it is only the first learned-adapter plumbing step.
 
 ## Recommended Next Run
 

@@ -10,6 +10,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
+from .aux_dnn import build_rgb_aux_tensor
 from .detectors import AuxMapRiskDetector, DetectorAdapter, NumpyRiskObjectDetector, fuse_rgb_aux_results
 from .eval_types import BoundingBox, DetectorResult, EvaluationSample, PipelineImageSet
 from .metrics import aggregate_metric_rows, evaluate_detections
@@ -17,7 +18,7 @@ from .pipeline import PerceptionISPPipeline
 from .types import PerceptionISPConfig, json_ready
 
 
-INPUT_ORDER = ("reference_rgb", "human_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_aux_rgb")
+INPUT_ORDER = ("reference_rgb", "human_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_rgb_aux_dnn", "perception_aux_rgb")
 PIPELINE_INPUT_NAMES = ("human_rgb", "perception_rgb", "perception_aux_rgb")
 AREA_BUCKETS = ("small", "medium", "large")
 
@@ -48,6 +49,7 @@ def compare_sample(
     *,
     rgb_detector: DetectorAdapter | None = None,
     aux_detector: DetectorAdapter | None = None,
+    rgb_aux_detector: DetectorAdapter | None = None,
     config: PerceptionISPConfig | None = None,
     label_agnostic: bool = True,
     include_images: bool = False,
@@ -70,6 +72,13 @@ def compare_sample(
                 aux_result,
                 images.perception_aux_rgb,
                 input_name="perception_fusion_rgb_aux",
+            )
+        )
+    if rgb_aux_detector is not None:
+        detector_results.append(
+            rgb_aux_detector.detect(
+                build_rgb_aux_tensor(images, layout="hwc"),
+                input_name="perception_rgb_aux_dnn",
             )
         )
     detector_results.append(aux_result)
@@ -99,6 +108,8 @@ def compare_sample(
         }
         if include_fusion:
             visuals["perception_fusion_rgb_aux"] = images.perception_rgb
+        if rgb_aux_detector is not None:
+            visuals["perception_rgb_aux_dnn"] = images.perception_rgb
         if sample.reference_rgb is not None:
             visuals["reference_rgb"] = sample.reference_rgb
         payload["_visuals"] = visuals
@@ -110,6 +121,7 @@ def compare_dataset(
     *,
     rgb_detector: DetectorAdapter | None = None,
     aux_detector: DetectorAdapter | None = None,
+    rgb_aux_detector: DetectorAdapter | None = None,
     config: PerceptionISPConfig | None = None,
     label_agnostic: bool = True,
     include_images: bool = False,
@@ -120,6 +132,7 @@ def compare_dataset(
             sample,
             rgb_detector=rgb_detector,
             aux_detector=aux_detector,
+            rgb_aux_detector=rgb_aux_detector,
             config=config,
             label_agnostic=label_agnostic,
             include_images=include_images,
@@ -252,6 +265,7 @@ def _materialize_visual_assets(result: Mapping[str, Any], destination: Path) -> 
                 ("human_rgb", "HumanISP RGB"),
                 ("perception_rgb", "PerceptionISP RGB"),
                 ("perception_fusion_rgb_aux", "Perception RGB+Aux Fusion"),
+                ("perception_rgb_aux_dnn", "Perception RGB+Aux DNN"),
                 ("perception_aux_rgb", "Perception Aux Maps"),
             ):
                 image = visual_sources.get(input_name)
@@ -398,6 +412,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
             f"<td>{sample.get('metrics', {}).get('human_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_fusion_rgb_aux', {}).get('recall@0.50', 0.0):.3f}</td>"
+            f"<td>{sample.get('metrics', {}).get('perception_rgb_aux_dnn', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_aux_rgb', {}).get('recall@0.50', 0.0):.3f}</td></tr>"
         )
         visuals = sample.get("visuals", ())
@@ -456,7 +471,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
   </table>
   <h2>Samples</h2>
   <table>
-    <thead><tr><th>Sample</th><th>Source</th><th>GT</th><th>Human Recall@0.50</th><th>Perception RGB Recall@0.50</th><th>Fusion Recall@0.50</th><th>Aux Recall@0.50</th></tr></thead>
+    <thead><tr><th>Sample</th><th>Source</th><th>GT</th><th>Human Recall@0.50</th><th>Perception RGB Recall@0.50</th><th>Fusion Recall@0.50</th><th>RGB+Aux DNN Recall@0.50</th><th>Aux Recall@0.50</th></tr></thead>
     <tbody>{''.join(sample_rows)}</tbody>
   </table>
   <h2>Class Breakdown</h2>
@@ -470,7 +485,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
     <tbody>{area_rows if area_rows else '<tr><td colspan="6">No area breakdown available.</td></tr>'}</tbody>
   </table>
   <h2>Visual Evidence</h2>
-  <p>Green boxes are ground truth. Red boxes are detector outputs on each ISP image. The RGB+Aux Fusion view keeps RGB detector labels and uses aux-map support for conservative score/filtering. The auxiliary preview uses edge, saturation, and reliability channels as RGB.</p>
+  <p>Green boxes are ground truth. Red boxes are detector outputs on each ISP image. The RGB+Aux Fusion view keeps RGB detector labels and uses aux-map support for conservative score/filtering. The RGB+Aux DNN view is only shown when a trained smoke checkpoint is supplied. The auxiliary preview uses edge, saturation, and reliability channels as RGB.</p>
   {''.join(visual_sections) if visual_sections else '<p>No visual assets were captured for this run.</p>'}
   <p>Raw JSON: <code>comparison_summary.json</code></p>
 </body>

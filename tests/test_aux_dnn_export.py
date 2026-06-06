@@ -11,7 +11,8 @@ import numpy as np
 from perception_isp.aux_dnn import RGB_AUX_CHANNELS, build_rgb_aux_tensor, make_aux_early_fusion_stem, make_torch_dataset
 from perception_isp.aux_export import export_aux_dataset
 from perception_isp.aux_train_smoke import train_smoke
-from perception_isp.comparison import build_pipeline_images
+from perception_isp.comparison import build_pipeline_images, compare_dataset
+from perception_isp.detectors import RGBAuxTorchSmokeDetector
 from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
 
 
@@ -92,6 +93,30 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(summary["time_estimates"][0]["samples"], 2)
             self.assertEqual(summary["time_estimates"][1]["samples"], 20)
             self.assertTrue((Path(tmp) / "train" / "train_smoke_summary.json").exists())
+            self.assertTrue((Path(tmp) / "train" / "rgb_aux_smoke_detector.pt").exists())
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_trained_rgb_aux_smoke_detector_integrates_with_comparison(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp)
+            summary = train_smoke(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                epochs=1,
+                device_name="cpu",
+                eval_fraction=0.34,
+                output_dir=Path(tmp) / "train",
+            )
+            detector = RGBAuxTorchSmokeDetector(summary["checkpoint"], confidence=0.0)
+            result = compare_dataset(
+                samples[:1],
+                rgb_aux_detector=detector,
+                label_agnostic=True,
+                include_images=True,
+            )
+            self.assertIn("perception_rgb_aux_dnn", result["aggregate"])
+            self.assertIn("perception_rgb_aux_dnn", result["samples"][0]["metrics"])
+            self.assertIn("perception_rgb_aux_dnn", result["samples"][0]["_visuals"])
 
 
 if __name__ == "__main__":

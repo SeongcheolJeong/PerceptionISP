@@ -17,7 +17,8 @@ This implementation is deliberately broad rather than hardware-optimized.
 | Task Image Formation | human RGB, vision RGB, raw-like tensor |
 | Output Formatter | accurate full tensor, fast stripe tensor, sparse edge packets |
 | DNN Export | RGB+aux six-channel tensor export, labels, manifest, PyTorch dataset adapter |
-| Training Smoke | tiny PyTorch RGB+aux stem and optimization loop for path validation |
+| Training Smoke | tiny PyTorch RGB+aux stem, optimization loop, checkpoint save/load, eval split |
+| Learned Adapter | `RGBAuxTorchSmokeDetector` loads a tiny checkpoint into the comparison harness |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -25,6 +26,6 @@ Known limits:
 
 - The Bayer demosaic block is an edge-aware numpy reference, not a production ISP demosaic.
 - The RGB+aux training loop is a smoke test, not a real detector training recipe.
-- No trained aux-aware detector checkpoint is included yet.
+- The RGB+aux smoke checkpoint predicts one generic box and is not a useful trained detector.
 - CameraE2E integration is optional and environment-dependent.
 - Latency values are engineering estimates, not measured hardware evidence.

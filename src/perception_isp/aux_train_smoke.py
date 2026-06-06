@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
-from .aux_dnn import make_aux_early_fusion_stem, make_torch_dataset
+from .aux_dnn import RGB_AUX_CHANNELS, make_aux_smoke_detector_model, make_torch_dataset
 from .types import json_ready
 
 
@@ -51,7 +51,6 @@ def train_smoke(
     output_dir: str | Path | None = None,
 ) -> Dict[str, Any]:
     import torch
-    import torch.nn as nn
     import torch.nn.functional as F
 
     dataset = make_torch_dataset(manifest_path)
@@ -60,12 +59,7 @@ def train_smoke(
     device = _select_device(torch, device_name)
     train_indices, eval_indices = _split_indices(len(dataset), eval_fraction)
 
-    model = nn.Sequential(
-        make_aux_early_fusion_stem(in_channels=6, out_channels=16),
-        nn.AdaptiveAvgPool2d((1, 1)),
-        nn.Flatten(),
-        nn.Linear(16, 5),
-    ).to(device)
+    model = make_aux_smoke_detector_model(stem_channels=16).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(learning_rate))
     history = []
     first_loss = None
@@ -126,6 +120,16 @@ def train_smoke(
     if output_dir is not None:
         destination = Path(output_dir).expanduser()
         destination.mkdir(parents=True, exist_ok=True)
+        (destination / "train_smoke_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
+        checkpoint = {
+            "model_type": "rgb_aux_smoke_detector_v1",
+            "model_state": model.state_dict(),
+            "channels": list(RGB_AUX_CHANNELS),
+            "stem_channels": 16,
+            "summary": summary,
+        }
+        torch.save(checkpoint, destination / "rgb_aux_smoke_detector.pt")
+        summary["checkpoint"] = str(destination / "rgb_aux_smoke_detector.pt")
         (destination / "train_smoke_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
     return summary
 

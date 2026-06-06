@@ -162,6 +162,84 @@ class UltralyticsYOLODetector(DetectorAdapter):
         return DetectorResult(self.name, input_name, tuple(detections), elapsed)
 
 
+class RGBAuxTorchSmokeDetector(DetectorAdapter):
+    """Tiny learned RGB+aux detector used to validate the DNN-facing path.
+
+    The checkpoint predicts objectness and one normalized box. It does not
+    learn class labels, so it should not be used for performance claims.
+    """
+
+    name = "rgb_aux_torch_smoke_detector"
+
+    def __init__(
+        self,
+        checkpoint_path: str,
+        *,
+        confidence: float = 0.10,
+        label: str = "object",
+        device: str = "auto",
+    ) -> None:
+        try:
+            import torch
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise RuntimeError("torch is not installed; install it to run RGB+aux smoke detector") from exc
+        from .aux_dnn import make_aux_smoke_detector_model
+
+        self.torch = torch
+        self.checkpoint_path = str(checkpoint_path)
+        self.confidence = float(confidence)
+        self.label = str(label)
+        self.device = _torch_device(torch, device)
+        checkpoint = torch.load(self.checkpoint_path, map_location="cpu")
+        stem_channels = int(checkpoint.get("stem_channels", 16)) if isinstance(checkpoint, Mapping) else 16
+        state = checkpoint.get("model_state") if isinstance(checkpoint, Mapping) else checkpoint
+        self.model = make_aux_smoke_detector_model(stem_channels=stem_channels)
+        self.model.load_state_dict(state)
+        self.model.to(self.device)
+        self.model.eval()
+
+    def detect(self, image: Any, *, input_name: str = "perception_rgb_aux_dnn") -> DetectorResult:
+        start = time.perf_counter()
+        tensor = _as_rgb_aux_chw(image)
+        rows, cols = int(tensor.shape[1]), int(tensor.shape[2])
+        with self.torch.no_grad():
+            x = self.torch.from_numpy(tensor[None, :, :, :]).to(self.device)
+            pred = self.model(x).detach().cpu().numpy()[0]
+        score = float(1.0 / (1.0 + np.exp(-float(pred[0]))))
+        detections: List[Detection] = []
+        if score >= self.confidence:
+            norm = 1.0 / (1.0 + np.exp(-np.asarray(pred[1:5], dtype=np.float64)))
+            x1, x2 = sorted((float(norm[0] * cols), float(norm[2] * cols)))
+            y1, y2 = sorted((float(norm[1] * rows), float(norm[3] * rows)))
+            if x2 - x1 < 1.0:
+                center = 0.5 * (x1 + x2)
+                x1, x2 = center - 0.5, center + 0.5
+            if y2 - y1 < 1.0:
+                center = 0.5 * (y1 + y2)
+                y1, y2 = center - 0.5, center + 0.5
+            detections.append(
+                Detection(
+                    BoundingBox(
+                        (
+                            max(0.0, min(float(cols - 1), x1)),
+                            max(0.0, min(float(rows - 1), y1)),
+                            max(0.0, min(float(cols), x2)),
+                            max(0.0, min(float(rows), y2)),
+                        ),
+                        label=self.label,
+                    ),
+                    score=score,
+                    metadata={
+                        "checkpoint": self.checkpoint_path,
+                        "uses_rgb_aux_tensor": True,
+                        "class_trained": False,
+                    },
+                )
+            )
+        elapsed = (time.perf_counter() - start) * 1000.0
+        return DetectorResult(self.name, input_name, tuple(detections), elapsed)
+
+
 def fuse_rgb_aux_results(
     rgb_result: DetectorResult,
     aux_result: DetectorResult,
@@ -246,6 +324,34 @@ def _as_rgb(image: Any) -> np.ndarray:
     if float(np.max(finite)) > 1.5:
         finite = finite / 255.0
     return np.clip(finite, 0.0, 1.0)
+
+
+def _as_rgb_aux_chw(image: Any) -> np.ndarray:
+    array = np.asarray(image, dtype=np.float32)
+    if array.ndim != 3:
+        raise ValueError("RGB+aux detector image must be a 6-channel HWC or CHW tensor")
+    if array.shape[0] == 6:
+        chw = array
+    elif array.shape[2] == 6:
+        chw = np.transpose(array, (2, 0, 1))
+    else:
+        raise ValueError("RGB+aux detector image must have six channels")
+    return np.nan_to_num(np.clip(chw, 0.0, 1.0), nan=0.0, posinf=1.0, neginf=0.0).astype(np.float32, copy=False)
+
+
+def _torch_device(torch: Any, value: str) -> Any:
+    requested = str(value or "auto").lower()
+    if requested == "cuda":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if requested == "mps":
+        return torch.device("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
+    if requested == "cpu":
+        return torch.device("cpu")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 def _aux_support_for_box(box: BoundingBox, aux: np.ndarray, aux_boxes: Sequence[BoundingBox]) -> Dict[str, float]:

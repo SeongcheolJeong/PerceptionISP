@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .comparison import compare_dataset, write_comparison_report
-from .detectors import AuxMapRiskDetector, NumpyRiskObjectDetector, detector_from_name
+from .detectors import AuxMapRiskDetector, NumpyRiskObjectDetector, RGBAuxTorchSmokeDetector, detector_from_name
 from .synthetic_eval import make_camerae2e_synthetic_evaluation_samples, make_synthetic_evaluation_samples
 from .types import PerceptionISPConfig, json_ready
 
@@ -26,6 +26,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa", default="auto", help="auto uses CameraE2E sensor-native CFA when available.")
     parser.add_argument("--rgb-detector", default="numpy", help="numpy or yolo")
     parser.add_argument("--aux-detector", default="aux", help="aux or numpy")
+    parser.add_argument("--rgb-aux-detector-checkpoint", default=None, help="Optional RGB+aux smoke detector checkpoint.")
     parser.add_argument("--tone-mapping", default="log", help="log, srgb, gamma, or linear.")
     parser.add_argument("--denoise-strength", type=float, default=0.18)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"], help="Bayer demosaic method.")
@@ -38,6 +39,11 @@ def main(argv: Any = None) -> int:
 
     rgb_detector = detector_from_name(args.rgb_detector)
     aux_detector = detector_from_name(args.aux_detector)
+    rgb_aux_detector = (
+        RGBAuxTorchSmokeDetector(args.rgb_aux_detector_checkpoint)
+        if args.rgb_aux_detector_checkpoint
+        else None
+    )
 
     if args.source == "camerae2e-synthetic":
         samples = make_camerae2e_synthetic_evaluation_samples(
@@ -104,6 +110,7 @@ def main(argv: Any = None) -> int:
         samples,
         rgb_detector=rgb_detector,
         aux_detector=aux_detector,
+        rgb_aux_detector=rgb_aux_detector,
         config=config,
         label_agnostic=not bool(args.label_aware),
         include_images=not bool(args.no_visuals),
@@ -120,6 +127,8 @@ def main(argv: Any = None) -> int:
         "use_camerae2e": not bool(args.no_camerae2e),
         "rgb_detector": rgb_detector.name,
         "aux_detector": aux_detector.name,
+        "rgb_aux_detector": None if rgb_aux_detector is None else rgb_aux_detector.name,
+        "rgb_aux_detector_checkpoint": args.rgb_aux_detector_checkpoint,
         "label_agnostic": not bool(args.label_aware),
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),

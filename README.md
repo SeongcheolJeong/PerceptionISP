@@ -121,6 +121,29 @@ sample counts. With `--eval-fraction`, it also records a deterministic
 train/eval split and eval loss. These estimates apply to the tiny RGB+aux stem
 only; full detector fine-tuning will be much slower.
 
+Run the trained smoke checkpoint through the normal comparison harness:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/coco8/data.yaml \
+  --split val \
+  --count 2 \
+  --width 640 --height 480 \
+  --cfa auto \
+  --rgb-detector yolo \
+  --tone-mapping srgb \
+  --demosaic-method edge_aware \
+  --rgb-aux-detector-checkpoint exports/perception_rgb_aux_coco8_train_benchmark/rgb_aux_smoke_detector.pt \
+  --output-dir reports/perception_compare_coco8_rgb_aux_dnn_smoke
+```
+
+The resulting `perception_rgb_aux_dnn` metric is expected to be weak until a
+real detector head is trained. The smoke checkpoint predicts one generic box
+and does not learn class labels.
+
 ## Validation
 
 ```bash

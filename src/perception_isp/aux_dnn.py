@@ -131,6 +131,19 @@ def make_aux_early_fusion_stem(*, in_channels: int = 6, out_channels: int = 24):
     )
 
 
+def make_aux_smoke_detector_model(*, stem_channels: int = 16):
+    """Create the tiny RGB+aux objectness/box model used by smoke tests."""
+
+    import torch.nn as nn
+
+    return nn.Sequential(
+        make_aux_early_fusion_stem(in_channels=6, out_channels=int(stem_channels)),
+        nn.AdaptiveAvgPool2d((1, 1)),
+        nn.Flatten(),
+        nn.Linear(int(stem_channels), 5),
+    )
+
+
 def tensor_stats(tensor: np.ndarray) -> Mapping[str, Any]:
     arr = np.asarray(tensor, dtype=np.float64)
     if arr.ndim == 3 and arr.shape[0] == len(RGB_AUX_CHANNELS):
