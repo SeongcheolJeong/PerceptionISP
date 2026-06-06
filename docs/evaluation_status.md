@@ -122,10 +122,26 @@ The compact RGB+aux dense detector then trained on MPS:
 | `aux_only_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 8.1 s | 59.3 | 1.2003 |
 
 The timing answer is therefore favorable for this compact path: on this Mac
-with MPS, a 1,496-sample KITTI-val-sized run is estimated at about 2.8 minutes
-for 5 epochs, and the 5,985-sample KITTI train split at about 11.3 minutes for
-5 epochs. Tensor export remains a separate cost, roughly 0.33 s/sample for the
-128-sample cached run.
+with MPS, a 1,496-sample KITTI-val-sized run is estimated at about 2-3 minutes
+for 5 epochs, and the 5,985-sample KITTI train split is about 6-12 minutes for
+5 epochs depending on the compact model settings. Tensor export remains a
+separate cost, roughly 0.33 s/sample for the 128-sample cached run.
+
+For planning, the practical training-time split is:
+
+| Training target | Dataset scale | Expected local time | What it proves |
+| --- | ---: | ---: | --- |
+| Compact RGB+aux dense detector, 5 epochs | KITTI train 5,985 | about 6-12 min | Data path, loss convergence, ablation mechanics |
+| Compact RGB+aux dense detector, 50 epochs | KITTI train 5,985 | about 1-2 h | Better small-model ablation, still not claim-quality |
+| Compact RGB+aux dense detector, 100 epochs | KITTI train 5,985 | about 2-4 h | Exhaustive local compact baseline |
+| Real YOLO-style RGB+aux detector fine-tune | KITTI train 5,985 | hours to overnight on a CUDA GPU | Credible KITTI-scale detector evidence |
+| Real detector training at COCO scale | 100k+ images | days on one GPU, cluster preferred | Publication-grade robustness evidence |
+
+The important caveat is that the fast rows are not a shortcut to a HumanISP
+superiority claim. They are useful for verifying that aux tensors can be
+trained and for rejecting weak architectures quickly. A real claim needs either
+a detector architecture adapted for RGB+aux input, or a trained auxiliary
+branch/calibration head evaluated on held-out data.
 
 However, the direct detector result is not useful yet:
 
@@ -191,6 +207,38 @@ This stricter holdout keeps the main precision/FP benefit, but recall loss is
 larger than the val-internal calibration result. It strengthens the engineering
 case for proposal calibration as a conservative FP reducer, but it still does
 not justify a broad HumanISP superiority claim.
+
+The train512 calibrator was also applied to the same 1,496-sample val report
+with feature-set-specific artifacts:
+
+```text
+reports/perception_calibrated_fusion_kitti_train512_to_val1496_score_aux/index.html
+reports/perception_calibrated_fusion_kitti_train512_to_val1496_score_label/index.html
+reports/perception_calibrated_fusion_kitti_train512_to_val1496_score_label_aux/index.html
+reports/perception_train512_calibration_feature_ablation_rollup/index.html
+```
+
+| Val input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 | 3.8135 |
+| RGB+Aux Fusion | 0.6063 | 0.4639 | 0.3030 | 0.2795 | 1.3235 | 3.7627 |
+| Train512 score+aux calibrated | 0.6098 | 0.4611 | 0.3015 | 0.2769 | 1.2627 | 3.6878 |
+| Train512 score+label calibrated | 0.6313 | 0.4609 | 0.3004 | 0.2787 | 1.0722 | 3.5000 |
+| Train512 score+label+aux calibrated | 0.6367 | 0.4587 | 0.2993 | 0.2769 | 1.0100 | 3.4271 |
+
+Feature ablation deltas versus the uncalibrated RGB+Aux Fusion input:
+
+| Calibrator | Delta P@0.50 | Delta R@0.50 | Delta R@0.75 | Delta Small R@0.50 | Delta FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| score+aux | +0.0035 | -0.0027 | -0.0015 | -0.0026 | -0.0608 |
+| score+label | +0.0250 | -0.0030 | -0.0026 | -0.0008 | -0.2513 |
+| score+label+aux | +0.0304 | -0.0052 | -0.0037 | -0.0026 | -0.3135 |
+
+This means aux evidence is useful but not dominant in the current proposal
+calibration path. Compared with score+label calibration alone, adding aux gives
+another `+0.0054` P50 and `-0.0622` FP/sample, but also costs `-0.0022` R50 and
+`-0.0018` small-object R50. The main gain still comes from proposal/label score
+calibration, not from aux maps alone.
 
 ## CameraE2E Resolution Finding
 

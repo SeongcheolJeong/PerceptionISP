@@ -165,6 +165,12 @@ the direct detector metrics are weak and produce too many false positives.
 Use `--channel-mode rgb_only` or `--channel-mode aux_only` for ablations with
 the same six-channel model shape and zeroed input groups.
 
+The current MPS timing is good for iteration, not for a performance claim:
+expect roughly minutes for a 5-epoch compact KITTI run, about 1-2 hours for a
+50-epoch compact KITTI run, and hours to overnight on a CUDA GPU for a real
+YOLO-style RGB+aux fine-tune. Tensor export is separate from training and is
+currently about 0.33 s/sample on the cached 128-sample KITTI run.
+
 Run the trained smoke checkpoint through the normal comparison harness:
 
 ```bash

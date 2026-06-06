@@ -107,6 +107,64 @@ class ProposalCalibrationTest(unittest.TestCase):
             self.assertTrue(model_path.exists())
             self.assertIn("proposal_calibration_v1", model_path.read_text())
 
+    def test_model_artifact_can_select_feature_set_and_threshold(self) -> None:
+        summary = {
+            "source_report": "unit",
+            "input": "perception_fusion_rgb_aux",
+            "train_gt_labels": ["car"],
+            "train_indices": [0],
+            "eval_indices": [1],
+            "recall_delta_floor": -0.001,
+            "models": [
+                {
+                    "feature_set": "score_label",
+                    "feature_names": ["score"],
+                    "weights": [1.0],
+                    "bias": 0.0,
+                    "mean": [0.0],
+                    "std": [1.0],
+                },
+                {
+                    "feature_set": "score_label_aux",
+                    "feature_names": ["score", "aux_support"],
+                    "weights": [1.0, 0.5],
+                    "bias": 0.1,
+                    "mean": [0.0, 0.0],
+                    "std": [1.0, 1.0],
+                },
+            ],
+            "rows": [
+                {
+                    "feature_set": "score_label",
+                    "threshold": 0.02,
+                    "metrics": {"precision@0.50_mean": 0.6},
+                    "delta_vs_baseline": {},
+                    "delta_vs_original": {"recall@0.50_mean": 0.0},
+                },
+                {
+                    "feature_set": "score_label_aux",
+                    "threshold": 0.03,
+                    "metrics": {"precision@0.50_mean": 0.7},
+                    "delta_vs_baseline": {},
+                    "delta_vs_original": {"recall@0.50_mean": 0.0},
+                },
+            ],
+            "best": {},
+        }
+        label_artifact = proposal_calibration_model_artifact(
+            summary,
+            feature_set="score_label",
+            threshold=0.02,
+            output_input_name="label_calibrated",
+        )
+        self.assertEqual(label_artifact["feature_set"], "score_label")
+        self.assertEqual(label_artifact["threshold"], 0.02)
+        self.assertEqual(label_artifact["output_input"], "label_calibrated")
+
+        aux_artifact = proposal_calibration_model_artifact(summary, feature_set="score_label_aux")
+        self.assertEqual(aux_artifact["feature_set"], "score_label_aux")
+        self.assertEqual(aux_artifact["threshold"], 0.03)
+
 
 def _sample(index: int) -> dict:
     true_score = 0.25 + 0.02 * index

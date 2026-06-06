@@ -213,25 +213,16 @@ def proposal_calibration_model_artifact(
     summary: Mapping[str, Any],
     *,
     selector: str | None = None,
+    feature_set: str | None = None,
+    threshold: float | None = None,
     output_input_name: str = "perception_calibrated_fusion_rgb_aux",
 ) -> Dict[str, Any]:
-    best = summary.get("best", {}) if isinstance(summary.get("best", {}), Mapping) else {}
-    selector_order = (
-        str(selector),
-    ) if selector else (
-        "max_precision_vs_original_with_recall_floor",
-        "max_precision_with_recall_floor",
-        "min_fp_with_recall_floor",
-        "max_recall_delta",
+    selected_name, selected = _select_artifact_row(
+        summary,
+        selector=selector,
+        feature_set=feature_set,
+        threshold=threshold,
     )
-    selected_name = ""
-    selected: Mapping[str, Any] = {}
-    for name in selector_order:
-        item = best.get(name, {}) if isinstance(best, Mapping) else {}
-        if item:
-            selected_name = str(name)
-            selected = item
-            break
     if not selected:
         return {}
     feature_set = str(selected.get("feature_set", ""))
@@ -262,6 +253,43 @@ def proposal_calibration_model_artifact(
         "selected_delta_vs_baseline": dict(selected.get("delta_vs_baseline", {})),
         "selected_delta_vs_original": dict(selected.get("delta_vs_original", {})),
     }
+
+
+def _select_artifact_row(
+    summary: Mapping[str, Any],
+    *,
+    selector: str | None,
+    feature_set: str | None,
+    threshold: float | None,
+) -> Tuple[str, Mapping[str, Any]]:
+    if feature_set:
+        normalized_feature = str(feature_set)
+        rows = [row for row in summary.get("rows", ()) if str(row.get("feature_set")) == normalized_feature]
+        if threshold is not None:
+            for row in rows:
+                if abs(float(row.get("threshold", 0.0)) - float(threshold)) <= 1.0e-9:
+                    return f"feature_set:{normalized_feature}@{float(threshold):.6g}", row
+            return "", {}
+        recall_delta_floor = float(summary.get("recall_delta_floor", -0.001))
+        selected = _best_precision_vs_original_with_floor(rows, recall_delta_floor=recall_delta_floor)
+        if not selected:
+            selected = _best_by(rows, key="recall@0.50_mean")
+        return f"feature_set:{normalized_feature}:best", selected
+
+    best = summary.get("best", {}) if isinstance(summary.get("best", {}), Mapping) else {}
+    selector_order = (
+        str(selector),
+    ) if selector else (
+        "max_precision_vs_original_with_recall_floor",
+        "max_precision_with_recall_floor",
+        "min_fp_with_recall_floor",
+        "max_recall_delta",
+    )
+    for name in selector_order:
+        item = best.get(name, {}) if isinstance(best, Mapping) else {}
+        if item:
+            return str(name), item
+    return "", {}
 
 
 def load_proposal_calibration_artifact(value: str | Path) -> Dict[str, Any]:
