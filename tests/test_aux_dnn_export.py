@@ -16,6 +16,7 @@ from perception_isp.aux_dnn import (
     build_rgb_aux_extended_tensor,
     build_rgb_aux_tensor,
     channel_mask_for_mode,
+    channels_for_tensor_key,
     labels_from_manifest,
     make_aux_early_fusion_stem,
     make_torch_dataset,
@@ -54,6 +55,13 @@ class AuxDNNExportTest(unittest.TestCase):
         self.assertTrue(np.all(rgb_only[3:] == 0.0))
         self.assertTrue(np.all(aux_only[:3] == 0.0))
         self.assertTrue(np.all(aux_only[3:] == 1.0))
+        extended_tensor = np.ones((len(RGB_AUX_EXTENDED_CHANNELS), 2, 3), dtype=np.float32)
+        extended_aux_only = apply_channel_mask(
+            extended_tensor,
+            channel_mask_for_mode("aux_only", channels=RGB_AUX_EXTENDED_CHANNELS),
+        )
+        self.assertTrue(np.all(extended_aux_only[:3] == 0.0))
+        self.assertTrue(np.all(extended_aux_only[3:] == 1.0))
 
     def test_export_aux_dataset_writes_manifest_tensors_and_labels(self) -> None:
         samples = make_synthetic_evaluation_samples(count=2, width=64, height=48)
@@ -120,13 +128,18 @@ class AuxDNNExportTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             export_aux_dataset(samples, tmp)
             dataset = make_torch_dataset(Path(tmp) / "manifest.jsonl")
+            extended_dataset = make_torch_dataset(Path(tmp) / "manifest.jsonl", tensor_key="rgb_aux_extended_chw")
             tensor, target = dataset[0]
+            extended_tensor, extended_target = extended_dataset[0]
             self.assertEqual(tuple(tensor.shape), (6, 48, 64))
+            self.assertEqual(tuple(extended_tensor.shape), (len(RGB_AUX_EXTENDED_CHANNELS), 48, 64))
             self.assertIn("boxes_normalized", target)
+            self.assertIn("boxes_normalized", extended_target)
             stem = make_aux_early_fusion_stem(in_channels=6, out_channels=8)
             out = stem(tensor.unsqueeze(0))
             self.assertEqual(out.shape[1], 8)
             self.assertTrue(torch.isfinite(out).all())
+            self.assertEqual(channels_for_tensor_key("rgb_aux_extended_chw"), RGB_AUX_EXTENDED_CHANNELS)
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_smoke_training_loop_runs_on_exported_tensors(self) -> None:
@@ -155,6 +168,27 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(summary["time_estimates"][1]["samples"], 20)
             self.assertTrue((Path(tmp) / "train" / "train_smoke_summary.json").exists())
             self.assertTrue((Path(tmp) / "train" / "rgb_aux_smoke_detector.pt").exists())
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_extended_smoke_training_loop_runs_on_exported_tensors(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp)
+            summary = train_smoke(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                tensor_key="rgb_aux_extended_chw",
+                epochs=1,
+                device_name="cpu",
+                eval_fraction=0.34,
+                output_dir=Path(tmp) / "train_extended",
+            )
+            self.assertEqual(summary["tensor_key"], "rgb_aux_extended_chw")
+            self.assertEqual(summary["input_channels"], len(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertEqual(summary["channels"], list(RGB_AUX_EXTENDED_CHANNELS))
+            detector = RGBAuxTorchSmokeDetector(summary["checkpoint"], confidence=0.0)
+            self.assertEqual(detector.input_channels, len(RGB_AUX_EXTENDED_CHANNELS))
+            result = compare_dataset(samples[:1], rgb_aux_detector=detector, include_images=True)
+            self.assertIn("perception_rgb_aux_dnn", result["aggregate"])
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_trained_rgb_aux_smoke_detector_integrates_with_comparison(self) -> None:
@@ -244,6 +278,47 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
             self.assertTrue((Path(tmp) / "dense_eval" / "index.html").exists())
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_extended_dense_detector_trains_and_evaluates(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp)
+            manifest = Path(tmp) / "manifest.jsonl"
+            summary = train_dense(
+                manifest_path=manifest,
+                tensor_key="rgb_aux_extended_chw",
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                channel_mode="aux_only",
+                eval_fraction=0.34,
+                include_labels=("car", "person"),
+                output_dir=Path(tmp) / "dense_extended",
+            )
+            self.assertEqual(summary["tensor_key"], "rgb_aux_extended_chw")
+            self.assertEqual(summary["input_channels"], len(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertEqual(summary["channels"], list(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertEqual(len(summary["channel_mask"]), len(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertEqual(summary["channel_mask"][:3], [0.0, 0.0, 0.0])
+            self.assertTrue(all(value == 1.0 for value in summary["channel_mask"][3:]))
+            detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
+            self.assertIsInstance(detector, RGBAuxTorchDenseDetector)
+            self.assertEqual(detector.input_channels, len(RGB_AUX_EXTENDED_CHANNELS))
+            result = compare_dataset(samples[:1], rgb_aux_detector=detector, label_agnostic=False, include_images=True)
+            self.assertIn("perception_rgb_aux_dnn", result["aggregate"])
+            direct = evaluate_dense_manifest(
+                manifest_path=manifest,
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_extended_eval",
+            )
+            self.assertEqual(direct["checkpoint_summary"]["tensor_key"], "rgb_aux_extended_chw")
+            self.assertEqual(direct["checkpoint_summary"]["input_channels"], len(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertIn("aggregate", direct)
 
 
 if __name__ == "__main__":

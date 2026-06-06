@@ -129,6 +129,10 @@ PYTHONPATH=src \
   --output-dir exports/perception_rgb_aux_coco8_train_benchmark
 ```
 
+Use `--tensor-key rgb_aux_extended_chw` to train the same smoke path on the
+extended 13-channel sensor-native tensor. The default remains `rgb_aux_chw` so
+existing checkpoints and timing reports stay reproducible.
+
 This smoke training is not a detector-performance claim. It only verifies the
 data path needed before real RGB+aux detector training. The summary includes
 elapsed time, sample-epochs/sec, and simple time estimates for the requested
@@ -165,6 +169,7 @@ PYTHONPATH=src \
   --device auto \
   --grid 12x40 \
   --base-channels 16 \
+  --tensor-key rgb_aux_chw \
   --channel-mode rgb_aux \
   --eval-fraction 0.25 \
   --include-labels car,pedestrian,cyclist \
@@ -176,7 +181,9 @@ This compact dense detector is still a learning-path benchmark, not a
 claim-quality detector. The current KITTI 128 run trains quickly on MPS, but
 the direct detector metrics are weak and produce too many false positives.
 Use `--channel-mode rgb_only` or `--channel-mode aux_only` for ablations with
-the same six-channel model shape and zeroed input groups.
+the same selected tensor shape and zeroed input groups. Use
+`--tensor-key rgb_aux_extended_chw` to train the compact dense detector on the
+extended 13-channel sensor-native tensor.
 
 The current MPS timing is good for iteration, not for a performance claim. From
 the observed KITTI ablation runs, compact dense training is about

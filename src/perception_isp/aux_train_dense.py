@@ -14,9 +14,11 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 
 from .aux_dnn import (
-    RGB_AUX_CHANNELS,
+    RGB_AUX_TENSOR_KEY,
     apply_channel_mask,
     channel_mask_for_mode,
+    channels_for_tensor_key,
+    chw_tensor_key,
     labels_from_manifest,
     make_aux_dense_detector_model,
     make_torch_dataset,
@@ -36,6 +38,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--grid", default="15x20", help="Detector grid as HxW.")
     parser.add_argument("--base-channels", type=int, default=24)
+    parser.add_argument("--tensor-key", default=RGB_AUX_TENSOR_KEY, help="Tensor key to train on: rgb_aux_chw or rgb_aux_extended_chw.")
     parser.add_argument("--channel-mode", default="rgb_aux", choices=["rgb_aux", "rgb_only", "aux_only"], help="Input ablation mode.")
     parser.add_argument("--eval-fraction", type=float, default=0.25)
     parser.add_argument("--split-strategy", default="coverage", choices=["coverage", "sequential"])
@@ -54,6 +57,7 @@ def main(argv: Any = None) -> int:
         device_name=str(args.device),
         grid_size=parse_grid_size(args.grid),
         base_channels=int(args.base_channels),
+        tensor_key=str(args.tensor_key),
         channel_mode=str(args.channel_mode),
         eval_fraction=float(args.eval_fraction),
         split_strategy=str(args.split_strategy),
@@ -76,6 +80,7 @@ def train_dense(
     device_name: str = "auto",
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
+    tensor_key: str = RGB_AUX_TENSOR_KEY,
     channel_mode: str = "rgb_aux",
     eval_fraction: float = 0.25,
     split_strategy: str = "coverage",
@@ -89,13 +94,15 @@ def train_dense(
     import torch
     import torch.nn.functional as F
 
-    dataset = make_torch_dataset(manifest_path)
+    resolved_tensor_key = chw_tensor_key(tensor_key)
+    channels = channels_for_tensor_key(resolved_tensor_key)
+    dataset = make_torch_dataset(manifest_path, tensor_key=resolved_tensor_key)
     if len(dataset) <= 0:
         raise ValueError("manifest contains no samples")
     class_names = _selected_class_names(labels_from_manifest(manifest_path), include_labels)
     class_to_index = {name: index for index, name in enumerate(class_names)}
     normalized_channel_mode = normalize_channel_mode(channel_mode)
-    channel_mask = channel_mask_for_mode(normalized_channel_mode)
+    channel_mask = channel_mask_for_mode(normalized_channel_mode, channels=channels)
     device = _select_device(torch, device_name)
     train_indices, eval_indices = _split_indices(dataset, eval_fraction, strategy=split_strategy, allowed_labels=set(class_names))
     train_class_names = _class_names_for_indices(dataset, train_indices, allowed_labels=set(class_names))
@@ -106,6 +113,7 @@ def train_dense(
         num_classes=len(class_names),
         grid_size=grid_size,
         base_channels=int(base_channels),
+        in_channels=len(channels),
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(learning_rate), weight_decay=5.0e-4)
     history = []
@@ -194,9 +202,11 @@ def train_dense(
         "learning_rate": float(learning_rate),
         "grid_size": [int(grid_size[0]), int(grid_size[1])],
         "base_channels": int(base_channels),
+        "tensor_key": resolved_tensor_key,
+        "input_channels": len(channels),
         "channel_mode": normalized_channel_mode,
         "channel_mask": [float(value) for value in channel_mask],
-        "channels": list(RGB_AUX_CHANNELS),
+        "channels": list(channels),
         "split_strategy": str(split_strategy),
         "eval_fraction": float(eval_fraction),
         "include_labels": list(class_names),
@@ -238,7 +248,9 @@ def train_dense(
         checkpoint = {
             "model_type": "rgb_aux_dense_detector_v1",
             "model_state": best_state if best_state is not None else _clone_state_dict_cpu(model),
-            "channels": list(RGB_AUX_CHANNELS),
+            "channels": list(channels),
+            "tensor_key": resolved_tensor_key,
+            "input_channels": len(channels),
             "channel_mode": normalized_channel_mode,
             "channel_mask": [float(value) for value in channel_mask],
             "grid_size": [int(grid_size[0]), int(grid_size[1])],

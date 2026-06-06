@@ -193,15 +193,18 @@ class RGBAuxTorchSmokeDetector(DetectorAdapter):
         self.device = _torch_device(torch, device)
         checkpoint = torch.load(self.checkpoint_path, map_location="cpu")
         stem_channels = int(checkpoint.get("stem_channels", 16)) if isinstance(checkpoint, Mapping) else 16
+        self.channels = tuple(str(value) for value in checkpoint.get("channels", RGB_AUX_CHANNELS)) if isinstance(checkpoint, Mapping) else tuple(RGB_AUX_CHANNELS)
+        self.tensor_key = str(checkpoint.get("tensor_key", "rgb_aux_chw")) if isinstance(checkpoint, Mapping) else "rgb_aux_chw"
+        self.input_channels = int(checkpoint.get("input_channels", len(self.channels))) if isinstance(checkpoint, Mapping) else len(self.channels)
         state = checkpoint.get("model_state") if isinstance(checkpoint, Mapping) else checkpoint
-        self.model = make_aux_smoke_detector_model(stem_channels=stem_channels)
+        self.model = make_aux_smoke_detector_model(stem_channels=stem_channels, in_channels=self.input_channels)
         self.model.load_state_dict(state)
         self.model.to(self.device)
         self.model.eval()
 
     def detect(self, image: Any, *, input_name: str = "perception_rgb_aux_dnn") -> DetectorResult:
         start = time.perf_counter()
-        tensor = _as_rgb_aux_chw(image)
+        tensor = _as_rgb_aux_chw(image, expected_channels=self.input_channels)
         rows, cols = int(tensor.shape[1]), int(tensor.shape[2])
         with self.torch.no_grad():
             x = self.torch.from_numpy(tensor[None, :, :, :]).to(self.device)
@@ -234,6 +237,8 @@ class RGBAuxTorchSmokeDetector(DetectorAdapter):
                         "checkpoint": self.checkpoint_path,
                         "uses_rgb_aux_tensor": True,
                         "class_trained": False,
+                        "tensor_key": self.tensor_key,
+                        "input_channels": self.input_channels,
                     },
                 )
             )
@@ -272,14 +277,18 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
             raise ValueError("dense detector checkpoint must be a mapping")
         self.box_encoding = str(checkpoint.get("box_encoding", "xyxy"))
         self.class_names = tuple(str(value) for value in checkpoint.get("class_names", ("object",))) or ("object",)
+        self.channels = tuple(str(value) for value in checkpoint.get("channels", RGB_AUX_CHANNELS)) or tuple(RGB_AUX_CHANNELS)
+        self.tensor_key = str(checkpoint.get("tensor_key", "rgb_aux_chw"))
+        self.input_channels = int(checkpoint.get("input_channels", len(self.channels)))
         self.channel_mode = str(checkpoint.get("channel_mode", "rgb_aux"))
-        self.channel_mask = tuple(float(value) for value in checkpoint.get("channel_mask", (1.0,) * len(RGB_AUX_CHANNELS)))
+        self.channel_mask = tuple(float(value) for value in checkpoint.get("channel_mask", (1.0,) * self.input_channels))
         grid_size = tuple(int(value) for value in checkpoint.get("grid_size", (15, 20)))
         base_channels = int(checkpoint.get("base_channels", 24))
         self.model = make_aux_dense_detector_model(
             num_classes=len(self.class_names),
             grid_size=(int(grid_size[0]), int(grid_size[1])),
             base_channels=base_channels,
+            in_channels=self.input_channels,
         )
         self.model.load_state_dict(checkpoint["model_state"])
         self.model.to(self.device)
@@ -287,7 +296,7 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
 
     def detect(self, image: Any, *, input_name: str = "perception_rgb_aux_dnn") -> DetectorResult:
         start = time.perf_counter()
-        tensor = _as_rgb_aux_chw(image)
+        tensor = _as_rgb_aux_chw(image, expected_channels=self.input_channels)
         rows, cols = int(tensor.shape[1]), int(tensor.shape[2])
         with self.torch.no_grad():
             x = apply_channel_mask(self.torch.from_numpy(tensor[None, :, :, :]).to(self.device), self.channel_mask)
@@ -336,6 +345,8 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
                             "grid_cell": [int(row), int(col)],
                             "objectness": float(objectness[row, col]),
                             "class_probability": float(class_scores[class_index, row, col]),
+                            "tensor_key": self.tensor_key,
+                            "input_channels": self.input_channels,
                         },
                     )
                 )
@@ -449,16 +460,17 @@ def _as_rgb(image: Any) -> np.ndarray:
     return np.clip(finite, 0.0, 1.0)
 
 
-def _as_rgb_aux_chw(image: Any) -> np.ndarray:
+def _as_rgb_aux_chw(image: Any, *, expected_channels: int = 6) -> np.ndarray:
     array = np.asarray(image, dtype=np.float32)
     if array.ndim != 3:
-        raise ValueError("RGB+aux detector image must be a 6-channel HWC or CHW tensor")
-    if array.shape[0] == 6:
+        raise ValueError(f"RGB+aux detector image must be a {expected_channels}-channel HWC or CHW tensor")
+    channels = int(expected_channels)
+    if array.shape[0] == channels:
         chw = array
-    elif array.shape[2] == 6:
+    elif array.shape[2] == channels:
         chw = np.transpose(array, (2, 0, 1))
     else:
-        raise ValueError("RGB+aux detector image must have six channels")
+        raise ValueError(f"RGB+aux detector image must have {channels} channels")
     return np.nan_to_num(np.clip(chw, 0.0, 1.0), nan=0.0, posinf=1.0, neginf=0.0).astype(np.float32, copy=False)
 
 

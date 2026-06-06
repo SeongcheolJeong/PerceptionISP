@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
-from .aux_dnn import RGB_AUX_CHANNELS, make_aux_smoke_detector_model, make_torch_dataset
+from .aux_dnn import RGB_AUX_TENSOR_KEY, channels_for_tensor_key, chw_tensor_key, make_aux_smoke_detector_model, make_torch_dataset
 from .types import json_ready
 
 
@@ -22,6 +22,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--lr", type=float, default=1.0e-3)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    parser.add_argument("--tensor-key", default=RGB_AUX_TENSOR_KEY, help="Tensor key to train on: rgb_aux_chw or rgb_aux_extended_chw.")
     parser.add_argument("--estimate-samples", default="10,100,1000,10000")
     parser.add_argument("--eval-fraction", type=float, default=0.0)
     parser.add_argument("--output-dir", default="exports/perception_rgb_aux_train_smoke")
@@ -32,6 +33,7 @@ def main(argv: Any = None) -> int:
         epochs=int(args.epochs),
         learning_rate=float(args.lr),
         device_name=str(args.device),
+        tensor_key=str(args.tensor_key),
         estimate_samples=parse_estimate_samples(args.estimate_samples),
         eval_fraction=float(args.eval_fraction),
         output_dir=args.output_dir,
@@ -46,6 +48,7 @@ def train_smoke(
     epochs: int = 2,
     learning_rate: float = 1.0e-3,
     device_name: str = "auto",
+    tensor_key: str = RGB_AUX_TENSOR_KEY,
     estimate_samples: Sequence[int] = (10, 100, 1000, 10000),
     eval_fraction: float = 0.0,
     output_dir: str | Path | None = None,
@@ -53,13 +56,15 @@ def train_smoke(
     import torch
     import torch.nn.functional as F
 
-    dataset = make_torch_dataset(manifest_path)
+    resolved_tensor_key = chw_tensor_key(tensor_key)
+    channels = channels_for_tensor_key(resolved_tensor_key)
+    dataset = make_torch_dataset(manifest_path, tensor_key=resolved_tensor_key)
     if len(dataset) <= 0:
         raise ValueError("manifest contains no samples")
     device = _select_device(torch, device_name)
     train_indices, eval_indices = _split_indices(len(dataset), eval_fraction)
 
-    model = make_aux_smoke_detector_model(stem_channels=16).to(device)
+    model = make_aux_smoke_detector_model(stem_channels=16, in_channels=len(channels)).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(learning_rate))
     history = []
     first_loss = None
@@ -99,6 +104,9 @@ def train_smoke(
         "train_sample_count": int(len(train_indices)),
         "eval_sample_count": int(len(eval_indices)),
         "device": str(device),
+        "tensor_key": resolved_tensor_key,
+        "input_channels": len(channels),
+        "channels": list(channels),
         "epochs": int(epoch_count),
         "learning_rate": float(learning_rate),
         "first_loss": float(first_loss if first_loss is not None else 0.0),
@@ -124,7 +132,9 @@ def train_smoke(
         checkpoint = {
             "model_type": "rgb_aux_smoke_detector_v1",
             "model_state": model.state_dict(),
-            "channels": list(RGB_AUX_CHANNELS),
+            "channels": list(channels),
+            "tensor_key": resolved_tensor_key,
+            "input_channels": len(channels),
             "stem_channels": 16,
             "summary": summary,
         }

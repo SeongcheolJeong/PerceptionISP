@@ -28,6 +28,8 @@ RGB_AUX_EXTENDED_CHANNELS = RGB_AUX_CHANNELS + (
     "aux_color_confidence",
     "aux_blur_focus_confidence",
 )
+RGB_AUX_TENSOR_KEY = "rgb_aux_chw"
+RGB_AUX_EXTENDED_TENSOR_KEY = "rgb_aux_extended_chw"
 CHANNEL_MODES = ("rgb_aux", "rgb_only", "aux_only")
 
 
@@ -69,6 +71,33 @@ def build_rgb_aux_extended_tensor(
     """Return the sensor-native extended RGB+aux tensor without changing the 6-channel default path."""
 
     return build_rgb_aux_tensor(images, layout=layout, dtype=dtype, channels=RGB_AUX_EXTENDED_CHANNELS)
+
+
+def channels_for_tensor_key(tensor_key: str | None) -> Tuple[str, ...]:
+    normalized = str(tensor_key or RGB_AUX_TENSOR_KEY)
+    if normalized in {"rgb_aux_chw", "rgb_aux_hwc", "stable", "six"}:
+        return RGB_AUX_CHANNELS
+    if normalized in {"rgb_aux_extended_chw", "rgb_aux_extended_hwc", "extended"}:
+        return RGB_AUX_EXTENDED_CHANNELS
+    raise ValueError(f"unsupported RGB+aux tensor key: {tensor_key!r}")
+
+
+def hwc_tensor_key(tensor_key: str | None) -> str:
+    normalized = str(tensor_key or RGB_AUX_TENSOR_KEY)
+    if normalized in {"rgb_aux_chw", "rgb_aux_hwc", "stable", "six"}:
+        return "rgb_aux_hwc"
+    if normalized in {"rgb_aux_extended_chw", "rgb_aux_extended_hwc", "extended"}:
+        return "rgb_aux_extended_hwc"
+    raise ValueError(f"unsupported RGB+aux tensor key: {tensor_key!r}")
+
+
+def chw_tensor_key(tensor_key: str | None) -> str:
+    normalized = str(tensor_key or RGB_AUX_TENSOR_KEY)
+    if normalized in {"rgb_aux_chw", "rgb_aux_hwc", "stable", "six"}:
+        return "rgb_aux_chw"
+    if normalized in {"rgb_aux_extended_chw", "rgb_aux_extended_hwc", "extended"}:
+        return "rgb_aux_extended_chw"
+    raise ValueError(f"unsupported RGB+aux tensor key: {tensor_key!r}")
 
 
 def _dnn_channel(name: str, *, rgb: np.ndarray, aux: np.ndarray, aux_maps: Mapping[str, Any]) -> np.ndarray:
@@ -138,36 +167,41 @@ def normalize_channel_mode(value: str | None) -> str:
     raise ValueError(f"unsupported RGB+aux channel mode: {value!r}")
 
 
-def channel_mask_for_mode(value: str | None) -> Tuple[float, ...]:
+def channel_mask_for_mode(value: str | None, *, channels: Sequence[str] | None = None) -> Tuple[float, ...]:
     mode = normalize_channel_mode(value)
+    channel_count = len(tuple(channels or RGB_AUX_CHANNELS))
     if mode == "rgb_only":
-        return (1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
+        return tuple(1.0 if index < 3 else 0.0 for index in range(channel_count))
     if mode == "aux_only":
-        return (0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
-    return (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+        return tuple(0.0 if index < 3 else 1.0 for index in range(channel_count))
+    return tuple(1.0 for _ in range(channel_count))
 
 
 def apply_channel_mask(tensor: Any, channel_mask: Sequence[float]):
     mask_values = tuple(float(value) for value in channel_mask)
-    if len(mask_values) != len(RGB_AUX_CHANNELS):
-        raise ValueError("channel mask must have one value per RGB+aux channel")
+    if not mask_values:
+        raise ValueError("channel mask must have at least one value")
     if hasattr(tensor, "new_tensor"):
         mask = tensor.new_tensor(mask_values)
         if getattr(tensor, "ndim", 0) == 4:
+            if int(tensor.shape[1]) != len(mask_values):
+                raise ValueError("torch RGB+aux tensor channel count does not match channel mask")
             return tensor * mask.view(1, -1, 1, 1)
         if getattr(tensor, "ndim", 0) == 3:
+            if int(tensor.shape[0]) != len(mask_values):
+                raise ValueError("torch RGB+aux tensor channel count does not match channel mask")
             return tensor * mask.view(-1, 1, 1)
         raise ValueError("torch RGB+aux tensor must be CHW or NCHW")
     arr = np.asarray(tensor, dtype=np.float32)
     mask_np = np.asarray(mask_values, dtype=np.float32)
     if arr.ndim == 4:
-        if arr.shape[1] != len(RGB_AUX_CHANNELS):
+        if arr.shape[1] != len(mask_values):
             raise ValueError("numpy RGB+aux tensor must be NCHW")
         return arr * mask_np.reshape(1, -1, 1, 1)
     if arr.ndim == 3:
-        if arr.shape[0] == len(RGB_AUX_CHANNELS):
+        if arr.shape[0] == len(mask_values):
             return arr * mask_np.reshape(-1, 1, 1)
-        if arr.shape[2] == len(RGB_AUX_CHANNELS):
+        if arr.shape[2] == len(mask_values):
             return arr * mask_np.reshape(1, 1, -1)
     raise ValueError("numpy RGB+aux tensor must be CHW, HWC, or NCHW")
 
@@ -203,7 +237,7 @@ def load_manifest(path: str | Path) -> Tuple[Dict[str, Any], ...]:
     return tuple(entries)
 
 
-def make_torch_dataset(manifest_path: str | Path):
+def make_torch_dataset(manifest_path: str | Path, *, tensor_key: str = RGB_AUX_TENSOR_KEY):
     """Return a PyTorch Dataset that loads exported RGB+aux tensors.
 
     This intentionally imports torch lazily so the rest of the package remains
@@ -215,6 +249,8 @@ def make_torch_dataset(manifest_path: str | Path):
 
     manifest = load_manifest(manifest_path)
     base = Path(manifest_path).expanduser().parent
+    resolved_tensor_key = chw_tensor_key(tensor_key)
+    channel_count = len(channels_for_tensor_key(resolved_tensor_key))
 
     class RGBAuxTensorDataset(Dataset):
         def __len__(self) -> int:
@@ -225,7 +261,17 @@ def make_torch_dataset(manifest_path: str | Path):
             tensor_path = base / str(item["tensor_path"])
             label_path = base / str(item["label_path"])
             with np.load(tensor_path) as payload:
-                tensor = np.asarray(payload["rgb_aux_chw"], dtype=np.float32)
+                if resolved_tensor_key not in payload:
+                    raise KeyError(f"tensor payload does not contain {resolved_tensor_key!r}: {tensor_path}")
+                tensor = np.asarray(payload[resolved_tensor_key], dtype=np.float32)
+                if tensor.ndim != 3:
+                    raise ValueError(f"RGB+aux tensor must be 3D CHW or HWC: {tensor_path}")
+                if tensor.shape[0] == channel_count:
+                    pass
+                elif tensor.shape[-1] == channel_count:
+                    tensor = np.transpose(tensor, (2, 0, 1))
+                else:
+                    raise ValueError(f"RGB+aux tensor channel count does not match {channel_count}: {tensor_path}")
             labels = json.loads(label_path.read_text())
             boxes = torch.as_tensor(labels.get("boxes_xyxy", []), dtype=torch.float32)
             boxes_normalized = torch.as_tensor(labels.get("boxes_xyxy_normalized", []), dtype=torch.float32)
@@ -255,13 +301,13 @@ def make_aux_early_fusion_stem(*, in_channels: int = 6, out_channels: int = 24):
     )
 
 
-def make_aux_smoke_detector_model(*, stem_channels: int = 16):
+def make_aux_smoke_detector_model(*, stem_channels: int = 16, in_channels: int = 6):
     """Create the tiny RGB+aux objectness/box model used by smoke tests."""
 
     import torch.nn as nn
 
     return nn.Sequential(
-        make_aux_early_fusion_stem(in_channels=6, out_channels=int(stem_channels)),
+        make_aux_early_fusion_stem(in_channels=int(in_channels), out_channels=int(stem_channels)),
         nn.AdaptiveAvgPool2d((1, 1)),
         nn.Flatten(),
         nn.Linear(int(stem_channels), 5),
@@ -273,6 +319,7 @@ def make_aux_dense_detector_model(
     num_classes: int,
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
+    in_channels: int = 6,
 ):
     """Create a compact class-aware RGB+aux grid detector."""
 
@@ -285,7 +332,7 @@ def make_aux_dense_detector_model(
             self.grid_size = (int(grid_size[0]), int(grid_size[1]))
             self.num_classes = int(num_classes)
             self.features = nn.Sequential(
-                nn.Conv2d(6, channels, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.Conv2d(int(in_channels), channels, kernel_size=3, stride=2, padding=1, bias=False),
                 nn.BatchNorm2d(channels),
                 nn.SiLU(inplace=True),
                 nn.Conv2d(channels, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),

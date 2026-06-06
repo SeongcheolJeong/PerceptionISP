@@ -107,9 +107,10 @@ def compare_sample(
                 )
             )
     if rgb_aux_detector is not None:
+        rgb_aux_channels = getattr(rgb_aux_detector, "channels", None)
         detector_results.append(
             rgb_aux_detector.detect(
-                build_rgb_aux_tensor(images, layout="hwc"),
+                build_rgb_aux_tensor(images, layout="hwc", channels=rgb_aux_channels),
                 input_name="perception_rgb_aux_dnn",
             )
         )

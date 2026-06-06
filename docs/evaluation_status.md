@@ -55,7 +55,11 @@ The repository now includes a DNN-facing export path:
   `tensors/*.npz`.
 - `perception_isp.aux_train_smoke`: runs a tiny PyTorch optimization loop on
   the exported stable six-channel tensors, with optional deterministic
-  train/eval split reporting.
+  train/eval split reporting. It also supports
+  `--tensor-key rgb_aux_extended_chw` for the extended sensor-native tensor.
+- `perception_isp.aux_train_dense`: trains the compact dense detector on either
+  the stable tensor or the extended tensor, recording `tensor_key`,
+  `input_channels`, and the active channel mask in the checkpoint.
 - `RGBAuxTorchSmokeDetector`: loads the tiny checkpoint and feeds
   `perception_rgb_aux_dnn` metrics into the normal comparison harness.
 

@@ -32,6 +32,8 @@ class AuxTrainingRollupTest(unittest.TestCase):
                         "eval_sample_count": 1,
                         "epochs": 2,
                         "device": "cpu",
+                        "tensor_key": "rgb_aux_extended_chw",
+                        "input_channels": 13,
                         "channel_mode": "rgb_aux",
                         "elapsed_seconds": 1.0,
                         "sample_epochs_per_second": 6.0,
@@ -62,6 +64,8 @@ class AuxTrainingRollupTest(unittest.TestCase):
             self.assertEqual(rollup["run_count"], 3)
             self.assertEqual([run["kind"] for run in rollup["runs"]], ["export", "train_dense", "dense_eval"])
             self.assertEqual(rollup["runs"][1]["channel_mode"], "rgb_aux")
+            self.assertEqual(rollup["runs"][1]["tensor_key"], "rgb_aux_extended_chw")
+            self.assertEqual(rollup["runs"][1]["input_channels"], 13)
             self.assertEqual(rollup["runs"][1]["throughput_key"], "sample_epochs_per_second")
             self.assertAlmostEqual(rollup["runs"][2]["metrics"]["recall@0.50_mean"], 0.25)
             self.assertEqual(rollup["training_time_plan"]["status"], "estimated")
@@ -72,6 +76,7 @@ class AuxTrainingRollupTest(unittest.TestCase):
             html = html_path.read_text()
             self.assertIn("PerceptionISP RGB+Aux Training Rollup", html)
             self.assertIn("R@0.50", html)
+            self.assertIn("rgb_aux_extended_chw", html)
             self.assertIn("Training-Time Plan", html)
             self.assertTrue((html_path.parent / "training_rollup_summary.json").exists())
 

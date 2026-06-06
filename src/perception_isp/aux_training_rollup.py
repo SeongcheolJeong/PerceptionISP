@@ -126,6 +126,8 @@ def _run_row(summary_path: Path, summary: Mapping[str, Any]) -> Dict[str, Any]:
         "eval_sample_count": _maybe_int(summary.get("eval_sample_count")),
         "epochs": _maybe_int(summary.get("epochs")),
         "device": summary.get("device"),
+        "tensor_key": summary.get("tensor_key"),
+        "input_channels": _maybe_int(summary.get("input_channels")),
         "channel_mode": channel_mode,
         "elapsed_seconds": _maybe_float(summary.get("elapsed_seconds")),
         "throughput_key": throughput_key,
@@ -274,6 +276,8 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
             f"<td>{_fmt(run.get('eval_sample_count'), digits=0)}</td>"
             f"<td>{_fmt(run.get('epochs'), digits=0)}</td>"
             f"<td>{html_lib.escape(str(run.get('device') or ''))}</td>"
+            f"<td>{html_lib.escape(str(run.get('tensor_key') or ''))}</td>"
+            f"<td>{_fmt(run.get('input_channels'), digits=0)}</td>"
             f"<td>{html_lib.escape(str(run.get('channel_mode') or ''))}</td>"
             f"<td>{_fmt(run.get('elapsed_seconds'))}</td>"
             f"<td>{html_lib.escape(str(run.get('throughput_key') or ''))}</td>"
@@ -316,7 +320,7 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
   <h1>PerceptionISP RGB+Aux Training Rollup</h1>
   <div class=\"note\">{html_lib.escape(str(rollup.get('interpretation', '')))}</div>
   <table>
-    <thead><tr><th>Run</th><th>Kind</th><th>Report</th><th>Samples</th><th>Train</th><th>Eval</th><th>Epochs</th><th>Device</th><th>Channels</th><th>Seconds</th><th>Rate</th><th>Rate Value</th><th>Eval Loss</th><th>P@0.50</th><th>R@0.50</th><th>FP@0.50</th><th>Det/sample</th></tr></thead>
+    <thead><tr><th>Run</th><th>Kind</th><th>Report</th><th>Samples</th><th>Train</th><th>Eval</th><th>Epochs</th><th>Device</th><th>Tensor</th><th>Input Ch</th><th>Channels</th><th>Seconds</th><th>Rate</th><th>Rate Value</th><th>Eval Loss</th><th>P@0.50</th><th>R@0.50</th><th>FP@0.50</th><th>Det/sample</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
   <h2>Time Estimates</h2>

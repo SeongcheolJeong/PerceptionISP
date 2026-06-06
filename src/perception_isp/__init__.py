@@ -1,7 +1,15 @@
 """Perception-oriented automotive ISP software reference."""
 
 from .camerae2e_bridge import camerae2e_or_synthetic_raw, raw_from_camerae2e, raw_from_camerae2e_rgb
-from .aux_dnn import RGB_AUX_CHANNELS, RGB_AUX_EXTENDED_CHANNELS, build_rgb_aux_extended_tensor, build_rgb_aux_tensor
+from .aux_dnn import (
+    RGB_AUX_CHANNELS,
+    RGB_AUX_EXTENDED_CHANNELS,
+    RGB_AUX_EXTENDED_TENSOR_KEY,
+    RGB_AUX_TENSOR_KEY,
+    build_rgb_aux_extended_tensor,
+    build_rgb_aux_tensor,
+    channels_for_tensor_key,
+)
 from .comparison import build_pipeline_images, compare_dataset, compare_sample, write_comparison_report
 from .detectors import AuxMapRiskDetector, NumpyRiskObjectDetector, RGBAuxTorchSmokeDetector, UltralyticsYOLODetector
 from .eval_types import BoundingBox, Detection, EvaluationSample
@@ -45,11 +53,14 @@ __all__ = [
     "NumpyRiskObjectDetector",
     "RGB_AUX_CHANNELS",
     "RGB_AUX_EXTENDED_CHANNELS",
+    "RGB_AUX_EXTENDED_TENSOR_KEY",
+    "RGB_AUX_TENSOR_KEY",
     "RGBAuxTorchSmokeDetector",
     "UltralyticsYOLODetector",
     "build_pipeline_images",
     "build_rgb_aux_extended_tensor",
     "build_rgb_aux_tensor",
+    "channels_for_tensor_key",
     "camerae2e_or_synthetic_raw",
     "compare_dataset",
     "compare_sample",

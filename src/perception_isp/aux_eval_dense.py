@@ -11,7 +11,7 @@ from typing import Any, Dict, Mapping, Sequence, Tuple
 
 import numpy as np
 
-from .aux_dnn import load_manifest
+from .aux_dnn import hwc_tensor_key, load_manifest
 from .detectors import rgb_aux_detector_from_checkpoint
 from .eval_types import BoundingBox
 from .metrics import aggregate_metric_rows, evaluate_detections
@@ -62,6 +62,7 @@ def evaluate_dense_manifest(
     manifest_root = Path(manifest_path).expanduser().parent
     checkpoint = torch.load(str(checkpoint_path), map_location="cpu")
     checkpoint_summary = checkpoint.get("summary", {}) if isinstance(checkpoint, Mapping) else {}
+    tensor_key = hwc_tensor_key(checkpoint.get("tensor_key", checkpoint_summary.get("tensor_key", "rgb_aux_chw")) if isinstance(checkpoint, Mapping) else "rgb_aux_chw")
     eval_labels = _eval_labels(checkpoint, checkpoint_summary, include_labels)
     indices = _indices_for_split(
         split,
@@ -80,7 +81,9 @@ def evaluate_dense_manifest(
         tensor_path = manifest_root / str(item["tensor_path"])
         label_path = manifest_root / str(item["label_path"])
         with np.load(tensor_path) as payload:
-            tensor = np.asarray(payload["rgb_aux_hwc"], dtype=np.float32)
+            if tensor_key not in payload:
+                raise KeyError(f"tensor payload does not contain {tensor_key!r}: {tensor_path}")
+            tensor = np.asarray(payload[tensor_key], dtype=np.float32)
         ground_truth = _filter_boxes(_read_boxes(label_path), eval_labels)
         result = detector.detect(tensor, input_name="perception_rgb_aux_dnn")
         detections = _filter_boxes(result.detections, eval_labels)
@@ -123,6 +126,8 @@ def evaluate_dense_manifest(
             "missing_eval_class_names": checkpoint_summary.get("missing_eval_class_names"),
             "channel_mode": checkpoint.get("channel_mode") if isinstance(checkpoint, Mapping) else None,
             "channel_mask": checkpoint.get("channel_mask") if isinstance(checkpoint, Mapping) else None,
+            "tensor_key": checkpoint.get("tensor_key") if isinstance(checkpoint, Mapping) else None,
+            "input_channels": checkpoint.get("input_channels") if isinstance(checkpoint, Mapping) else None,
         },
         "samples": sample_rows,
     }
