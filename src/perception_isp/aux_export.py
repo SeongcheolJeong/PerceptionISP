@@ -30,10 +30,13 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--dataset", default=None)
     parser.add_argument("--split", default="val")
     parser.add_argument("--count", type=int, default=4)
+    parser.add_argument("--offset", type=int, default=0, help="Skip this many dataset images before applying --count.")
     parser.add_argument("--width", type=int, default=320)
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--cfa", default="auto")
     parser.add_argument("--no-camerae2e", action="store_true")
+    parser.add_argument("--load-progress-interval", type=int, default=0, help="Print dataset loading progress every N samples; 0 disables progress logging.")
+    parser.add_argument("--raw-cache-dir", default=None, help="Optional directory for cached dataset RAW samples.")
     parser.add_argument("--tone-mapping", default="srgb")
     parser.add_argument("--denoise-strength", type=float, default=0.18)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"])
@@ -46,10 +49,13 @@ def main(argv: Any = None) -> int:
         dataset=args.dataset,
         split=args.split,
         count=args.count,
+        offset=int(args.offset),
         width=args.width,
         height=args.height,
         cfa_pattern=args.cfa,
         use_camerae2e=not bool(args.no_camerae2e),
+        progress_interval=int(args.load_progress_interval),
+        cache_dir=args.raw_cache_dir,
     )
     config = PerceptionISPConfig(
         tone_mapping=args.tone_mapping,
@@ -66,10 +72,13 @@ def main(argv: Any = None) -> int:
             "dataset": args.dataset,
             "split": args.split,
             "count": int(args.count),
+            "offset": int(args.offset),
             "width": int(args.width),
             "height": int(args.height),
             "cfa": args.cfa,
             "use_camerae2e": not bool(args.no_camerae2e),
+            "load_progress_interval": int(args.load_progress_interval),
+            "raw_cache_dir": args.raw_cache_dir,
             "tone_mapping": args.tone_mapping,
             "denoise_strength": float(args.denoise_strength),
             "demosaic_method": str(args.demosaic_method),
@@ -157,10 +166,13 @@ def _load_samples(
     dataset: str | None,
     split: str,
     count: int,
+    offset: int = 0,
     width: int,
     height: int,
     cfa_pattern: str,
     use_camerae2e: bool,
+    progress_interval: int = 0,
+    cache_dir: str | Path | None = None,
 ) -> Sequence[EvaluationSample]:
     if source == "synthetic":
         from .synthetic_eval import make_synthetic_evaluation_samples
@@ -179,10 +191,14 @@ def _load_samples(
             dataset,
             split=split,
             limit=count,
+            offset=offset,
             width=width,
             height=height,
             cfa_pattern=cfa_pattern,
             use_camerae2e=use_camerae2e,
+            progress_interval=progress_interval,
+            progress_label=f"load:kitti-dataset:{offset}+{count}",
+            cache_dir=cache_dir,
         )
     if not dataset:
         raise ValueError("--dataset is required for --source yolo-dataset")
@@ -192,10 +208,14 @@ def _load_samples(
         dataset,
         split=split,
         limit=count,
+        offset=offset,
         width=width,
         height=height,
         cfa_pattern=cfa_pattern,
         use_camerae2e=use_camerae2e,
+        progress_interval=progress_interval,
+        progress_label=f"load:yolo-dataset:{offset}+{count}",
+        cache_dir=cache_dir,
     )
 
 

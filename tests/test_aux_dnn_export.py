@@ -5,12 +5,13 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
 from perception_isp.aux_dnn import RGB_AUX_CHANNELS, build_rgb_aux_tensor, labels_from_manifest, make_aux_early_fusion_stem, make_torch_dataset
 from perception_isp.aux_eval_dense import evaluate_dense_manifest
-from perception_isp.aux_export import export_aux_dataset
+from perception_isp.aux_export import _load_samples, export_aux_dataset
 from perception_isp.aux_train_dense import train_dense
 from perception_isp.aux_train_smoke import train_smoke
 from perception_isp.comparison import build_pipeline_images, compare_dataset
@@ -55,6 +56,30 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertGreater(labels["box_count"], 0)
             self.assertTrue((root / "summary.json").exists())
             self.assertTrue((root / "index.html").exists())
+
+    def test_load_samples_for_yolo_dataset_forwards_cache_and_progress_options(self) -> None:
+        with mock.patch("perception_isp.yolo_dataset.load_yolo_detection_samples", return_value=()) as loader:
+            samples = _load_samples(
+                source="yolo-dataset",
+                dataset="data/unit.yaml",
+                split="val",
+                count=3,
+                offset=5,
+                width=64,
+                height=48,
+                cfa_pattern="auto",
+                use_camerae2e=True,
+                progress_interval=2,
+                cache_dir=Path("cache/raw"),
+            )
+
+        self.assertEqual(samples, ())
+        kwargs = loader.call_args.kwargs
+        self.assertEqual(kwargs["limit"], 3)
+        self.assertEqual(kwargs["offset"], 5)
+        self.assertEqual(kwargs["progress_interval"], 2)
+        self.assertEqual(kwargs["progress_label"], "load:yolo-dataset:5+3")
+        self.assertEqual(kwargs["cache_dir"], Path("cache/raw"))
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_torch_dataset_and_stem_consume_exported_tensors(self) -> None:

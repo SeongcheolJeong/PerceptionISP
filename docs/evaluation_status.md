@@ -95,6 +95,50 @@ expected: this tiny checkpoint predicts one generic box and has no class head.
 It proves that a learned RGB+aux path can be loaded and evaluated, not that it
 is a useful detector yet.
 
+### KITTI RGB+Aux Compact Dense Benchmark
+
+A KITTI val subset was exported as six-channel RGB+aux tensors using
+`detector_log`, `denoise=0.30`, `edge_aware`, `artifact=0.20`, and the cached
+CameraE2E RAW samples:
+
+```text
+exports/perception_rgb_aux_kitti_val128_detector_log/index.html
+```
+
+Export result:
+
+| Samples | Boxes | Export time | Export rate | RAW provenance |
+| ---: | ---: | ---: | ---: | --- |
+| 128 | 635 | 42.6 s | 3.00 samples/s | 128 true CFA mosaics, source/target `GRBG` |
+
+The compact RGB+aux dense detector then trained on MPS:
+
+| Run | Train/Eval | Epochs | Grid | Background weight | Elapsed | Sample-epochs/s | Best eval loss |
+| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| `dense` | 96 / 32 | 5 | 12x40 | 0.10 | 10.9 s | 44.0 | 1.0307 |
+| `dense_bg1` | 96 / 32 | 8 | 12x40 | 1.00 | 13.7 s | 56.0 | 1.6490 |
+
+The timing answer is therefore favorable for this compact path: on this Mac
+with MPS, a 1,496-sample KITTI-val-sized run is estimated at about 2.8 minutes
+for 5 epochs, and the 5,985-sample KITTI train split at about 11.3 minutes for
+5 epochs. Tensor export remains a separate cost, roughly 0.33 s/sample for the
+128-sample cached run.
+
+However, the direct detector result is not useful yet:
+
+| Run | Eval samples | Confidence | Precision@0.50 | Recall@0.50 | Small Recall@0.50 | FP@0.50 | Detections/sample |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `dense` | 32 | 0.30 | 0.0084 | 0.1558 | 0.1380 | 90.6563 | 91.4375 |
+| `dense_bg1` | 32 | 0.30 | 0.0081 | 0.0990 | 0.0641 | 64.3750 | 64.8125 |
+
+Confidence sweeps from `0.30` to `0.98` did not produce a usable operating
+point. Raising confidence lowers FP but collapses recall. This is a concrete
+negative result: the compact dense detector is useful to measure the RGB+aux
+training path and resource needs, but it is not enough for a HumanISP-vs-
+PerceptionISP superiority claim. A practical aux path should either fine-tune a
+real detector stem/head or train a detector-side calibration branch over the
+pretrained RGB detector proposals.
+
 ## CameraE2E Resolution Finding
 
 CameraE2E itself follows the expected path: RGB scene to spectral scene, sensor

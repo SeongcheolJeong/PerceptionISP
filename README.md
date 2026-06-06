@@ -93,6 +93,8 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
   --count 2 \
   --width 640 --height 480 \
   --cfa auto \
+  --load-progress-interval 1 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
   --tone-mapping srgb \
   --demosaic-method edge_aware \
   --demosaic-artifact-suppression 0.35 \
@@ -120,6 +122,45 @@ elapsed time, sample-epochs/sec, and simple time estimates for the requested
 sample counts. With `--eval-fraction`, it also records a deterministic
 train/eval split and eval loss. These estimates apply to the tiny RGB+aux stem
 only; full detector fine-tuning will be much slower.
+
+For a driving-sized local timing check, export and train a compact KITTI
+RGB+aux detector on 128 cached CameraE2E-backed validation samples:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_export \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 128 \
+  --width 640 --height 192 \
+  --cfa auto \
+  --load-progress-interval 32 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
+  --tone-mapping detector_log \
+  --denoise-strength 0.30 \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.20 \
+  --output-dir exports/perception_rgb_aux_kitti_val128_detector_log
+
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_train_dense \
+  --manifest exports/perception_rgb_aux_kitti_val128_detector_log/manifest.jsonl \
+  --epochs 5 \
+  --device auto \
+  --grid 12x40 \
+  --base-channels 16 \
+  --eval-fraction 0.25 \
+  --include-labels car,pedestrian,cyclist \
+  --estimate-samples 128,1496,5985 \
+  --output-dir exports/perception_rgb_aux_kitti_val128_detector_log_dense
+```
+
+This compact dense detector is still a learning-path benchmark, not a
+claim-quality detector. The current KITTI 128 run trains quickly on MPS, but
+the direct detector metrics are weak and produce too many false positives.
 
 Run the trained smoke checkpoint through the normal comparison harness:
 
