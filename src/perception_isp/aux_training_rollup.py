@@ -6,6 +6,7 @@ import argparse
 import html as html_lib
 import json
 import os
+import statistics
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
 
@@ -20,30 +21,48 @@ SUMMARY_CANDIDATES = (
 )
 
 METRIC_KEYS = ("precision@0.50_mean", "recall@0.50_mean", "fp@0.50_mean", "det_count_mean")
+DEFAULT_PLANNING_SCENARIOS = (
+    ("KITTI val-sized compact check", 1496, 5),
+    ("KITTI train compact check", 5985, 5),
+    ("KITTI train stronger compact run", 5985, 50),
+    ("KITTI train exhaustive compact run", 5985, 100),
+)
 
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Create a rollup report from RGB+aux export/training/eval summaries.")
     parser.add_argument("summaries", nargs="+", help="Summary JSON paths or directories containing a known summary file.")
+    parser.add_argument(
+        "--plan-scenario",
+        action="append",
+        default=[],
+        help="Training-time scenario as name=samples,epochs. Defaults cover KITTI-sized compact runs.",
+    )
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_training_rollup")
     args = parser.parse_args(argv)
 
-    rollup = build_training_rollup(args.summaries)
+    rollup = build_training_rollup(args.summaries, planning_scenarios=parse_planning_scenarios(args.plan_scenario))
     html_path = write_training_rollup(rollup, args.output_dir)
     print(json.dumps(json_ready({"report": str(html_path), "run_count": rollup["run_count"]}), indent=2))
     return 0
 
 
-def build_training_rollup(paths: Sequence[str | Path]) -> Dict[str, Any]:
+def build_training_rollup(
+    paths: Sequence[str | Path],
+    *,
+    planning_scenarios: Sequence[tuple[str, int, int]] | None = None,
+) -> Dict[str, Any]:
     runs = []
     for raw_path in paths:
         summary_path = _summary_path(raw_path)
         summary = json.loads(summary_path.read_text())
         runs.append(_run_row(summary_path, summary))
+    planning = _training_time_plan(runs, planning_scenarios or DEFAULT_PLANNING_SCENARIOS)
     return {
         "run_count": int(len(runs)),
         "metric_keys": list(METRIC_KEYS),
         "runs": runs,
+        "training_time_plan": planning,
         "interpretation": "Training rows quantify local RGB+aux data-path cost. Dense-eval rows are diagnostic only and are not detector-performance claims.",
     }
 
@@ -55,6 +74,24 @@ def write_training_rollup(rollup: Mapping[str, Any], output_dir: str | Path) -> 
     html_path = destination / "index.html"
     html_path.write_text(_render_html(rollup, destination))
     return html_path
+
+
+def parse_planning_scenarios(values: Sequence[str]) -> tuple[tuple[str, int, int], ...]:
+    if not values:
+        return DEFAULT_PLANNING_SCENARIOS
+    scenarios = []
+    for value in values:
+        if "=" not in str(value) or "," not in str(value):
+            raise ValueError("plan scenario must be formatted as name=samples,epochs")
+        name, raw_counts = str(value).split("=", 1)
+        samples_text, epochs_text = raw_counts.split(",", 1)
+        name = name.strip()
+        samples = int(samples_text.strip())
+        epochs = int(epochs_text.strip())
+        if not name or samples <= 0 or epochs <= 0:
+            raise ValueError("plan scenario must contain a name, positive samples, and positive epochs")
+        scenarios.append((name, samples, epochs))
+    return tuple(scenarios)
 
 
 def _summary_path(path: str | Path) -> Path:
@@ -103,6 +140,110 @@ def _run_row(summary_path: Path, summary: Mapping[str, Any]) -> Dict[str, Any]:
         "metrics": {key: _maybe_float(aggregate.get(key)) for key in METRIC_KEYS},
     }
     return row
+
+
+def _training_time_plan(runs: Sequence[Mapping[str, Any]], scenarios: Sequence[tuple[str, int, int]]) -> Dict[str, Any]:
+    train_rates = [
+        float(run.get("throughput"))
+        for run in runs
+        if str(run.get("kind", "")).startswith("train") and run.get("throughput_key") == "sample_epochs_per_second" and run.get("throughput") is not None
+    ]
+    export_rates = [
+        float(run.get("throughput"))
+        for run in runs
+        if run.get("kind") == "export" and run.get("throughput_key") == "samples_per_second" and run.get("throughput") is not None
+    ]
+    if not train_rates:
+        return {
+            "status": "missing_train_rate",
+            "scenario_count": 0,
+            "interpretation": "No train sample-epochs/sec measurements were available, so training-time planning is not possible.",
+            "scenarios": [],
+        }
+    train_rate_summary = _rate_summary(train_rates)
+    export_rate_summary = _rate_summary(export_rates) if export_rates else None
+    rows = [
+        _scenario_estimate(
+            name=name,
+            samples=samples,
+            epochs=epochs,
+            train_rate_summary=train_rate_summary,
+            export_rate_summary=export_rate_summary,
+        )
+        for name, samples, epochs in scenarios
+    ]
+    return {
+        "status": "estimated",
+        "scenario_count": len(rows),
+        "train_rate": train_rate_summary,
+        "export_rate": export_rate_summary,
+        "scenarios": rows,
+        "interpretation": "Estimates use observed local throughput; compact-detector timing is not a claim-quality detector-training guarantee.",
+    }
+
+
+def _rate_summary(values: Sequence[float]) -> Dict[str, Any]:
+    clean = [float(value) for value in values if float(value) > 0.0]
+    if not clean:
+        return {"count": 0, "min": None, "median": None, "max": None}
+    return {
+        "count": len(clean),
+        "min": min(clean),
+        "median": statistics.median(clean),
+        "max": max(clean),
+    }
+
+
+def _scenario_estimate(
+    *,
+    name: str,
+    samples: int,
+    epochs: int,
+    train_rate_summary: Mapping[str, Any],
+    export_rate_summary: Mapping[str, Any] | None,
+) -> Dict[str, Any]:
+    train_typical = _estimate_seconds(sample_epochs=int(samples) * int(epochs), rate=train_rate_summary.get("median"))
+    train_conservative = _estimate_seconds(sample_epochs=int(samples) * int(epochs), rate=train_rate_summary.get("min"))
+    train_optimistic = _estimate_seconds(sample_epochs=int(samples) * int(epochs), rate=train_rate_summary.get("max"))
+    export_typical = _estimate_seconds(sample_epochs=int(samples), rate=None if export_rate_summary is None else export_rate_summary.get("median"))
+    total_typical = None if train_typical is None else float(train_typical + (export_typical or 0.0))
+    return {
+        "name": str(name),
+        "samples": int(samples),
+        "epochs": int(epochs),
+        "sample_epochs": int(samples) * int(epochs),
+        "train_seconds_typical": train_typical,
+        "train_minutes_typical": _seconds_to_minutes(train_typical),
+        "train_hours_typical": _seconds_to_hours(train_typical),
+        "train_seconds_conservative": train_conservative,
+        "train_minutes_conservative": _seconds_to_minutes(train_conservative),
+        "train_hours_conservative": _seconds_to_hours(train_conservative),
+        "train_seconds_optimistic": train_optimistic,
+        "train_minutes_optimistic": _seconds_to_minutes(train_optimistic),
+        "train_hours_optimistic": _seconds_to_hours(train_optimistic),
+        "export_seconds_typical": export_typical,
+        "export_minutes_typical": _seconds_to_minutes(export_typical),
+        "total_seconds_typical": total_typical,
+        "total_minutes_typical": _seconds_to_minutes(total_typical),
+        "total_hours_typical": _seconds_to_hours(total_typical),
+    }
+
+
+def _estimate_seconds(*, sample_epochs: int, rate: Any) -> float | None:
+    if rate is None:
+        return None
+    rate_value = float(rate)
+    if rate_value <= 0.0:
+        return None
+    return float(int(sample_epochs) / rate_value)
+
+
+def _seconds_to_minutes(seconds: float | None) -> float | None:
+    return None if seconds is None else float(seconds / 60.0)
+
+
+def _seconds_to_hours(seconds: float | None) -> float | None:
+    return None if seconds is None else float(seconds / 3600.0)
 
 
 def _summary_kind(summary_path: Path, summary: Mapping[str, Any]) -> str:
@@ -155,6 +296,7 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
                 "</tr>"
             )
     estimate_body = "".join(estimate_rows) if estimate_rows else '<tr><td colspan="5">No time estimates recorded.</td></tr>'
+    plan_html = _training_time_plan_html(rollup.get("training_time_plan", {}))
     return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -182,10 +324,49 @@ def _render_html(rollup: Mapping[str, Any], destination: Path) -> str:
     <thead><tr><th>Run</th><th>Samples</th><th>Epochs</th><th>Minutes</th><th>Hours</th></tr></thead>
     <tbody>{estimate_body}</tbody>
   </table>
+  <h2>Training-Time Plan</h2>
+  {plan_html}
   <p>Raw JSON: <code>training_rollup_summary.json</code></p>
 </body>
 </html>
 """
+
+
+def _training_time_plan_html(plan: Any) -> str:
+    if not isinstance(plan, Mapping) or plan.get("status") != "estimated":
+        return "<p>No training-time plan is available.</p>"
+    train_rate = plan.get("train_rate", {}) if isinstance(plan.get("train_rate"), Mapping) else {}
+    export_rate = plan.get("export_rate", {}) if isinstance(plan.get("export_rate"), Mapping) else {}
+    plan_rows = "".join(
+        "<tr>"
+        f"<td>{html_lib.escape(str(row.get('name', '')))}</td>"
+        f"<td>{_fmt(row.get('samples'), digits=0)}</td>"
+        f"<td>{_fmt(row.get('epochs'), digits=0)}</td>"
+        f"<td>{_fmt(row.get('train_minutes_typical'))}</td>"
+        f"<td>{_fmt(row.get('train_minutes_conservative'))}</td>"
+        f"<td>{_fmt(row.get('train_hours_typical'))}</td>"
+        f"<td>{_fmt(row.get('export_minutes_typical'))}</td>"
+        f"<td>{_fmt(row.get('total_minutes_typical'))}</td>"
+        "</tr>"
+        for row in plan.get("scenarios", ())
+    )
+    if not plan_rows:
+        plan_rows = '<tr><td colspan="8">No planning scenarios were available.</td></tr>'
+    return (
+        f"<p>{html_lib.escape(str(plan.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Train Rate Count</th><th>Median Train Rate</th><th>Min Train Rate</th><th>Max Train Rate</th><th>Median Export Rate</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_fmt(train_rate.get('count'), digits=0)}</td>"
+        f"<td>{_fmt(train_rate.get('median'))} sample-epochs/s</td>"
+        f"<td>{_fmt(train_rate.get('min'))} sample-epochs/s</td>"
+        f"<td>{_fmt(train_rate.get('max'))} sample-epochs/s</td>"
+        f"<td>{_fmt(export_rate.get('median'))} samples/s</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Scenario</th><th>Samples</th><th>Epochs</th><th>Typical Train Min</th><th>Conservative Train Min</th><th>Typical Train Hours</th><th>Typical Export Min</th><th>Typical Total Min</th></tr></thead>"
+        f"<tbody>{plan_rows}</tbody></table>"
+    )
 
 
 def _relative_report_link(run: Mapping[str, Any], destination: Path) -> str:

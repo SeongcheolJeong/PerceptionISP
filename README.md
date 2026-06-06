@@ -165,11 +165,13 @@ the direct detector metrics are weak and produce too many false positives.
 Use `--channel-mode rgb_only` or `--channel-mode aux_only` for ablations with
 the same six-channel model shape and zeroed input groups.
 
-The current MPS timing is good for iteration, not for a performance claim:
-expect roughly minutes for a 5-epoch compact KITTI run, about 1-2 hours for a
-50-epoch compact KITTI run, and hours to overnight on a CUDA GPU for a real
-YOLO-style RGB+aux fine-tune. Tensor export is separate from training and is
-currently about 0.33 s/sample on the cached 128-sample KITTI run.
+The current MPS timing is good for iteration, not for a performance claim. From
+the observed KITTI ablation runs, compact dense training is about
+`59 sample-epochs/s`: a 5,985-sample, 5-epoch compact run is about 8.4 minutes
+for training only, 50 epochs is about 1.4 hours, and 100 epochs is about
+2.8 hours. Tensor export is separate from training and is currently about
+0.33 s/sample on the cached 128-sample KITTI run, so export plus 5-epoch
+training is about 41.6 minutes for 5,985 images.
 
 Roll up export, training, and dense-eval summaries into one timing/diagnostic
 report:
@@ -188,9 +190,11 @@ PYTHONPATH=src \
   --output-dir reports/perception_rgb_aux_training_rollup_kitti_val128
 ```
 
-The rollup is a resource and diagnostic view. It makes clear that the compact
-dense path trains quickly, while its direct detector metrics are still too weak
-for a HumanISP-vs-PerceptionISP performance claim.
+The rollup is a resource and diagnostic view. It now includes a Training-Time
+Plan derived from observed sample-epochs/sec and export samples/sec, making
+compact KITTI-sized timing scenarios reproducible. It also makes clear that the
+compact dense path trains quickly, while its direct detector metrics are still
+too weak for a HumanISP-vs-PerceptionISP performance claim.
 
 Run the trained smoke checkpoint through the normal comparison harness:
 

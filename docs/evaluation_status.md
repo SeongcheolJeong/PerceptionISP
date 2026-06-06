@@ -129,22 +129,25 @@ reports/perception_rgb_aux_training_rollup_kitti_val128/index.html
 ```
 
 That rollup is a resource/diagnostic report, not a performance-claim report. It
-combines export time, train time, time estimates, and the direct dense-detector
-metrics below so the cost/performance tradeoff is visible in one place.
+combines export time, train time, generated training-time planning scenarios,
+and the direct dense-detector metrics below so the cost/performance tradeoff is
+visible in one place.
 
 The timing answer is therefore favorable for this compact path: on this Mac
-with MPS, a 1,496-sample KITTI-val-sized run is estimated at about 2-3 minutes
-for 5 epochs, and the 5,985-sample KITTI train split is about 6-12 minutes for
-5 epochs depending on the compact model settings. Tensor export remains a
-separate cost, roughly 0.33 s/sample for the 128-sample cached run.
+with MPS, the observed compact dense median is about `59.3 sample-epochs/s`.
+A 1,496-sample KITTI-val-sized run is estimated at about 2.1 minutes for
+5 epochs, and the 5,985-sample KITTI train split is about 8.4 minutes for
+5 epochs. Tensor export remains a separate cost, roughly 0.33 s/sample for the
+128-sample cached run, so export plus 5-epoch compact training is about
+41.6 minutes for 5,985 images.
 
 For planning, the practical training-time split is:
 
 | Training target | Dataset scale | Expected local time | What it proves |
 | --- | ---: | ---: | --- |
-| Compact RGB+aux dense detector, 5 epochs | KITTI train 5,985 | about 6-12 min | Data path, loss convergence, ablation mechanics |
-| Compact RGB+aux dense detector, 50 epochs | KITTI train 5,985 | about 1-2 h | Better small-model ablation, still not claim-quality |
-| Compact RGB+aux dense detector, 100 epochs | KITTI train 5,985 | about 2-4 h | Exhaustive local compact baseline |
+| Compact RGB+aux dense detector, 5 epochs | KITTI train 5,985 | about 8.4 min training, 41.6 min with export | Data path, loss convergence, ablation mechanics |
+| Compact RGB+aux dense detector, 50 epochs | KITTI train 5,985 | about 1.4 h training, 2.0 h with export | Better small-model ablation, still not claim-quality |
+| Compact RGB+aux dense detector, 100 epochs | KITTI train 5,985 | about 2.8 h training, 3.4 h with export | Exhaustive local compact baseline |
 | Real YOLO-style RGB+aux detector fine-tune | KITTI train 5,985 | hours to overnight on a CUDA GPU | Credible KITTI-scale detector evidence |
 | Real detector training at COCO scale | 100k+ images | days on one GPU, cluster preferred | Publication-grade robustness evidence |
 
