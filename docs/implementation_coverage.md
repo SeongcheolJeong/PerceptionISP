@@ -19,7 +19,7 @@ This implementation is deliberately broad rather than hardware-optimized.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, RGB+aux training rollup, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -28,5 +28,6 @@ Known limits:
 - The Bayer demosaic block is an edge-aware numpy reference, not a production ISP demosaic.
 - The RGB+aux compact dense detector is still a learning-path benchmark, not a claim-quality detector.
 - The RGB+aux smoke checkpoint predicts one generic box and is not a useful trained detector.
+- The benchmark-protocol checklist is a claim blocker/coverage tool; it does not create missing real-RAW or adverse-condition evidence by itself.
 - CameraE2E integration is optional and environment-dependent.
 - Latency values are engineering estimates, not measured hardware evidence.

@@ -335,7 +335,7 @@ the current reproduced output is:
 reports/perception_claim_readiness_repro/dashboard/index.html
 ```
 
-It intentionally separates three decisions:
+It intentionally separates claim decisions from evidence-coverage decisions:
 
 | Decision | Current status |
 | --- | --- |
@@ -343,6 +343,20 @@ It intentionally separates three decisions:
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
 | Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
+| Benchmark protocol coverage | Not supported until the minimum RAW/perception ablation matrix is covered |
+
+The readiness bundle also writes:
+
+```text
+reports/perception_claim_readiness_repro/benchmark_protocol/index.html
+reports/perception_claim_readiness_repro/benchmark_protocol/protocol_coverage_summary.json
+```
+
+This protocol coverage is a blocker checklist, not a metric result. It checks
+whether the evidence includes the minimum matrix needed for broad claims:
+paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
+detector recipe, CI-backed gates, task metrics, naive RAW/minimal adaptation,
+classical lightweight RAW transform, and task-aware/aux-assisted paths.
 
 Task-oriented group metrics are also generated from the same saved detections:
 

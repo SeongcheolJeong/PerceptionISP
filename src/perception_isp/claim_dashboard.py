@@ -16,6 +16,7 @@ CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
+PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -23,6 +24,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--claim-gate", action="append", default=[], help="Claim gate summary path/dir, optionally name=path.")
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
+    parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -31,6 +33,7 @@ def main(argv: Any = None) -> int:
         claim_gate_specs=args.claim_gate,
         training_rollup=args.training_rollup,
         task_metrics=args.task_metrics,
+        protocol_coverage=args.protocol_coverage,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -55,17 +58,20 @@ def build_claim_dashboard(
     claim_gate_specs: Sequence[str | Path],
     training_rollup: str | Path | None = None,
     task_metrics: str | Path | None = None,
+    protocol_coverage: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
     task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
+    protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task)
+    decisions = _claim_decisions(claims, training, task, protocol)
     return {
         "claims": claims,
         "training": training,
         "task_metrics": task,
+        "protocol_coverage": protocol,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
@@ -178,6 +184,25 @@ def _load_task_metrics(spec: str | Path, *, claims: Sequence[Mapping[str, Any]])
     }
 
 
+def _load_protocol_coverage(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, PROTOCOL_COVERAGE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    requirements = [row for row in data.get("requirements", ()) if isinstance(row, Mapping)]
+    missing = [row for row in requirements if str(row.get("status", "")) != "covered"]
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "missing_required": list(data.get("missing_required", ())),
+        "missing_raw_claim": list(data.get("missing_raw_claim", ())),
+        "missing_count": len(missing),
+        "requirements": requirements,
+        "interpretation": str(data.get("interpretation", "")),
+    }
+
+
 def _select_task_target(data: Mapping[str, Any], *, claims: Sequence[Mapping[str, Any]], baseline_input: str) -> str:
     available = {str(value) for value in data.get("inputs", ())}
     for profile in ("fp_reducer", "broad_superiority"):
@@ -258,6 +283,7 @@ def _claim_decisions(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
+    protocol_coverage: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -286,6 +312,14 @@ def _claim_decisions(
             decisions.append({"status": "needs_gate", "claim": "Task-group metrics are candidate evidence, but need a configured held-out task gate before a task-level claim."})
         elif status in {"missing_target", "missing_groups"}:
             decisions.append({"status": "needs_eval", "claim": "Task-group evidence is incomplete, so task-level claims are not ready."})
+    if protocol_coverage is not None:
+        status = str(protocol_coverage.get("status", "unknown"))
+        if status == "claim_ready":
+            decisions.append({"status": "supported", "claim": "The configured benchmark protocol coverage is complete."})
+        else:
+            missing = list(protocol_coverage.get("missing_required", ())) + list(protocol_coverage.get("missing_raw_claim", ()))
+            suffix = "" if not missing else f" Missing: {', '.join(str(value) for value in missing)}."
+            decisions.append({"status": "not_supported", "claim": "Benchmark protocol coverage is incomplete; do not make a broad HumanISP or RAW/sensor-native superiority claim." + suffix})
     return decisions
 
 
@@ -415,6 +449,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
     task_metrics = dashboard.get("task_metrics")
     task_metrics_html = _task_metrics_html(task_metrics, destination) if isinstance(task_metrics, Mapping) else "<p>No task metrics summary was provided.</p>"
+    protocol = dashboard.get("protocol_coverage")
+    protocol_html = _protocol_html(protocol, destination) if isinstance(protocol, Mapping) else "<p>No benchmark protocol coverage summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
     comparison_body = comparison_rows if comparison_rows else '<tr><td colspan="4">No comparison rollups were provided.</td></tr>'
     return f"""<!doctype html>
@@ -454,6 +490,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {training_html}
   <h2>Task Metrics</h2>
   {task_metrics_html}
+  <h2>Benchmark Protocol Coverage</h2>
+  {protocol_html}
   <h2>Supporting Rollups</h2>
   <table>
     <thead><tr><th>Name</th><th>Report</th><th>Runs</th><th>Baseline</th></tr></thead>
@@ -553,6 +591,42 @@ def _task_metric_row(row: Mapping[str, Any]) -> str:
         f"<td>{_task_delta_cell(row.get('delta_recall@0.50'), lower_is_better=False)}</td>"
         f"<td>{_task_delta_cell(row.get('delta_recall@0.75'), lower_is_better=False)}</td>"
         f"<td>{_task_delta_cell(row.get('delta_fp@0.50_per_sample'), lower_is_better=True)}</td>"
+        "</tr>"
+    )
+
+
+def _protocol_html(protocol: Mapping[str, Any], destination: Path) -> str:
+    rows = "".join(_protocol_row(row) for row in protocol.get("requirements", ()))
+    if not rows:
+        rows = '<tr><td colspan="5">No protocol coverage rows were available.</td></tr>'
+    status = str(protocol.get("status", ""))
+    status_class = "supported" if status == "claim_ready" else "not_supported"
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(status)}</code>. {html_lib.escape(str(protocol.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Missing Required</th><th>Missing RAW Claim</th><th>Missing Rows</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(protocol, destination)}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in protocol.get('missing_required', ())) or 'none')}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in protocol.get('missing_raw_claim', ())) or 'none')}</td>"
+        f"<td>{int(protocol.get('missing_count', 0))}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Status</th><th>Scope</th><th>Requirement</th><th>Evidence</th><th>Missing Reason</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _protocol_row(row: Mapping[str, Any]) -> str:
+    status = str(row.get("status", ""))
+    status_class = "supported" if status == "covered" else "not_supported"
+    return (
+        "<tr>"
+        f"<td class=\"{status_class}\">{html_lib.escape(status)}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('scope', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('label', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('missing_reason', '')))}</td>"
         "</tr>"
     )
 

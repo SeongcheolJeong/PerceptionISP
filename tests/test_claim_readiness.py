@@ -34,9 +34,12 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue((root / "readiness" / "broad_superiority_vs_human" / "claim_gate_summary.json").exists())
             self.assertTrue((root / "readiness" / "fp_reducer_vs_fusion" / "claim_gate_summary.json").exists())
             self.assertTrue((root / "readiness" / "task_metrics" / "task_metrics_summary.json").exists())
+            self.assertTrue((root / "readiness" / "benchmark_protocol" / "protocol_coverage_summary.json").exists())
             self.assertTrue((root / "readiness" / "rgb_aux_training_rollup" / "training_rollup_summary.json").exists())
             self.assertTrue((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").exists())
             self.assertIn("task_metrics", summary)
+            self.assertIn("benchmark_protocol", summary)
+            self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -46,8 +49,16 @@ class ClaimReadinessTest(unittest.TestCase):
                 ],
                 "not_supported",
             )
+            self.assertTrue(
+                any(
+                    claim.startswith("Benchmark protocol coverage is incomplete")
+                    and status == "not_supported"
+                    for claim, status in decisions.items()
+                )
+            )
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(dashboard_summary["task_metrics"]["status"], "recall_tradeoff")
+            self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
 
     def test_claim_readiness_cli_outputs_compact_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -73,6 +84,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertFalse(printed["broad_superiority"]["pass"])
             self.assertTrue(printed["fp_reducer"]["pass"])
             self.assertIn("task_metrics", printed)
+            self.assertIn("benchmark_protocol", printed)
             self.assertTrue((root / "readiness" / "claim_readiness_summary.json").exists())
 
 

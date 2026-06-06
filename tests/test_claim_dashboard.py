@@ -18,12 +18,14 @@ class ClaimDashboardTest(unittest.TestCase):
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             training = _write_training_rollup(root / "training")
             task_metrics = _write_task_metrics(root / "task_metrics")
+            protocol = _write_protocol_coverage(root / "protocol")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
                 claim_gate_specs=[f"Human superiority={broad}", f"FP reducer={fp}"],
                 training_rollup=training,
                 task_metrics=task_metrics,
+                protocol_coverage=protocol,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -33,10 +35,18 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("not_supported", statuses)
             self.assertEqual(dashboard["training"]["status"], "diagnostic_only")
             self.assertEqual(dashboard["task_metrics"]["status"], "recall_tradeoff")
+            self.assertEqual(dashboard["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
                 "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
                 [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertTrue(
+                any(
+                    item["claim"].startswith("Benchmark protocol coverage is incomplete")
+                    and item["status"] == "not_supported"
+                    for item in dashboard["decisions"]
+                )
             )
 
             html_path = write_claim_dashboard(dashboard, root / "dashboard")
@@ -45,6 +55,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Broad HumanISP superiority gate failed", html)
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
             self.assertIn("Task Metrics", html)
+            self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
 
@@ -53,14 +64,27 @@ class ClaimDashboardTest(unittest.TestCase):
             root = Path(tmp)
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             task_metrics = _write_task_metrics(root / "task_metrics")
+            protocol = _write_protocol_coverage(root / "protocol")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                exit_code = dashboard_main(["--claim-gate", str(fp), "--task-metrics", str(task_metrics), "--output-dir", str(root / "dashboard")])
+                exit_code = dashboard_main(
+                    [
+                        "--claim-gate",
+                        str(fp),
+                        "--task-metrics",
+                        str(task_metrics),
+                        "--protocol-coverage",
+                        str(protocol),
+                        "--output-dir",
+                        str(root / "dashboard"),
+                    ]
+                )
             printed = json.loads(stdout.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertEqual(printed["claim_count"], 1)
             summary = json.loads((root / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(summary["task_metrics"]["status"], "recall_tradeoff")
+            self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
 
@@ -214,6 +238,33 @@ def _write_task_metrics(path: Path) -> Path:
                         },
                     },
                 },
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_protocol_coverage(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "protocol_coverage_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "not_claim_ready",
+                "missing_required": ["held_out_scale"],
+                "missing_raw_claim": ["naive_raw_baseline"],
+                "requirements": [
+                    {
+                        "id": "held_out_scale",
+                        "label": "Held-out sample scale",
+                        "scope": "claim_required",
+                        "status": "missing",
+                        "evidence": "max report sample_count: 3",
+                        "missing_reason": "The largest available held-out report is too small for a broad claim.",
+                    }
+                ],
+                "interpretation": "Protocol evidence is incomplete.",
             }
         )
         + "\n"

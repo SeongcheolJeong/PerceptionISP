@@ -759,8 +759,8 @@ score+label+aux reduces FP/sample, but VRU recall is still lower than HumanISP
 (`dR50=-0.0138` for `vru`, `dR50=-0.0157` for `person`).
 
 For the current KITTI evidence bundle, the one-shot readiness command rebuilds
-both claim gates, task metrics, the RGB+aux training rollup, and a dashboard
-that includes the task-metric tradeoff decision:
+both claim gates, task metrics, the RGB+aux training rollup, benchmark-protocol
+coverage, and a dashboard that includes the task-metric tradeoff decision:
 
 ```bash
 PYTHONPATH=src \
@@ -785,3 +785,26 @@ PYTHONPATH=src \
 ```
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
+
+The readiness bundle now writes
+`benchmark_protocol/protocol_coverage_summary.json` and
+`benchmark_protocol/index.html`. This checklist encodes the minimum evidence
+matrix from the RAW/perception-ISP literature: paired HumanISP and
+PerceptionISP streams, enough held-out samples, fixed detector recipe,
+CI-backed claim gates, task metrics, naive RAW/minimal adaptation, classical
+lightweight RAW transform, and a task-aware or aux-assisted path. Missing rows
+are blockers for broad HumanISP or RAW/sensor-native superiority claims.
+
+The protocol checker can also be run directly when assembling evidence by hand:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
+  --comparison-report reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
+  --training-rollup reports/perception_claim_readiness_repro/rgb_aux_training_rollup \
+  --claim-gate reports/perception_claim_readiness_repro/broad_superiority_vs_human \
+  --claim-gate reports/perception_claim_readiness_repro/fp_reducer_vs_fusion \
+  --task-metrics reports/perception_claim_readiness_repro/task_metrics \
+  --min-samples 1000 \
+  --output-dir reports/perception_benchmark_protocol
+```
