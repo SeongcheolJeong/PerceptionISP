@@ -33,8 +33,10 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(summary["fp_reducer"]["pass"])
             self.assertTrue((root / "readiness" / "broad_superiority_vs_human" / "claim_gate_summary.json").exists())
             self.assertTrue((root / "readiness" / "fp_reducer_vs_fusion" / "claim_gate_summary.json").exists())
+            self.assertTrue((root / "readiness" / "task_metrics" / "task_metrics_summary.json").exists())
             self.assertTrue((root / "readiness" / "rgb_aux_training_rollup" / "training_rollup_summary.json").exists())
             self.assertTrue((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").exists())
+            self.assertIn("task_metrics", summary)
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -62,6 +64,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertFalse(printed["broad_superiority"]["pass"])
             self.assertTrue(printed["fp_reducer"]["pass"])
+            self.assertIn("task_metrics", printed)
             self.assertTrue((root / "readiness" / "claim_readiness_summary.json").exists())
 
 

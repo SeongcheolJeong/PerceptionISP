@@ -714,8 +714,24 @@ The dashboard currently says: broad HumanISP superiority is not supported,
 bounded FP reduction is supported, and the learned RGB+aux DNN path is
 trainable but not yet claim-quality.
 
+Task-oriented group metrics can be extracted from the same saved detections:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.task_metrics \
+  reports/perception_calibrated_fusion_kitti_train512_to_val1496_features/score_label_aux \
+  --baseline-input human_rgb \
+  --inputs human_rgb,perception_fusion_rgb_aux,perception_calibrated_score_label_aux_fusion_rgb_aux \
+  --output-dir reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496
+```
+
+The current task metric result reinforces the caution: calibrated
+score+label+aux reduces FP/sample, but VRU recall is still lower than HumanISP
+(`dR50=-0.0138` for `vru`, `dR50=-0.0157` for `person`).
+
 For the current KITTI evidence bundle, the one-shot readiness command rebuilds
-both claim gates, the RGB+aux training rollup, and the dashboard:
+both claim gates, task metrics, the RGB+aux training rollup, and the dashboard:
 
 ```bash
 PYTHONPATH=src \

@@ -10,6 +10,7 @@ from typing import Any, Dict, Mapping, Sequence
 from .aux_training_rollup import build_training_rollup, write_training_rollup
 from .claim_dashboard import build_claim_dashboard, write_claim_dashboard
 from .claim_gate import build_claim_gate, write_claim_gate
+from .task_metrics import build_task_metrics, write_task_metrics
 from .types import json_ready
 
 
@@ -109,6 +110,15 @@ def run_claim_readiness(
     )
     fp_html = write_claim_gate(fp_summary, fp_dir)
 
+    task_metrics_dir = destination / "task_metrics"
+    task_summary = build_task_metrics(
+        report,
+        source_report=report_path,
+        baseline_input=str(human_baseline_input),
+        inputs=tuple(dict.fromkeys((str(human_baseline_input), str(fusion_baseline_input), str(target_input)))),
+    )
+    task_html = write_task_metrics(task_summary, task_metrics_dir)
+
     training_rollup_path = None
     if training_summaries:
         training_summary = build_training_rollup(training_summaries)
@@ -154,6 +164,10 @@ def run_claim_readiness(
             "failed": [item.get("metric") for item in fp_summary.get("criteria", ()) if not bool(item.get("pass"))],
         },
         "training_rollup": "" if training_rollup_path is None else str(training_rollup_path),
+        "task_metrics": {
+            "report": str(task_html),
+            "summary_json": str(task_html.parent / "task_metrics_summary.json"),
+        },
         "dashboard": {
             "report": str(dashboard_html),
             "summary_json": str(dashboard_html.parent / "claim_dashboard_summary.json"),
@@ -198,6 +212,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "dashboard": summary.get("dashboard", {}).get("report") if isinstance(summary.get("dashboard"), Mapping) else "",
         "broad_superiority": summary.get("broad_superiority"),
         "fp_reducer": summary.get("fp_reducer"),
+        "task_metrics": summary.get("task_metrics"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],
     }
 

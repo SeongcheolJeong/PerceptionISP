@@ -334,6 +334,24 @@ It intentionally separates three decisions:
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
 
+Task-oriented group metrics are also generated from the same saved detections:
+
+```text
+reports/perception_task_metrics_kitti_train512_score_label_aux_to_val1496/index.html
+reports/perception_claim_readiness_repro/task_metrics/index.html
+```
+
+The current task metrics show why the FP-reducer claim should stay narrow:
+
+| Group / input | P@0.50 | R@0.50 | R@0.75 | FP/sample | Delta R@0.50 vs Human | Delta FP/sample vs Human |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Human VRU | 0.4993 | 0.2697 | 0.0779 | 0.2366 | +0.0000 | +0.0000 |
+| Calibrated VRU | 0.5888 | 0.2559 | 0.0741 | 0.1564 | -0.0138 | -0.0802 |
+| Human person | 0.5740 | 0.3647 | 0.1066 | 0.1731 | +0.0000 | +0.0000 |
+| Calibrated person | 0.5975 | 0.3490 | 0.1014 | 0.1504 | -0.0157 | -0.0227 |
+| Human vehicle | 0.6939 | 0.5061 | 0.3361 | 0.9866 | +0.0000 | +0.0000 |
+| Calibrated vehicle | 0.7205 | 0.4963 | 0.3326 | 0.8509 | -0.0098 | -0.1357 |
+
 ## CameraE2E Resolution Finding
 
 CameraE2E itself follows the expected path: RGB scene to spectral scene, sensor
