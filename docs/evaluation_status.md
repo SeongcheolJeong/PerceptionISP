@@ -155,6 +155,43 @@ weaker. Therefore the current compact dense architecture is not a usable proof
 that auxiliary maps improve detector performance; it is only a fast engineering
 path for testing tensor export, training, checkpoint loading, and ablations.
 
+### KITTI Train-Subset to Val Calibration
+
+To separate calibration fitting from the validation report more strictly, a
+512-sample KITTI train subset was evaluated with the same CameraE2E RAW path,
+`detector_log` PerceptionISP config, fixed `log` HumanISP baseline, and
+label-aware KITTI-to-COCO mapping:
+
+```text
+reports/perception_compare_kitti_train512_detector_log_harness/index.html
+reports/perception_proposal_calibration_kitti_train512_detector_log/index.html
+reports/perception_calibrated_fusion_kitti_train512_to_val1496_detector_log/index.html
+reports/perception_claim_readiness_rollup/index.html
+```
+
+The train-subset calibrator used a hash split of 346 train / 166 eval samples.
+It selected `score_label_aux` at threshold `0.04`, then was applied to the full
+1,496-sample KITTI val report. This val set was not used to fit or select the
+calibrator.
+
+| Val input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 | 3.8135 |
+| RGB+Aux Fusion | 0.6063 | 0.4639 | 0.3030 | 0.2795 | 1.3235 | 3.7627 |
+| Train512 Calibrated RGB+Aux Fusion | 0.6367 | 0.4587 | 0.2993 | 0.2769 | 1.0100 | 3.4271 |
+
+Train512-to-val deltas:
+
+| Comparison | Delta P@0.50 | Delta R@0.50 | Delta R@0.75 | Delta Small R@0.50 | Delta FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Calibrated vs HumanISP | +0.0294 | -0.0108 | -0.0045 | -0.0025 | -0.3309 |
+| Calibrated vs RGB+Aux Fusion | +0.0304 | -0.0052 | -0.0037 | -0.0026 | -0.3135 |
+
+This stricter holdout keeps the main precision/FP benefit, but recall loss is
+larger than the val-internal calibration result. It strengthens the engineering
+case for proposal calibration as a conservative FP reducer, but it still does
+not justify a broad HumanISP superiority claim.
+
 ## CameraE2E Resolution Finding
 
 CameraE2E itself follows the expected path: RGB scene to spectral scene, sensor

@@ -12,7 +12,14 @@ from typing import Any, Dict, Mapping, Sequence, Tuple
 from .types import json_ready
 
 
-DEFAULT_INPUTS = ("reference_rgb", "human_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_rgb_aux_dnn")
+DEFAULT_INPUTS = (
+    "reference_rgb",
+    "human_rgb",
+    "perception_rgb",
+    "perception_fusion_rgb_aux",
+    "perception_calibrated_fusion_rgb_aux",
+    "perception_rgb_aux_dnn",
+)
 METRIC_KEYS = ("precision@0.50_mean", "recall@0.50_mean", "recall@0.75_mean", "small_recall@0.50_mean", "fp@0.50_mean", "det_count_mean")
 
 

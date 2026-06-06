@@ -575,4 +575,17 @@ PYTHONPATH=src \
 `--proposal-calibration-model` requires fusion to stay enabled because the
 artifact is trained on `perception_fusion_rgb_aux` proposals.
 
+For stricter evidence, train the proposal calibrator on a KITTI train report and
+apply it to the KITTI val report. The current quick holdout uses a 512-sample
+train subset and writes:
+
+```text
+reports/perception_proposal_calibration_kitti_train512_detector_log
+reports/perception_calibrated_fusion_kitti_train512_to_val1496_detector_log
+reports/perception_claim_readiness_rollup
+```
+
+That run keeps the FP/precision benefit on val, but still loses recall versus
+HumanISP, so it is not a broad superiority claim.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

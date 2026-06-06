@@ -37,6 +37,14 @@ class ReportRollupTest(unittest.TestCase):
                                 "fp@0.50_mean": 0.8,
                                 "det_count_mean": 2.1,
                             },
+                            "perception_calibrated_fusion_rgb_aux": {
+                                "precision@0.50_mean": 0.7,
+                                "recall@0.50_mean": 0.39,
+                                "recall@0.75_mean": 0.29,
+                                "small_recall@0.50_mean": 0.21,
+                                "fp@0.50_mean": 0.6,
+                                "det_count_mean": 1.8,
+                            },
                         },
                     }
                 )
@@ -47,6 +55,9 @@ class ReportRollupTest(unittest.TestCase):
             perception = rollup["runs"][0]["inputs"]["perception_rgb"]
             self.assertAlmostEqual(perception["delta_precision@0.50_mean"], 0.1)
             self.assertAlmostEqual(perception["delta_recall@0.50_mean"], 0.05)
+            calibrated = rollup["runs"][0]["inputs"]["perception_calibrated_fusion_rgb_aux"]
+            self.assertAlmostEqual(calibrated["delta_precision@0.50_mean"], 0.2)
+            self.assertAlmostEqual(calibrated["delta_recall@0.50_mean"], -0.01)
             html_path = write_rollup_report(rollup, root / "rollup")
             self.assertTrue(html_path.exists())
             self.assertIn("PerceptionISP Comparison Rollup", html_path.read_text())
