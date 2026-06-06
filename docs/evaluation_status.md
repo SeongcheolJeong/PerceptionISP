@@ -17,6 +17,10 @@ This project now has an end-to-end perception comparison path:
 - Native KITTI `image_2` + `label_2` loader.
 - Conservative RGB+aux fusion adapter that keeps RGB detector labels and adds
   aux-map support metadata from edge, saturation, and reliability channels.
+- RGB+aux DNN export that writes six-channel tensors and labels for downstream
+  training.
+- Tiny PyTorch smoke training loop proving the exported six-channel tensors can
+  be consumed by a DNN stem and optimized.
 - HTML visual evidence: green boxes are ground truth, red boxes are detector outputs.
 
 ## What The Current Evidence Means
@@ -33,6 +37,35 @@ single-image pseudo-label and small synthetic smoke runs are too narrow. The
 auxiliary-map detector is a deterministic baseline rather than a trained
 perception model, and the RGB+aux fusion adapter is only a reference integration
 path until a detector is trained to consume those auxiliary channels.
+
+## Aux Map DNN Training Status
+
+Auxiliary maps are not automatically used by existing RGB DNNs. A pretrained
+YOLO-style RGB detector expects three channels, so PerceptionISP aux maps become
+useful only after one of these downstream changes:
+
+- Train or fine-tune a detector with a six-channel RGB+aux input stem.
+- Add a separate aux branch and fuse features with the RGB branch.
+- Train a score/proposal calibration head that consumes aux evidence.
+
+The repository now includes a DNN-facing export path:
+
+- `perception_isp.aux_export`: writes `manifest.jsonl`, `labels/*.json`, and
+  `tensors/*.npz`.
+- `perception_isp.aux_train_smoke`: runs a tiny PyTorch optimization loop on
+  the exported six-channel tensors.
+
+Current local resource check:
+
+- CUDA: unavailable.
+- Apple MPS: available.
+- RAM: 32 GB.
+
+This is enough for smoke training and small subset fine-tuning, but not enough
+to make strong perception performance claims from large-scale detector
+retraining. The current verified smoke run exported two COCO8 CameraE2E-backed
+samples in about 6 seconds and ran one MPS training epoch in about 3 seconds.
+That proves the data path, not detector superiority.
 
 ## CameraE2E Resolution Finding
 
@@ -108,7 +141,7 @@ For a fair PerceptionISP claim, compare at least:
 
 - HumanISP RGB + pretrained RGB detector.
 - PerceptionISP RGB + the same pretrained RGB detector.
-- PerceptionISP auxiliary maps + a detector or adapter trained to consume those maps.
+- PerceptionISP RGB+aux + a detector or adapter trained to consume those maps.
 
 ## Recommended Next Run
 

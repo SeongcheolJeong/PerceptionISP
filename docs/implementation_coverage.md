@@ -16,12 +16,15 @@ This implementation is deliberately broad rather than hardware-optimized.
 | LED / Temporal | temporal difference, consistency, flicker confidence, light-source confidence |
 | Task Image Formation | human RGB, vision RGB, raw-like tensor |
 | Output Formatter | accurate full tensor, fast stripe tensor, sparse edge packets |
+| DNN Export | RGB+aux six-channel tensor export, labels, manifest, PyTorch dataset adapter |
+| Training Smoke | tiny PyTorch RGB+aux stem and optimization loop for path validation |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
 Known limits:
 
-- The demosaic and dewarp blocks are intentionally simple numpy baselines.
-- No learned DNN branch is included yet; tensors are prepared for downstream models.
+- The Bayer demosaic block is an edge-aware numpy reference, not a production ISP demosaic.
+- The RGB+aux training loop is a smoke test, not a real detector training recipe.
+- No trained aux-aware detector checkpoint is included yet.
 - CameraE2E integration is optional and environment-dependent.
 - Latency values are engineering estimates, not measured hardware evidence.

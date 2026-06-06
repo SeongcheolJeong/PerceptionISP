@@ -14,6 +14,8 @@ dependencies = ["numpy", "pillow"]
 perception-isp = "perception_isp.cli:main"
 perception-isp-eval = "perception_isp.eval_cli:main"
 perception-isp-sweep = "perception_isp.resolution_sweep:main"
+perception-isp-aux-export = "perception_isp.aux_export:main"
+perception-isp-aux-train-smoke = "perception_isp.aux_train_smoke:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

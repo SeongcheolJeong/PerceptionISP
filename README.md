@@ -70,6 +70,51 @@ luma, edge_strength, edge_confidence,
 temporal_difference, saturation, noise_variance
 ```
 
+## RGB+Aux DNN Export
+
+Existing RGB detectors do not automatically use PerceptionISP auxiliary maps.
+To make aux maps useful, the downstream model must be adapted and trained or
+fine-tuned with aux channels. The export path writes a six-channel tensor:
+
+```text
+rgb_r, rgb_g, rgb_b,
+aux_edge_strength, aux_saturation, aux_reliability
+```
+
+Export a small CameraE2E-backed COCO8 smoke dataset:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_export \
+  --source yolo-dataset \
+  --dataset data/coco8/data.yaml \
+  --split val \
+  --count 2 \
+  --width 640 --height 480 \
+  --cfa auto \
+  --tone-mapping srgb \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.35 \
+  --output-dir exports/perception_rgb_aux_coco8_smoke
+```
+
+Run a tiny PyTorch smoke training loop to prove the six-channel tensor can be
+consumed by a DNN stem and optimized:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_train_smoke \
+  --manifest exports/perception_rgb_aux_coco8_smoke/manifest.jsonl \
+  --epochs 1 \
+  --device auto \
+  --output-dir exports/perception_rgb_aux_coco8_train_smoke
+```
+
+This smoke training is not a detector-performance claim. It only verifies the
+data path needed before real RGB+aux detector training.
+
 ## Validation
 
 ```bash
