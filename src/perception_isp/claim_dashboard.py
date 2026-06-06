@@ -292,10 +292,13 @@ def _claim_decisions(
         decisions.append({"status": "supported", "claim": "Broad metric superiority versus HumanISP is supported by the configured gate."})
     elif broad_claims:
         decisions.append({"status": "not_supported", "claim": "Broad HumanISP superiority is not supported by the current gate evidence."})
-    if any(bool(claim.get("pass")) for claim in fp_claims):
-        decisions.append({"status": "supported", "claim": "Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."})
+    passing_fp_claim = next((claim for claim in fp_claims if bool(claim.get("pass"))), None)
+    if passing_fp_claim is not None:
+        baseline = _baseline_claim_name(str(passing_fp_claim.get("baseline_input", "")))
+        decisions.append({"status": "supported", "claim": f"Recall-budgeted FP reduction versus {baseline} is supported."})
     elif fp_claims:
-        decisions.append({"status": "not_supported", "claim": "Recall-budgeted FP reduction is not supported by the current gate evidence."})
+        baseline = _baseline_claim_name(str(fp_claims[0].get("baseline_input", "")))
+        decisions.append({"status": "not_supported", "claim": f"Recall-budgeted FP reduction versus {baseline} is not supported by the current gate evidence."})
     if training is not None:
         status = str(training.get("status", "unknown"))
         if status == "diagnostic_only":
@@ -321,6 +324,16 @@ def _claim_decisions(
             suffix = "" if not missing else f" Missing: {', '.join(str(value) for value in missing)}."
             decisions.append({"status": "not_supported", "claim": "Benchmark protocol coverage is incomplete; do not make a broad HumanISP or RAW/sensor-native superiority claim." + suffix})
     return decisions
+
+
+def _baseline_claim_name(input_name: str) -> str:
+    if input_name == "human_rgb":
+        return "HumanISP"
+    if input_name == "perception_fusion_rgb_aux":
+        return "the RGB+Aux fusion baseline"
+    if input_name:
+        return f"`{input_name}`"
+    return "the configured baseline"
 
 
 def _training_status(

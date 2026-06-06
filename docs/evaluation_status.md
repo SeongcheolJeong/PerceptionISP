@@ -322,6 +322,53 @@ This supports only a bounded FP-reduction claim against the current fusion
 baseline. It does not support saying that PerceptionISP broadly outperforms
 HumanISP.
 
+### Perception RGB score-label calibration
+
+Because the uncalibrated `perception_rgb` stream is near HumanISP recall parity,
+a second detector-side branch calibrates `perception_rgb` proposals directly
+instead of using the RGB+aux fusion proposals:
+
+```text
+reports/perception_proposal_calibration_kitti_train512_perception_rgb/index.html
+reports/perception_calibrated_perception_rgb_kitti_train512_to_val1496/index.html
+```
+
+This target is:
+
+```text
+perception_calibrated_score_label_perception_rgb
+```
+
+On KITTI val 1496, it gives a stronger HumanISP-relative FP-reduction result:
+
+| Input | P@0.50 | R@0.50 | R@0.75 | Small R@0.50 | FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 | 1.3409 |
+| Perception RGB | 0.6022 | 0.4688 | 0.3057 | 0.2808 | 1.3750 |
+| Score-label calibrated Perception RGB | 0.6303 | 0.4663 | 0.3038 | 0.2800 | 1.1036 |
+
+The HumanISP-relative `fp_reducer` gate passes with paired CI enabled:
+
+```text
+reports/perception_claim_gate_kitti_train512_perception_rgb_fp_reducer_vs_human/index.html
+```
+
+The broad-superiority gate for the same target still fails:
+
+```text
+reports/perception_claim_gate_kitti_train512_perception_rgb_broad_vs_human/index.html
+```
+
+The consolidated dashboard for this narrower claim is:
+
+```text
+reports/perception_claim_readiness_perception_rgb_fp_vs_human/index.html
+```
+
+This is currently the cleanest supported claim: **recall-budgeted false-positive
+reduction versus HumanISP**, not broad HumanISP superiority and not task-level
+VRU/person recall improvement.
+
 The consolidated claim-readiness dashboard is:
 
 ```text

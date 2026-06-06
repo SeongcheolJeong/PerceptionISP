@@ -87,8 +87,17 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
+    def test_fp_reducer_decision_names_human_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fp = _write_claim_gate(root / "fp_human", profile="fp_reducer", passed=True, baseline_input="human_rgb")
+            dashboard = build_claim_dashboard(claim_gate_specs=[str(fp)])
 
-def _write_claim_gate(path: Path, *, profile: str, passed: bool) -> Path:
+            decisions = {item["claim"]: item["status"] for item in dashboard["decisions"]}
+            self.assertEqual(decisions["Recall-budgeted FP reduction versus HumanISP is supported."], "supported")
+
+
+def _write_claim_gate(path: Path, *, profile: str, passed: bool, baseline_input: str | None = None) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
     criteria = [
@@ -106,7 +115,7 @@ def _write_claim_gate(path: Path, *, profile: str, passed: bool) -> Path:
                 "pass": passed,
                 "sample_count": 1000,
                 "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
-                "baseline_input": "human_rgb" if profile == "broad_superiority" else "perception_fusion_rgb_aux",
+                "baseline_input": baseline_input or ("human_rgb" if profile == "broad_superiority" else "perception_fusion_rgb_aux"),
                 "criteria": criteria,
                 "interpretation": "unit",
             }

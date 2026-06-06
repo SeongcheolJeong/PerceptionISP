@@ -720,6 +720,36 @@ loss on R50/R75/small R50, and at least `0.10` fewer FP/sample. This supports a
 bounded FP-reduction claim only; it does not convert the result into a broad
 HumanISP superiority claim.
 
+A second detector-side calibration branch trains on `perception_rgb` proposals
+instead of the RGB+aux fusion proposals. It is useful because the uncalibrated
+Perception RGB stream is already near HumanISP recall parity, and the calibrator
+can remove false positives with a smaller recall loss:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.proposal_calibration \
+  reports/perception_compare_kitti_train512_detector_log_harness \
+  --input perception_rgb \
+  --feature-sets score,score_label \
+  --thresholds 0.00:0.30:0.01 \
+  --baseline-input human_rgb \
+  --train-fraction 0.67 \
+  --split-strategy hash \
+  --seed kitti_train512_perception_rgb_calibration \
+  --recall-delta-floor -0.001 \
+  --artifact-feature-set score_label \
+  --artifact-output-input perception_calibrated_score_label_perception_rgb \
+  --output-dir reports/perception_proposal_calibration_kitti_train512_perception_rgb
+```
+
+Applied to KITTI val 1496, this target passes the `fp_reducer` gate against
+HumanISP while still failing the stricter broad-superiority gate:
+
+```text
+reports/perception_calibrated_perception_rgb_kitti_train512_to_val1496/index.html
+reports/perception_claim_gate_kitti_train512_perception_rgb_fp_reducer_vs_human/index.html
+reports/perception_claim_readiness_perception_rgb_fp_vs_human/index.html
+```
+
 Create a consolidated readiness dashboard from the claim gates, RGB+aux
 training rollup, and calibration rollup:
 
