@@ -17,6 +17,9 @@ from .aux_dnn import RGB_AUX_CHANNELS, labels_from_manifest, make_aux_dense_dete
 from .types import json_ready
 
 
+BOX_ENCODING = "cell_center_size"
+
+
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Train a compact class-aware detector on PerceptionISP RGB+aux tensors.")
     parser.add_argument("--manifest", required=True)
@@ -26,6 +29,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--grid", default="15x20", help="Detector grid as HxW.")
     parser.add_argument("--base-channels", type=int, default=24)
     parser.add_argument("--eval-fraction", type=float, default=0.25)
+    parser.add_argument("--split-strategy", default="coverage", choices=["coverage", "sequential"])
     parser.add_argument("--no-object-weight", type=float, default=0.15)
     parser.add_argument("--box-weight", type=float, default=5.0)
     parser.add_argument("--class-weight", type=float, default=1.0)
@@ -41,6 +45,7 @@ def main(argv: Any = None) -> int:
         grid_size=parse_grid_size(args.grid),
         base_channels=int(args.base_channels),
         eval_fraction=float(args.eval_fraction),
+        split_strategy=str(args.split_strategy),
         no_object_weight=float(args.no_object_weight),
         box_weight=float(args.box_weight),
         class_weight=float(args.class_weight),
@@ -60,6 +65,7 @@ def train_dense(
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
     eval_fraction: float = 0.25,
+    split_strategy: str = "coverage",
     no_object_weight: float = 0.15,
     box_weight: float = 5.0,
     class_weight: float = 1.0,
@@ -75,7 +81,7 @@ def train_dense(
     class_names = labels_from_manifest(manifest_path)
     class_to_index = {name: index for index, name in enumerate(class_names)}
     device = _select_device(torch, device_name)
-    train_indices, eval_indices = _split_indices(len(dataset), eval_fraction)
+    train_indices, eval_indices = _split_indices(dataset, eval_fraction, strategy=split_strategy)
     train_class_names = _class_names_for_indices(dataset, train_indices)
     eval_class_names = _class_names_for_indices(dataset, eval_indices)
     missing_eval_class_names = tuple(sorted(set(eval_class_names) - set(train_class_names)))
@@ -90,6 +96,10 @@ def train_dense(
     first_loss = None
     last_loss = None
     total_steps = 0
+    best_state = None
+    best_epoch = -1
+    best_loss = None
+    best_loss_kind = "eval_loss" if eval_indices else "train_loss"
     epoch_count = max(int(epochs), 1)
     start_time = time.perf_counter()
     initial_eval_loss = _evaluate_loss(
@@ -148,6 +158,11 @@ def train_dense(
                 "eval_loss": eval_mean,
             }
         )
+        selected_loss = eval_mean if eval_mean is not None else train_mean
+        if selected_loss is not None and (best_loss is None or float(selected_loss) < float(best_loss)):
+            best_loss = float(selected_loss)
+            best_epoch = int(epoch)
+            best_state = _clone_state_dict_cpu(model)
     elapsed_seconds = max(time.perf_counter() - start_time, 1.0e-9)
     sample_epochs_per_second = float(total_steps / elapsed_seconds)
     summary = {
@@ -160,6 +175,10 @@ def train_dense(
         "learning_rate": float(learning_rate),
         "grid_size": [int(grid_size[0]), int(grid_size[1])],
         "base_channels": int(base_channels),
+        "split_strategy": str(split_strategy),
+        "eval_fraction": float(eval_fraction),
+        "train_indices": [int(index) for index in train_indices],
+        "eval_indices": [int(index) for index in eval_indices],
         "class_names": list(class_names),
         "class_count": int(len(class_names)),
         "train_class_names": list(train_class_names),
@@ -172,6 +191,10 @@ def train_dense(
         "last_loss": float(last_loss if last_loss is not None else 0.0),
         "initial_eval_loss": initial_eval_loss,
         "final_eval_loss": history[-1]["eval_loss"] if history else initial_eval_loss,
+        "checkpoint_epoch": int(best_epoch),
+        "checkpoint_loss": best_loss,
+        "checkpoint_loss_kind": best_loss_kind,
+        "box_encoding": BOX_ENCODING,
         "elapsed_seconds": float(elapsed_seconds),
         "total_sample_epochs": int(total_steps),
         "sample_epochs_per_second": sample_epochs_per_second,
@@ -187,18 +210,26 @@ def train_dense(
     if output_dir is not None:
         destination = Path(output_dir).expanduser()
         destination.mkdir(parents=True, exist_ok=True)
+        final_state = _clone_state_dict_cpu(model)
         checkpoint = {
             "model_type": "rgb_aux_dense_detector_v1",
-            "model_state": model.state_dict(),
+            "model_state": best_state if best_state is not None else _clone_state_dict_cpu(model),
             "channels": list(RGB_AUX_CHANNELS),
             "grid_size": [int(grid_size[0]), int(grid_size[1])],
             "base_channels": int(base_channels),
             "class_names": list(class_names),
+            "box_encoding": BOX_ENCODING,
             "summary": summary,
         }
         checkpoint_path = destination / "rgb_aux_dense_detector.pt"
         torch.save(checkpoint, checkpoint_path)
         summary["checkpoint"] = str(checkpoint_path)
+        final_checkpoint = dict(checkpoint)
+        final_checkpoint["model_state"] = final_state
+        final_checkpoint["checkpoint_kind"] = "final"
+        final_checkpoint_path = destination / "rgb_aux_dense_detector_final.pt"
+        torch.save(final_checkpoint, final_checkpoint_path)
+        summary["final_checkpoint"] = str(final_checkpoint_path)
         (destination / "train_dense_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
     return summary
 
@@ -313,7 +344,11 @@ def _dense_targets(
         row, col = cell
         occupied.add(cell)
         object_target[0, row, col] = 1.0
-        box_target[:, row, col] = torch.tensor((x1, y1, x2, y2), dtype=torch.float32, device=device)
+        width = max(x2 - x1, 1.0e-6)
+        height = max(y2 - y1, 1.0e-6)
+        offset_x = max(0.0, min(1.0, center_x * cols - col))
+        offset_y = max(0.0, min(1.0, center_y * rows - row))
+        box_target[:, row, col] = torch.tensor((offset_x, offset_y, width, height), dtype=torch.float32, device=device)
         class_target[row, col] = int(class_index)
     return object_target, box_target, class_target
 
@@ -386,6 +421,10 @@ def _evaluate_loss(
     return float(sum(losses) / max(len(losses), 1))
 
 
+def _clone_state_dict_cpu(model: Any) -> Dict[str, Any]:
+    return {str(key): value.detach().cpu().clone() for key, value in model.state_dict().items()}
+
+
 def _class_names_for_indices(dataset: Any, indices: Sequence[int]) -> Tuple[str, ...]:
     labels = set()
     for index in indices:
@@ -394,14 +433,47 @@ def _class_names_for_indices(dataset: Any, indices: Sequence[int]) -> Tuple[str,
     return tuple(sorted(labels))
 
 
-def _split_indices(sample_count: int, eval_fraction: float) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-    count = int(sample_count)
+def _split_indices(dataset: Any, eval_fraction: float, *, strategy: str = "coverage") -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+    count = int(len(dataset))
     indices = tuple(range(count))
     fraction = max(float(eval_fraction), 0.0)
     if count <= 1 or fraction <= 0.0:
         return indices, ()
     eval_count = min(max(int(round(count * min(fraction, 0.9))), 1), count - 1)
+    if str(strategy).lower() == "coverage":
+        return _coverage_split_indices(dataset, indices, eval_count)
     return indices[:-eval_count], indices[-eval_count:]
+
+
+def _coverage_split_indices(dataset: Any, indices: Sequence[int], eval_count: int) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+    """Keep eval labels covered by train whenever the manifest allows it."""
+
+    sample_labels = {int(index): _labels_for_index(dataset, int(index)) for index in indices}
+    train = set(int(index) for index in indices)
+    eval_selected: list[int] = []
+    for candidate in reversed(indices):
+        if len(eval_selected) >= int(eval_count):
+            break
+        candidate = int(candidate)
+        labels = sample_labels[candidate]
+        if not labels:
+            train.remove(candidate)
+            eval_selected.append(candidate)
+            continue
+        remaining_labels = set()
+        for index in train:
+            if index == candidate:
+                continue
+            remaining_labels.update(sample_labels[index])
+        if labels.issubset(remaining_labels):
+            train.remove(candidate)
+            eval_selected.append(candidate)
+    return tuple(sorted(train)), tuple(sorted(eval_selected))
+
+
+def _labels_for_index(dataset: Any, index: int) -> set[str]:
+    _, target = dataset[int(index)]
+    return {str(value) for value in target.get("labels_text", ())}
 
 
 def _time_estimates(*, sample_epochs_per_second: float, epochs: int, sample_counts: Sequence[int]) -> list[Dict[str, Any]]:

@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from perception_isp.aux_dnn import RGB_AUX_CHANNELS, build_rgb_aux_tensor, labels_from_manifest, make_aux_early_fusion_stem, make_torch_dataset
+from perception_isp.aux_eval_dense import evaluate_dense_manifest
 from perception_isp.aux_export import export_aux_dataset
 from perception_isp.aux_train_dense import train_dense
 from perception_isp.aux_train_smoke import train_smoke
@@ -141,11 +142,21 @@ class AuxDNNExportTest(unittest.TestCase):
             )
             self.assertEqual(summary["sample_count"], 3)
             self.assertEqual(summary["class_names"], ["car", "person", "traffic_light"])
+            self.assertEqual(summary["split_strategy"], "coverage")
+            self.assertIn("train_indices", summary)
+            self.assertIn("eval_indices", summary)
+            self.assertIn("checkpoint_epoch", summary)
+            self.assertIn("checkpoint_loss", summary)
+            self.assertIn("checkpoint_loss_kind", summary)
+            self.assertEqual(summary["box_encoding"], "cell_center_size")
             self.assertIn("train_class_names", summary)
             self.assertIn("eval_class_names", summary)
             self.assertIn("missing_eval_class_names", summary)
+            self.assertEqual(summary["missing_eval_class_names"], [])
             self.assertGreater(summary["sample_epochs_per_second"], 0.0)
             self.assertTrue((Path(tmp) / "dense" / "rgb_aux_dense_detector.pt").exists())
+            self.assertTrue((Path(tmp) / "dense" / "rgb_aux_dense_detector_final.pt").exists())
+            self.assertIn("final_checkpoint", summary)
             detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
             self.assertIsInstance(detector, RGBAuxTorchDenseDetector)
             result = compare_dataset(
@@ -157,6 +168,18 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("perception_rgb_aux_dnn", result["aggregate"])
             self.assertIn("perception_rgb_aux_dnn", result["samples"][0]["metrics"])
             self.assertIn("perception_rgb_aux_dnn", result["samples"][0]["_visuals"])
+            direct = evaluate_dense_manifest(
+                manifest_path=manifest,
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_eval",
+            )
+            self.assertEqual(direct["sample_count"], len(summary["eval_indices"]))
+            self.assertIn("aggregate", direct)
+            self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
+            self.assertTrue((Path(tmp) / "dense_eval" / "index.html").exists())
 
 
 if __name__ == "__main__":

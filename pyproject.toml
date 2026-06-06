@@ -17,6 +17,7 @@ perception-isp-sweep = "perception_isp.resolution_sweep:main"
 perception-isp-aux-export = "perception_isp.aux_export:main"
 perception-isp-aux-train-smoke = "perception_isp.aux_train_smoke:main"
 perception-isp-aux-train-dense = "perception_isp.aux_train_dense:main"
+perception-isp-aux-eval-dense = "perception_isp.aux_eval_dense:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

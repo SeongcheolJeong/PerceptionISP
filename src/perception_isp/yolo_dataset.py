@@ -43,7 +43,7 @@ def load_yolo_detection_samples(
     """Load a YOLO-format detection dataset as PerceptionISP samples."""
 
     root, config = _resolve_dataset(dataset)
-    names = _class_names(config)
+    names = _class_names(config, root)
     image_dir = _split_path(root, config, split, "images")
     label_dir = _label_dir_for_image_dir(root, image_dir)
     if not image_dir.exists():
@@ -106,10 +106,14 @@ def _resolve_dataset(dataset: str | Path) -> Tuple[Path, Dict[str, Any]]:
             root = path.parent / root
         return root.resolve(), config
     config_path = path / "data.yaml"
-    config = _read_yaml_like(config_path) if config_path.exists() else {"path": str(path)}
-    root = Path(config.get("path", path)).expanduser()
-    if not root.is_absolute():
-        root = path / root
+    if config_path.exists():
+        config = _read_yaml_like(config_path)
+        root = Path(config.get("path", path)).expanduser()
+        if not root.is_absolute():
+            root = path / root
+    else:
+        config = {}
+        root = path.expanduser()
     return root.resolve(), config
 
 
@@ -140,13 +144,103 @@ def _read_simple_yaml(path: Path) -> Dict[str, Any]:
     return payload
 
 
-def _class_names(config: Mapping[str, Any]) -> Dict[int, str]:
+def _class_names(config: Mapping[str, Any], root: Path | None = None) -> Dict[int, str]:
     names = config.get("names", {})
     if isinstance(names, Mapping):
-        return {int(key): str(value) for key, value in names.items()}
+        parsed = {int(key): str(value) for key, value in names.items()}
+        if parsed:
+            return parsed
     if isinstance(names, Sequence) and not isinstance(names, (str, bytes)):
-        return {index: str(value) for index, value in enumerate(names)}
+        parsed = {index: str(value) for index, value in enumerate(names)}
+        if parsed:
+            return parsed
+    if root is not None and str(root.name).lower().startswith("coco"):
+        return {index: value for index, value in enumerate(COCO80_CLASS_NAMES)}
     return {}
+
+
+COCO80_CLASS_NAMES = (
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
+)
 
 
 def _split_path(root: Path, config: Mapping[str, Any], split: str, kind: str) -> Path:

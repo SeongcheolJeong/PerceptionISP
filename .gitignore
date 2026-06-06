@@ -26,6 +26,8 @@ exports/
 data/**/*.zip
 data/**/images/
 data/**/labels/
+data/**/LICENSE
+data/**/README.txt
 data/sample_images/
 
 # Model weights and large ML artifacts

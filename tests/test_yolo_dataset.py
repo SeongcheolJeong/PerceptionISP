@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import os
 from pathlib import Path
 
 import numpy as np
@@ -39,6 +40,57 @@ class YoloDatasetAdapterTest(unittest.TestCase):
             self.assertEqual(samples[0].reference_rgb.shape, (48, 64, 3))
             self.assertEqual(len(samples[0].ground_truth), 1)
             self.assertEqual(samples[0].ground_truth[0].label, "car")
+
+    def test_coco_root_without_yaml_uses_coco_class_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "coco128"
+            image_dir = root / "images" / "train2017"
+            label_dir = root / "labels" / "train2017"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            rgb[8:16, 10:22, :] = 255
+            Image.fromarray(rgb).save(image_dir / "sample.jpg")
+            (label_dir / "sample.txt").write_text("0 0.5 0.5 0.25 0.25\n")
+
+            samples = load_yolo_detection_samples(
+                root,
+                split="train2017",
+                limit=1,
+                width=64,
+                height=48,
+                use_camerae2e=False,
+            )
+
+            self.assertEqual(len(samples), 1)
+            self.assertEqual(samples[0].ground_truth[0].label, "person")
+
+    def test_relative_root_without_yaml_does_not_duplicate_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "coco128"
+            image_dir = root / "images" / "train2017"
+            label_dir = root / "labels" / "train2017"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            Image.fromarray(rgb).save(image_dir / "sample.jpg")
+            (label_dir / "sample.txt").write_text("0 0.5 0.5 0.25 0.25\n")
+            previous = Path.cwd()
+            try:
+                os.chdir(tmp)
+                samples = load_yolo_detection_samples(
+                    Path("coco128"),
+                    split="train2017",
+                    limit=1,
+                    width=64,
+                    height=48,
+                    use_camerae2e=False,
+                )
+            finally:
+                os.chdir(previous)
+
+            self.assertEqual(len(samples), 1)
+            self.assertEqual(samples[0].metadata["image_path"].count("coco128"), 1)
 
 
 if __name__ == "__main__":

@@ -269,6 +269,7 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
         checkpoint = torch.load(self.checkpoint_path, map_location="cpu")
         if not isinstance(checkpoint, Mapping):
             raise ValueError("dense detector checkpoint must be a mapping")
+        self.box_encoding = str(checkpoint.get("box_encoding", "xyxy"))
         self.class_names = tuple(str(value) for value in checkpoint.get("class_names", ("object",))) or ("object",)
         grid_size = tuple(int(value) for value in checkpoint.get("grid_size", (15, 20)))
         base_channels = int(checkpoint.get("base_channels", 24))
@@ -300,10 +301,16 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
                 score = float(objectness[row, col] * class_scores[class_index, row, col])
                 if score < self.confidence:
                     continue
-                x1n, y1n, x2n, y2n = [float(value) for value in boxes[:, row, col]]
-                x1n, x2n = sorted((x1n, x2n))
-                y1n, y2n = sorted((y1n, y2n))
-                x1, y1, x2, y2 = x1n * cols, y1n * rows, x2n * cols, y2n * rows
+                x1, y1, x2, y2 = _decode_dense_box(
+                    boxes[:, row, col],
+                    row=row,
+                    col=col,
+                    grid_rows=grid_rows,
+                    grid_cols=grid_cols,
+                    image_rows=rows,
+                    image_cols=cols,
+                    encoding=self.box_encoding,
+                )
                 if x2 - x1 < 1.0 or y2 - y1 < 1.0:
                     continue
                 detections.append(
@@ -523,6 +530,37 @@ def _nms_detections(
         if not suppress:
             kept.append(detection)
     return tuple(kept)
+
+
+def _decode_dense_box(
+    values: Any,
+    *,
+    row: int,
+    col: int,
+    grid_rows: int,
+    grid_cols: int,
+    image_rows: int,
+    image_cols: int,
+    encoding: str,
+) -> Tuple[float, float, float, float]:
+    a, b, c, d = [float(value) for value in values]
+    if str(encoding) == "cell_center_size":
+        center_x = (float(col) + a) / max(float(grid_cols), 1.0)
+        center_y = (float(row) + b) / max(float(grid_rows), 1.0)
+        width = c
+        height = d
+        x1n, x2n = center_x - 0.5 * width, center_x + 0.5 * width
+        y1n, y2n = center_y - 0.5 * height, center_y + 0.5 * height
+    else:
+        x1n, y1n, x2n, y2n = a, b, c, d
+        x1n, x2n = sorted((x1n, x2n))
+        y1n, y2n = sorted((y1n, y2n))
+    return (
+        x1n * float(image_cols),
+        y1n * float(image_rows),
+        x2n * float(image_cols),
+        y2n * float(image_rows),
+    )
 
 
 def _road_roi(rows: int, cols: int) -> np.ndarray:
