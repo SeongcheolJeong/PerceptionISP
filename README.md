@@ -152,6 +152,7 @@ PYTHONPATH=src \
   --device auto \
   --grid 12x40 \
   --base-channels 16 \
+  --channel-mode rgb_aux \
   --eval-fraction 0.25 \
   --include-labels car,pedestrian,cyclist \
   --estimate-samples 128,1496,5985 \
@@ -161,6 +162,8 @@ PYTHONPATH=src \
 This compact dense detector is still a learning-path benchmark, not a
 claim-quality detector. The current KITTI 128 run trains quickly on MPS, but
 the direct detector metrics are weak and produce too many false positives.
+Use `--channel-mode rgb_only` or `--channel-mode aux_only` for ablations with
+the same six-channel model shape and zeroed input groups.
 
 Run the trained smoke checkpoint through the normal comparison harness:
 

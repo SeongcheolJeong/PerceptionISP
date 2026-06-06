@@ -9,7 +9,15 @@ from unittest import mock
 
 import numpy as np
 
-from perception_isp.aux_dnn import RGB_AUX_CHANNELS, build_rgb_aux_tensor, labels_from_manifest, make_aux_early_fusion_stem, make_torch_dataset
+from perception_isp.aux_dnn import (
+    RGB_AUX_CHANNELS,
+    apply_channel_mask,
+    build_rgb_aux_tensor,
+    channel_mask_for_mode,
+    labels_from_manifest,
+    make_aux_early_fusion_stem,
+    make_torch_dataset,
+)
 from perception_isp.aux_eval_dense import evaluate_dense_manifest
 from perception_isp.aux_export import _load_samples, export_aux_dataset
 from perception_isp.aux_train_dense import train_dense
@@ -30,6 +38,15 @@ class AuxDNNExportTest(unittest.TestCase):
         self.assertEqual(tuple(RGB_AUX_CHANNELS[:3]), ("rgb_r", "rgb_g", "rgb_b"))
         self.assertTrue(np.isfinite(hwc).all())
         self.assertGreater(float(np.mean(hwc[:, :, 3])), 0.0)
+
+    def test_channel_masks_zero_expected_groups(self) -> None:
+        tensor = np.ones((6, 2, 3), dtype=np.float32)
+        rgb_only = apply_channel_mask(tensor, channel_mask_for_mode("rgb_only"))
+        aux_only = apply_channel_mask(tensor, channel_mask_for_mode("aux_only"))
+        self.assertTrue(np.all(rgb_only[:3] == 1.0))
+        self.assertTrue(np.all(rgb_only[3:] == 0.0))
+        self.assertTrue(np.all(aux_only[:3] == 0.0))
+        self.assertTrue(np.all(aux_only[3:] == 1.0))
 
     def test_export_aux_dataset_writes_manifest_tensors_and_labels(self) -> None:
         samples = make_synthetic_evaluation_samples(count=2, width=64, height=48)
@@ -161,6 +178,7 @@ class AuxDNNExportTest(unittest.TestCase):
                 device_name="cpu",
                 grid_size=(4, 6),
                 base_channels=8,
+                channel_mode="aux_only",
                 eval_fraction=0.34,
                 include_labels=("car", "person"),
                 estimate_samples=(3, 30),
@@ -176,6 +194,8 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("checkpoint_loss", summary)
             self.assertIn("checkpoint_loss_kind", summary)
             self.assertEqual(summary["box_encoding"], "cell_center_size")
+            self.assertEqual(summary["channel_mode"], "aux_only")
+            self.assertEqual(summary["channel_mask"], [0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
             self.assertIn("train_class_names", summary)
             self.assertIn("eval_class_names", summary)
             self.assertIn("missing_eval_class_names", summary)
@@ -205,6 +225,7 @@ class AuxDNNExportTest(unittest.TestCase):
             )
             self.assertEqual(direct["sample_count"], len(summary["eval_indices"]))
             self.assertEqual(direct["eval_labels"], ["car", "person"])
+            self.assertEqual(direct["checkpoint_summary"]["channel_mode"], "aux_only")
             self.assertTrue(all(sample["gt_count"] == 2 for sample in direct["samples"]))
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())

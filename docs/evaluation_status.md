@@ -117,6 +117,9 @@ The compact RGB+aux dense detector then trained on MPS:
 | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: |
 | `dense` | 96 / 32 | 5 | 12x40 | 0.10 | 10.9 s | 44.0 | 1.0307 |
 | `dense_bg1` | 96 / 32 | 8 | 12x40 | 1.00 | 13.7 s | 56.0 | 1.6490 |
+| `rgb_aux_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 7.9 s | 60.7 | 1.0860 |
+| `rgb_only_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 8.2 s | 58.6 | 1.1785 |
+| `aux_only_ablation` | 96 / 32 | 5 | 12x40 | 0.15 | 8.1 s | 59.3 | 1.2003 |
 
 The timing answer is therefore favorable for this compact path: on this Mac
 with MPS, a 1,496-sample KITTI-val-sized run is estimated at about 2.8 minutes
@@ -130,6 +133,12 @@ However, the direct detector result is not useful yet:
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `dense` | 32 | 0.30 | 0.0084 | 0.1558 | 0.1380 | 90.6563 | 91.4375 |
 | `dense_bg1` | 32 | 0.30 | 0.0081 | 0.0990 | 0.0641 | 64.3750 | 64.8125 |
+| `rgb_aux_ablation` | 32 | 0.30 | 0.0081 | 0.1047 | 0.0167 | 68.6250 | 69.2188 |
+| `rgb_only_ablation` | 32 | 0.30 | 0.0089 | 0.0984 | 0.0312 | 59.8438 | 60.4688 |
+| `aux_only_ablation` | 32 | 0.30 | 0.0045 | 0.0767 | 0.0156 | 92.5938 | 93.0000 |
+| `rgb_aux_ablation` | 32 | 0.50 | 0.0114 | 0.0898 | 0.0167 | 48.7500 | 49.2812 |
+| `rgb_only_ablation` | 32 | 0.50 | 0.0118 | 0.0835 | 0.0312 | 40.2500 | 40.8125 |
+| `aux_only_ablation` | 32 | 0.50 | 0.0050 | 0.0767 | 0.0156 | 84.6250 | 85.0312 |
 
 Confidence sweeps from `0.30` to `0.98` did not produce a usable operating
 point. Raising confidence lowers FP but collapses recall. This is a concrete
@@ -138,6 +147,13 @@ training path and resource needs, but it is not enough for a HumanISP-vs-
 PerceptionISP superiority claim. A practical aux path should either fine-tune a
 real detector stem/head or train a detector-side calibration branch over the
 pretrained RGB detector proposals.
+
+The channel ablation sharpens the conclusion. The `rgb_aux` model gets the best
+eval loss and slightly higher R50 than `rgb_only`, but it does not improve the
+operating point because FP and precision remain worse. `aux_only` is clearly
+weaker. Therefore the current compact dense architecture is not a usable proof
+that auxiliary maps improve detector performance; it is only a fast engineering
+path for testing tensor export, training, checkpoint loading, and ablations.
 
 ## CameraE2E Resolution Finding
 

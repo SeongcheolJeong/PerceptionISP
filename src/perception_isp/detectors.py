@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
+from .aux_dnn import RGB_AUX_CHANNELS, apply_channel_mask
 from .eval_types import BoundingBox, Detection, DetectorResult
 
 
@@ -271,6 +272,8 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
             raise ValueError("dense detector checkpoint must be a mapping")
         self.box_encoding = str(checkpoint.get("box_encoding", "xyxy"))
         self.class_names = tuple(str(value) for value in checkpoint.get("class_names", ("object",))) or ("object",)
+        self.channel_mode = str(checkpoint.get("channel_mode", "rgb_aux"))
+        self.channel_mask = tuple(float(value) for value in checkpoint.get("channel_mask", (1.0,) * len(RGB_AUX_CHANNELS)))
         grid_size = tuple(int(value) for value in checkpoint.get("grid_size", (15, 20)))
         base_channels = int(checkpoint.get("base_channels", 24))
         self.model = make_aux_dense_detector_model(
@@ -287,7 +290,7 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
         tensor = _as_rgb_aux_chw(image)
         rows, cols = int(tensor.shape[1]), int(tensor.shape[2])
         with self.torch.no_grad():
-            x = self.torch.from_numpy(tensor[None, :, :, :]).to(self.device)
+            x = apply_channel_mask(self.torch.from_numpy(tensor[None, :, :, :]).to(self.device), self.channel_mask)
             pred = self.model(x)[0].detach().cpu()
             objectness = self.torch.sigmoid(pred[0]).numpy()
             boxes = self.torch.sigmoid(pred[1:5]).numpy()
@@ -329,6 +332,7 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
                             "checkpoint": self.checkpoint_path,
                             "uses_rgb_aux_tensor": True,
                             "class_trained": True,
+                            "channel_mode": self.channel_mode,
                             "grid_cell": [int(row), int(col)],
                             "objectness": float(objectness[row, col]),
                             "class_probability": float(class_scores[class_index, row, col]),

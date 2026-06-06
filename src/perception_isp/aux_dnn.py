@@ -19,6 +19,7 @@ RGB_AUX_CHANNELS = (
     "aux_saturation",
     "aux_reliability",
 )
+CHANNEL_MODES = ("rgb_aux", "rgb_only", "aux_only")
 
 
 def build_rgb_aux_tensor(
@@ -46,6 +47,51 @@ def build_rgb_aux_tensor(
     if normalized_layout == "chw":
         return np.transpose(tensor, (2, 0, 1))
     raise ValueError("layout must be 'hwc' or 'chw'")
+
+
+def normalize_channel_mode(value: str | None) -> str:
+    normalized = str(value or "rgb_aux").lower().replace("-", "_")
+    if normalized in {"all", "full", "rgbaux", "rgb_aux"}:
+        return "rgb_aux"
+    if normalized in {"rgb", "rgb_only"}:
+        return "rgb_only"
+    if normalized in {"aux", "aux_only"}:
+        return "aux_only"
+    raise ValueError(f"unsupported RGB+aux channel mode: {value!r}")
+
+
+def channel_mask_for_mode(value: str | None) -> Tuple[float, ...]:
+    mode = normalize_channel_mode(value)
+    if mode == "rgb_only":
+        return (1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
+    if mode == "aux_only":
+        return (0.0, 0.0, 0.0, 1.0, 1.0, 1.0)
+    return (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+
+
+def apply_channel_mask(tensor: Any, channel_mask: Sequence[float]):
+    mask_values = tuple(float(value) for value in channel_mask)
+    if len(mask_values) != len(RGB_AUX_CHANNELS):
+        raise ValueError("channel mask must have one value per RGB+aux channel")
+    if hasattr(tensor, "new_tensor"):
+        mask = tensor.new_tensor(mask_values)
+        if getattr(tensor, "ndim", 0) == 4:
+            return tensor * mask.view(1, -1, 1, 1)
+        if getattr(tensor, "ndim", 0) == 3:
+            return tensor * mask.view(-1, 1, 1)
+        raise ValueError("torch RGB+aux tensor must be CHW or NCHW")
+    arr = np.asarray(tensor, dtype=np.float32)
+    mask_np = np.asarray(mask_values, dtype=np.float32)
+    if arr.ndim == 4:
+        if arr.shape[1] != len(RGB_AUX_CHANNELS):
+            raise ValueError("numpy RGB+aux tensor must be NCHW")
+        return arr * mask_np.reshape(1, -1, 1, 1)
+    if arr.ndim == 3:
+        if arr.shape[0] == len(RGB_AUX_CHANNELS):
+            return arr * mask_np.reshape(-1, 1, 1)
+        if arr.shape[2] == len(RGB_AUX_CHANNELS):
+            return arr * mask_np.reshape(1, 1, -1)
+    raise ValueError("numpy RGB+aux tensor must be CHW, HWC, or NCHW")
 
 
 def boxes_xyxy_array(boxes: Sequence[BoundingBox]) -> np.ndarray:

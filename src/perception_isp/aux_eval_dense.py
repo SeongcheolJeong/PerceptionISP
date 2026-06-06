@@ -121,6 +121,8 @@ def evaluate_dense_manifest(
             "eval_sample_count": checkpoint_summary.get("eval_sample_count"),
             "split_strategy": checkpoint_summary.get("split_strategy"),
             "missing_eval_class_names": checkpoint_summary.get("missing_eval_class_names"),
+            "channel_mode": checkpoint.get("channel_mode") if isinstance(checkpoint, Mapping) else None,
+            "channel_mask": checkpoint.get("channel_mask") if isinstance(checkpoint, Mapping) else None,
         },
         "samples": sample_rows,
     }
@@ -249,6 +251,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <h1>PerceptionISP RGB+Aux Dense Eval</h1>
   <div class=\"note\">Direct tensor-manifest evaluation. CameraE2E and ISP are not recomputed in this report.</div>
   <p>Split: <code>{html_lib.escape(str(summary.get('split', '')))}</code>, samples: {int(summary.get('sample_count', 0))}, label agnostic: {bool(summary.get('label_agnostic', False))}.</p>
+  <p>Channel mode: <code>{html_lib.escape(str(summary.get('checkpoint_summary', {}).get('channel_mode') or 'rgb_aux'))}</code>.</p>
   <p>Eval labels: <code>{html_lib.escape(eval_labels or 'none')}</code>.</p>
   <p>Recall@0.50 mean: {float(aggregate.get('recall@0.50_mean', 0.0)):.3f}, precision@0.50 mean: {float(aggregate.get('precision@0.50_mean', 0.0)):.3f}, detections/sample: {float(aggregate.get('det_count_mean', 0.0)):.2f}.</p>
   <p>Missing eval classes from train: <code>{html_lib.escape(missing or 'none')}</code>.</p>
