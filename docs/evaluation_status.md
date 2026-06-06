@@ -436,6 +436,10 @@ metrics exactly. The full 1,496-sample apply report is useful to inspect the
 operating point across all available samples, but it includes training samples
 and should not be treated as held-out evidence.
 
+The normal comparison, ISP sweep, and resolution sweep CLIs now also accept
+`--proposal-calibration-model`, which applies the same artifact during the run
+instead of requiring a separate saved-report apply step.
+
 Applied report results:
 
 | Report split | Input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 | FP@0.50 | Detections/sample |

@@ -52,6 +52,43 @@ class ComparisonHarnessTest(unittest.TestCase):
         self.assertIn("fusion", fused.detections[0].metadata)
         self.assertGreater(fused.detections[0].metadata["fusion"]["aux_support"], 0.3)
 
+    def test_comparison_can_apply_proposal_calibration_artifact(self) -> None:
+        artifact = {
+            "model_type": "proposal_calibration_v1",
+            "input": "perception_fusion_rgb_aux",
+            "output_input": "perception_calibrated_fusion_rgb_aux",
+            "threshold": 0.0,
+            "feature_set": "score",
+            "feature_names": ["score"],
+            "train_gt_labels": ["car", "person", "traffic_light"],
+            "model": {
+                "feature_set": "score",
+                "feature_names": ["score"],
+                "weights": [0.0],
+                "bias": 0.0,
+                "mean": [0.0],
+                "std": [1.0],
+            },
+        }
+        samples = make_synthetic_evaluation_samples(count=1, width=96, height=64)
+        result = compare_dataset(samples, proposal_calibration_artifact=artifact)
+        self.assertIn("perception_calibrated_fusion_rgb_aux", result["aggregate"])
+        self.assertIn("perception_calibrated_fusion_rgb_aux", result["samples"][0]["metrics"])
+        detector_names = {item["input_name"] for item in result["samples"][0]["detectors"]}
+        self.assertIn("perception_calibrated_fusion_rgb_aux", detector_names)
+
+    def test_proposal_calibration_requires_fusion(self) -> None:
+        artifact = {
+            "model_type": "proposal_calibration_v1",
+            "input": "perception_fusion_rgb_aux",
+            "output_input": "perception_calibrated_fusion_rgb_aux",
+            "threshold": 0.0,
+            "model": {"feature_names": [], "weights": [], "bias": 0.0, "mean": [], "std": []},
+        }
+        samples = make_synthetic_evaluation_samples(count=1, width=96, height=64)
+        with self.assertRaises(ValueError):
+            compare_dataset(samples, include_fusion=False, proposal_calibration_artifact=artifact)
+
     def test_comparison_includes_reference_rgb_when_available(self) -> None:
         samples = list(make_synthetic_evaluation_samples(count=1, width=96, height=64))
         samples[0].reference_rgb = np.zeros((64, 96, 3), dtype=np.float64)

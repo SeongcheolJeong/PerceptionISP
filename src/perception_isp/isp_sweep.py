@@ -13,10 +13,18 @@ from .comparison import compare_dataset, write_comparison_report
 from .detectors import UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
 from .eval_cli import parse_label_map, remap_sample_labels
 from .eval_types import EvaluationSample
+from .proposal_calibration import load_proposal_calibration_artifact, proposal_calibration_run_config
 from .types import PerceptionISPConfig, json_ready
 
 
-TRACKED_INPUTS = ("reference_rgb", "human_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_aux_rgb")
+TRACKED_INPUTS = (
+    "reference_rgb",
+    "human_rgb",
+    "perception_rgb",
+    "perception_fusion_rgb_aux",
+    "perception_calibrated_fusion_rgb_aux",
+    "perception_aux_rgb",
+)
 TRACKED_METRICS = (
     "precision@0.50_mean",
     "recall@0.50_mean",
@@ -56,11 +64,14 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--ground-truth-label-map", default=None, help="Comma-separated src=dst labels, or preset 'kitti-coco'.")
     parser.add_argument("--no-visuals", action="store_true")
     parser.add_argument("--no-fusion", action="store_true")
+    parser.add_argument("--proposal-calibration-model", default=None, help="Optional proposal_calibration_model.json for calibrated RGB+Aux fusion.")
     parser.add_argument("--progress-interval", type=int, default=0)
     parser.add_argument("--load-progress-interval", type=int, default=0)
     parser.add_argument("--raw-cache-dir", default=None)
     parser.add_argument("--output-dir", default="reports/perception_isp_sweep")
     args = parser.parse_args(argv)
+    if args.proposal_calibration_model and bool(args.no_fusion):
+        raise ValueError("--proposal-calibration-model requires fusion; remove --no-fusion")
 
     samples = _load_samples(
         source=args.source,
@@ -94,6 +105,11 @@ def main(argv: Any = None) -> int:
         if args.rgb_aux_detector_checkpoint
         else None
     )
+    proposal_calibration_artifact = (
+        load_proposal_calibration_artifact(args.proposal_calibration_model)
+        if args.proposal_calibration_model
+        else None
+    )
     human_config = PerceptionISPConfig(
         tone_mapping=str(args.human_tone_mapping),
         denoise_strength=float(args.human_denoise_strength),
@@ -125,10 +141,13 @@ def main(argv: Any = None) -> int:
             label_agnostic=not bool(args.label_aware),
             include_images=not bool(args.no_visuals),
             include_fusion=not bool(args.no_fusion),
+            proposal_calibration_artifact=proposal_calibration_artifact,
             progress_interval=int(args.progress_interval),
             progress_label=f"isp-sweep:{run_index}/{len(configs)}:{run_id}",
         )
         result["run_config"] = _run_config(args, config, human_config, label_map, run_index, len(configs))
+        if proposal_calibration_artifact is not None:
+            result["run_config"]["proposal_calibration"] = proposal_calibration_run_config(proposal_calibration_artifact)
         report_path = write_comparison_report(result, run_dir)
         runs.append(summarize_run(result, report_path.relative_to(destination)))
 
@@ -228,11 +247,13 @@ def build_sweep_summary(
         "raw_cache_dir": args.raw_cache_dir,
         "label_agnostic": not bool(args.label_aware),
         "ground_truth_label_map": dict(label_map),
+        "proposal_calibration_model": getattr(args, "proposal_calibration_model", None),
         "human_baseline_config": _config_dict(human_config),
         "best": {
             "perception_rgb_by_delta_recall@0.50": _best_run(run_list, "perception_rgb", "recall@0.50_mean"),
             "perception_rgb_by_delta_small_recall@0.50": _best_run(run_list, "perception_rgb", "small_recall@0.50_mean"),
             "fusion_by_delta_recall@0.50": _best_run(run_list, "perception_fusion_rgb_aux", "recall@0.50_mean"),
+            "calibrated_fusion_by_delta_recall@0.50": _best_run(run_list, "perception_calibrated_fusion_rgb_aux", "recall@0.50_mean"),
         },
         "runs": run_list,
     }
@@ -320,6 +341,7 @@ def _run_config(
         "label_agnostic": not bool(args.label_aware),
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),
+        "proposal_calibration_model": getattr(args, "proposal_calibration_model", None),
         "load_progress_interval": int(args.load_progress_interval),
         "raw_cache_dir": args.raw_cache_dir,
         "ground_truth_label_map": dict(label_map),
@@ -381,6 +403,7 @@ def _render_sweep_html(summary: Mapping[str, Any]) -> str:
         delta = run.get("delta_vs_human", {})
         perception = metrics.get("perception_rgb", {})
         fusion = metrics.get("perception_fusion_rgb_aux", {})
+        calibrated = metrics.get("perception_calibrated_fusion_rgb_aux", {})
         human = metrics.get("human_rgb", {})
         reference = metrics.get("reference_rgb", {})
         config = run.get("perception_config", {})
@@ -397,6 +420,9 @@ def _render_sweep_html(summary: Mapping[str, Any]) -> str:
             f"<td class=\"{_delta_class(delta.get('perception_rgb', {}).get('small_recall@0.50_mean'))}\">{_fmt_delta(delta.get('perception_rgb', {}).get('small_recall@0.50_mean'))}</td>"
             f"<td>{_fmt(fusion.get('recall@0.50_mean'))}</td>"
             f"<td class=\"{_delta_class(delta.get('perception_fusion_rgb_aux', {}).get('recall@0.50_mean'))}\">{_fmt_delta(delta.get('perception_fusion_rgb_aux', {}).get('recall@0.50_mean'))}</td>"
+            f"<td>{_fmt(calibrated.get('precision@0.50_mean'))}</td>"
+            f"<td>{_fmt(calibrated.get('recall@0.50_mean'))}</td>"
+            f"<td class=\"{_delta_class(delta.get('perception_calibrated_fusion_rgb_aux', {}).get('recall@0.50_mean'))}\">{_fmt_delta(delta.get('perception_calibrated_fusion_rgb_aux', {}).get('recall@0.50_mean'))}</td>"
             f"<td>{_fmt(perception.get('det_count_mean'))}</td>"
             f"<td>{_fmt(perception.get('fp@0.50_mean'))}</td>"
             "</tr>"
@@ -436,7 +462,7 @@ def _render_sweep_html(summary: Mapping[str, Any]) -> str:
   <h2>Best Runs</h2>
   <ul>{''.join(best_items)}</ul>
   <table>
-    <thead><tr><th>Run</th><th>Perception Config</th><th>Reference R50</th><th>Human R50</th><th>Perception P50</th><th>Perception R50</th><th>Delta R50</th><th>Delta Small R50</th><th>Fusion R50</th><th>Fusion Delta R50</th><th>Det Count</th><th>FP50</th></tr></thead>
+    <thead><tr><th>Run</th><th>Perception Config</th><th>Reference R50</th><th>Human R50</th><th>Perception P50</th><th>Perception R50</th><th>Delta R50</th><th>Delta Small R50</th><th>Fusion R50</th><th>Fusion Delta R50</th><th>Calibrated P50</th><th>Calibrated R50</th><th>Calibrated Delta R50</th><th>Det Count</th><th>FP50</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
   <p>Raw JSON: <code>isp_sweep_summary.json</code></p>

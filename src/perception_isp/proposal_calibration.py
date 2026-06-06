@@ -264,6 +264,30 @@ def proposal_calibration_model_artifact(
     }
 
 
+def load_proposal_calibration_artifact(value: str | Path) -> Dict[str, Any]:
+    path = Path(value).expanduser()
+    if not path.exists():
+        raise FileNotFoundError(f"proposal calibration model not found: {path}")
+    artifact = json.loads(path.read_text())
+    if str(artifact.get("model_type", "")) != "proposal_calibration_v1":
+        raise ValueError(f"unsupported proposal calibration artifact: {path}")
+    artifact["_model_path"] = str(path)
+    return artifact
+
+
+def proposal_calibration_run_config(artifact: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "model_type": artifact.get("model_type"),
+        "model_path": artifact.get("_model_path"),
+        "selector": artifact.get("selector"),
+        "input": artifact.get("input"),
+        "output_input": artifact.get("output_input"),
+        "threshold": artifact.get("threshold"),
+        "feature_set": artifact.get("feature_set"),
+        "source_report": artifact.get("source_report"),
+    }
+
+
 def apply_proposal_calibration_to_report(
     report: Mapping[str, Any],
     artifact: Mapping[str, Any],
@@ -345,6 +369,54 @@ def apply_proposal_calibration_to_report(
     return result
 
 
+def calibrate_detector_result_for_sample(
+    sample: Any,
+    source_result: DetectorResult,
+    artifact: Mapping[str, Any],
+    *,
+    output_input_name: str | None = None,
+) -> DetectorResult:
+    """Apply a saved proposal calibration artifact during live comparison runs."""
+    if str(artifact.get("model_type", "")) != "proposal_calibration_v1":
+        raise ValueError("unsupported proposal calibration artifact")
+    input_name = str(artifact.get("input", source_result.input_name))
+    if input_name != str(source_result.input_name):
+        raise ValueError(f"proposal calibration expects input {input_name!r}, got {source_result.input_name!r}")
+    output_name = str(output_input_name or artifact.get("output_input", "perception_calibrated_fusion_rgb_aux"))
+    threshold = float(artifact.get("threshold", 0.0))
+    model = dict(artifact.get("model", {}))
+    feature_names = tuple(str(name) for name in artifact.get("feature_names") or model.get("feature_names", ()))
+    train_gt_labels = tuple(str(label) for label in artifact.get("train_gt_labels", ()))
+    sample_payload = _sample_payload_for_live_calibration(sample)
+    calibrated: List[Detection] = []
+    for detection in source_result.detections:
+        score = _predict_detection_score(
+            detection,
+            sample_payload,
+            model,
+            feature_names=feature_names,
+            train_gt_labels=train_gt_labels,
+        )
+        if score < threshold:
+            continue
+        metadata = dict(detection.metadata)
+        metadata["proposal_calibration"] = {
+            "source_input": input_name,
+            "source_score": float(detection.score),
+            "calibrated_score": float(score),
+            "threshold": threshold,
+            "feature_set": str(artifact.get("feature_set", model.get("feature_set", ""))),
+            "selector": str(artifact.get("selector", "")),
+        }
+        calibrated.append(Detection(detection.box, score=float(score), metadata=metadata))
+    return DetectorResult(
+        detector_name="proposal_calibration",
+        input_name=output_name,
+        detections=tuple(sorted(calibrated, key=lambda det: float(det.score), reverse=True)),
+        elapsed_ms=0.0,
+    )
+
+
 def split_sample_indices(
     samples: Sequence[Mapping[str, Any]],
     *,
@@ -383,6 +455,17 @@ def _summary_path(value: str | Path) -> Path:
     if not path.exists():
         raise FileNotFoundError(f"comparison summary not found: {path}")
     return path
+
+
+def _sample_payload_for_live_calibration(sample: Any) -> Dict[str, Any]:
+    if isinstance(sample, Mapping):
+        return dict(sample)
+    metadata = getattr(sample, "metadata", {})
+    ground_truth = getattr(sample, "ground_truth", ())
+    return {
+        "metadata": dict(metadata) if isinstance(metadata, Mapping) else {},
+        "ground_truth": [box.to_dict() if hasattr(box, "to_dict") else dict(box) for box in ground_truth],
+    }
 
 
 def _aggregate_original(

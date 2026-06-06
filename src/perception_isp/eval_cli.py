@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 from .comparison import compare_dataset, write_comparison_report
 from .detectors import UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
 from .eval_types import BoundingBox, EvaluationSample
+from .proposal_calibration import load_proposal_calibration_artifact, proposal_calibration_run_config
 from .synthetic_eval import make_camerae2e_synthetic_evaluation_samples, make_synthetic_evaluation_samples
 from .types import PerceptionISPConfig, json_ready
 
@@ -41,6 +42,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--label-aware", action="store_true", help="Require exact class labels during metric matching.")
     parser.add_argument("--no-visuals", action="store_true", help="Skip overlay PNG generation in the HTML report.")
     parser.add_argument("--no-fusion", action="store_true", help="Skip the Perception RGB+Aux fusion metric.")
+    parser.add_argument("--proposal-calibration-model", default=None, help="Optional proposal_calibration_model.json for calibrated RGB+Aux fusion.")
     parser.add_argument("--fusion-low-score-threshold", type=float, default=0.42, help="Suppress RGB detections below this score when aux support is weak.")
     parser.add_argument("--fusion-low-support-threshold", type=float, default=0.16, help="Weak aux support threshold for low-score RGB suppression.")
     parser.add_argument("--fusion-score-gain", type=float, default=0.08, help="Score gain for detections with strong aux support.")
@@ -50,6 +52,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--raw-cache-dir", default=None, help="Optional directory for cached dataset RAW samples.")
     parser.add_argument("--ground-truth-label-map", default=None, help="Comma-separated src=dst labels, or preset 'kitti-coco'.")
     args = parser.parse_args(argv)
+    if args.proposal_calibration_model and bool(args.no_fusion):
+        raise ValueError("--proposal-calibration-model requires fusion; remove --no-fusion")
 
     rgb_detector = (
         UltralyticsYOLODetector(str(args.rgb_detector_model), confidence=float(args.rgb_detector_confidence))
@@ -63,6 +67,11 @@ def main(argv: Any = None) -> int:
             confidence=args.rgb_aux_detector_confidence,
         )
         if args.rgb_aux_detector_checkpoint
+        else None
+    )
+    proposal_calibration_artifact = (
+        load_proposal_calibration_artifact(args.proposal_calibration_model)
+        if args.proposal_calibration_model
         else None
     )
 
@@ -156,6 +165,7 @@ def main(argv: Any = None) -> int:
         fusion_options=fusion_options,
         progress_interval=int(args.progress_interval),
         progress_label=f"{args.source}:{args.offset}+{args.count}",
+        proposal_calibration_artifact=proposal_calibration_artifact,
     )
     result["run_config"] = {
         "source": args.source,
@@ -178,6 +188,7 @@ def main(argv: Any = None) -> int:
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),
         "fusion_options": fusion_options,
+        "proposal_calibration_model": args.proposal_calibration_model,
         "progress_interval": int(args.progress_interval),
         "load_progress_interval": int(args.load_progress_interval),
         "raw_cache_dir": args.raw_cache_dir,
@@ -187,6 +198,8 @@ def main(argv: Any = None) -> int:
         "demosaic_method": str(args.demosaic_method),
         "demosaic_artifact_suppression": float(args.demosaic_artifact_suppression),
     }
+    if proposal_calibration_artifact is not None:
+        result["run_config"]["proposal_calibration"] = proposal_calibration_run_config(proposal_calibration_artifact)
     html_path = write_comparison_report(result, args.output_dir)
     print(json.dumps(json_ready({"report": str(html_path), "aggregate": result["aggregate"], "run_config": result["run_config"]}), indent=2))
     return 0

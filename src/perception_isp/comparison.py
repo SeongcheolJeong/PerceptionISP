@@ -17,6 +17,7 @@ from .detectors import AuxMapRiskDetector, DetectorAdapter, NumpyRiskObjectDetec
 from .eval_types import BoundingBox, DetectorResult, EvaluationSample, PipelineImageSet
 from .metrics import aggregate_metric_rows, evaluate_detections
 from .pipeline import PerceptionISPPipeline
+from .proposal_calibration import calibrate_detector_result_for_sample
 from .types import PerceptionISPConfig, json_ready
 
 
@@ -73,7 +74,10 @@ def compare_sample(
     include_images: bool = False,
     include_fusion: bool = True,
     fusion_options: Mapping[str, Any] | None = None,
+    proposal_calibration_artifact: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
+    if proposal_calibration_artifact is not None and not include_fusion:
+        raise ValueError("proposal calibration requires RGB+Aux fusion to be enabled")
     images = build_pipeline_images(sample, config=config, human_config=human_config)
     rgb_model = rgb_detector or NumpyRiskObjectDetector()
     aux_model = aux_detector or AuxMapRiskDetector()
@@ -85,15 +89,22 @@ def compare_sample(
     aux_result = aux_model.detect(images.perception_aux_rgb, input_name="perception_aux_rgb")
     detector_results.extend((human_result, perception_result))
     if include_fusion:
-        detector_results.append(
-            fuse_rgb_aux_results(
-                perception_result,
-                aux_result,
-                images.perception_aux_rgb,
-                input_name="perception_fusion_rgb_aux",
-                **dict(fusion_options or {}),
-            )
+        fusion_result = fuse_rgb_aux_results(
+            perception_result,
+            aux_result,
+            images.perception_aux_rgb,
+            input_name="perception_fusion_rgb_aux",
+            **dict(fusion_options or {}),
         )
+        detector_results.append(fusion_result)
+        if proposal_calibration_artifact is not None:
+            detector_results.append(
+                calibrate_detector_result_for_sample(
+                    sample,
+                    fusion_result,
+                    proposal_calibration_artifact,
+                )
+            )
     if rgb_aux_detector is not None:
         detector_results.append(
             rgb_aux_detector.detect(
@@ -129,6 +140,8 @@ def compare_sample(
         }
         if include_fusion:
             visuals["perception_fusion_rgb_aux"] = images.perception_rgb
+            if proposal_calibration_artifact is not None:
+                visuals["perception_calibrated_fusion_rgb_aux"] = images.perception_rgb
         if rgb_aux_detector is not None:
             visuals["perception_rgb_aux_dnn"] = images.perception_rgb
         if sample.reference_rgb is not None:
@@ -151,6 +164,7 @@ def compare_dataset(
     fusion_options: Mapping[str, Any] | None = None,
     progress_interval: int = 0,
     progress_label: str = "compare_dataset",
+    proposal_calibration_artifact: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     sample_results = []
     total = int(len(samples))
@@ -169,6 +183,7 @@ def compare_dataset(
                 include_images=include_images,
                 include_fusion=include_fusion,
                 fusion_options=fusion_options,
+                proposal_calibration_artifact=proposal_calibration_artifact,
             )
         )
         if interval and (sample_index == total or sample_index % interval == 0):
@@ -306,6 +321,7 @@ def _materialize_visual_assets(result: Mapping[str, Any], destination: Path) -> 
                 ("human_rgb", "HumanISP RGB"),
                 ("perception_rgb", "PerceptionISP RGB"),
                 ("perception_fusion_rgb_aux", "Perception RGB+Aux Fusion"),
+                ("perception_calibrated_fusion_rgb_aux", "Calibrated RGB+Aux Fusion"),
                 ("perception_rgb_aux_dnn", "Perception RGB+Aux DNN"),
                 ("perception_aux_rgb", "Perception Aux Maps"),
             ):
@@ -455,6 +471,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
             f"<td>{sample.get('metrics', {}).get('human_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_fusion_rgb_aux', {}).get('recall@0.50', 0.0):.3f}</td>"
+            f"<td>{sample.get('metrics', {}).get('perception_calibrated_fusion_rgb_aux', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_rgb_aux_dnn', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{sample.get('metrics', {}).get('perception_aux_rgb', {}).get('recall@0.50', 0.0):.3f}</td></tr>"
         )
@@ -525,7 +542,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
   </table>
   <h2>Samples</h2>
   <table>
-    <thead><tr><th>Sample</th><th>Source</th><th>GT</th><th>Human Recall@0.50</th><th>Perception RGB Recall@0.50</th><th>Fusion Recall@0.50</th><th>RGB+Aux DNN Recall@0.50</th><th>Aux Recall@0.50</th></tr></thead>
+    <thead><tr><th>Sample</th><th>Source</th><th>GT</th><th>Human Recall@0.50</th><th>Perception RGB Recall@0.50</th><th>Fusion Recall@0.50</th><th>Calibrated Fusion Recall@0.50</th><th>RGB+Aux DNN Recall@0.50</th><th>Aux Recall@0.50</th></tr></thead>
     <tbody>{''.join(sample_rows)}</tbody>
   </table>
   <h2>Class Breakdown</h2>
@@ -539,7 +556,7 @@ def _render_html(result: Mapping[str, Any]) -> str:
     <tbody>{area_rows if area_rows else '<tr><td colspan="6">No area breakdown available.</td></tr>'}</tbody>
   </table>
   <h2>Visual Evidence</h2>
-  <p>Green boxes are ground truth. Red boxes are detector outputs on each ISP image. The RGB+Aux Fusion view keeps RGB detector labels and uses aux-map support for conservative score/filtering. The RGB+Aux DNN view is only shown when a trained smoke checkpoint is supplied. The auxiliary preview uses edge, saturation, and reliability channels as RGB.</p>
+  <p>Green boxes are ground truth. Red boxes are detector outputs on each ISP image. The RGB+Aux Fusion view keeps RGB detector labels and uses aux-map support for conservative score/filtering. Calibrated RGB+Aux Fusion applies a saved proposal calibration model to those fused detections. The RGB+Aux DNN view is only shown when a trained smoke checkpoint is supplied. The auxiliary preview uses edge, saturation, and reliability channels as RGB.</p>
   {''.join(visual_sections) if visual_sections else '<p>No visual assets were captured for this run.</p>'}
   <p>Raw JSON: <code>comparison_summary.json</code></p>
 </body>
@@ -579,6 +596,8 @@ def _render_run_config_rows(run_config: Mapping[str, Any]) -> str:
         "aux_detector",
         "fusion",
         "fusion_options",
+        "proposal_calibration_model",
+        "proposal_calibration",
         "label_agnostic",
         "demosaic_method",
         "tone_mapping",

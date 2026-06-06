@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 
 from .comparison import compare_dataset, write_comparison_report
 from .detectors import detector_from_name
+from .proposal_calibration import load_proposal_calibration_artifact, proposal_calibration_run_config
 from .types import PerceptionISPConfig, json_ready
 
 
@@ -31,14 +32,22 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-camerae2e", action="store_true")
     parser.add_argument("--no-visuals", action="store_true")
     parser.add_argument("--no-fusion", action="store_true")
+    parser.add_argument("--proposal-calibration-model", default=None, help="Optional proposal_calibration_model.json for calibrated RGB+Aux fusion.")
     parser.add_argument("--load-progress-interval", type=int, default=0)
     parser.add_argument("--raw-cache-dir", default=None)
     parser.add_argument("--output-dir", default="reports/perception_resolution_sweep")
     args = parser.parse_args(argv)
+    if args.proposal_calibration_model and bool(args.no_fusion):
+        raise ValueError("--proposal-calibration-model requires fusion; remove --no-fusion")
 
     resolutions = parse_resolutions(args.resolutions)
     rgb_detector = detector_from_name(args.rgb_detector)
     aux_detector = detector_from_name(args.aux_detector)
+    proposal_calibration_artifact = (
+        load_proposal_calibration_artifact(args.proposal_calibration_model)
+        if args.proposal_calibration_model
+        else None
+    )
     config = PerceptionISPConfig(
         tone_mapping=args.tone_mapping,
         denoise_strength=float(args.denoise_strength),
@@ -71,6 +80,7 @@ def main(argv: Any = None) -> int:
             label_agnostic=not bool(args.label_aware),
             include_images=not bool(args.no_visuals),
             include_fusion=not bool(args.no_fusion),
+            proposal_calibration_artifact=proposal_calibration_artifact,
         )
         run_dir = destination / f"{width}x{height}"
         result["run_config"] = {
@@ -87,6 +97,7 @@ def main(argv: Any = None) -> int:
             "label_agnostic": not bool(args.label_aware),
             "visuals": not bool(args.no_visuals),
             "fusion": not bool(args.no_fusion),
+            "proposal_calibration_model": args.proposal_calibration_model,
             "load_progress_interval": int(args.load_progress_interval),
             "raw_cache_dir": args.raw_cache_dir,
             "tone_mapping": args.tone_mapping,
@@ -94,6 +105,8 @@ def main(argv: Any = None) -> int:
             "demosaic_method": str(args.demosaic_method),
             "demosaic_artifact_suppression": float(args.demosaic_artifact_suppression),
         }
+        if proposal_calibration_artifact is not None:
+            result["run_config"]["proposal_calibration"] = proposal_calibration_run_config(proposal_calibration_artifact)
         report_path = write_comparison_report(result, run_dir)
         runs.append(summarize_run(result, report_path.relative_to(destination)))
 
@@ -103,6 +116,7 @@ def main(argv: Any = None) -> int:
         "source": args.source,
         "split": args.split,
         "count": int(args.count),
+        "proposal_calibration_model": args.proposal_calibration_model,
         "runs": runs,
     }
     (destination / "sweep_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
@@ -145,7 +159,14 @@ def summarize_run(result: Mapping[str, Any], report_path: Path) -> Dict[str, Any
                 "mean_recall": float(aggregate.get(name, {}).get("mean_recall_mean", 0.0)),
                 "det_count": float(aggregate.get(name, {}).get("det_count_mean", 0.0)),
             }
-            for name in ("reference_rgb", "human_rgb", "perception_rgb", "perception_fusion_rgb_aux", "perception_aux_rgb")
+            for name in (
+                "reference_rgb",
+                "human_rgb",
+                "perception_rgb",
+                "perception_fusion_rgb_aux",
+                "perception_calibrated_fusion_rgb_aux",
+                "perception_aux_rgb",
+            )
             if name in aggregate
         },
         "raw_provenance": {
@@ -234,6 +255,8 @@ def _render_sweep_html(summary: Mapping[str, Any]) -> str:
             f"<td>{metrics.get('human_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{metrics.get('perception_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{metrics.get('perception_fusion_rgb_aux', {}).get('recall@0.50', 0.0):.3f}</td>"
+            f"<td>{metrics.get('perception_calibrated_fusion_rgb_aux', {}).get('precision@0.50', 0.0):.3f}</td>"
+            f"<td>{metrics.get('perception_calibrated_fusion_rgb_aux', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{metrics.get('perception_aux_rgb', {}).get('recall@0.50', 0.0):.3f}</td>"
             f"<td>{provenance.get('true_sensor_cfa_mosaic_count', 0)}/{provenance.get('sample_count', 0)}</td>"
             f"<td>{html_lib.escape(', '.join(provenance.get('source_patterns', ())))}</td>"
@@ -262,7 +285,7 @@ def _render_sweep_html(summary: Mapping[str, Any]) -> str:
   <h1>PerceptionISP Resolution Sweep</h1>
   <div class=\"note\">This report compares detector metrics across scene/sensor resolutions. For CameraE2E-backed evidence, True CFA and Native >= Target should equal sample count, and Remapped should normally be 0 when using sensor-native CFA.</div>
   <table>
-    <thead><tr><th>Resolution</th><th>Reference Recall@0.50</th><th>Human Recall@0.50</th><th>Perception Recall@0.50</th><th>Fusion Recall@0.50</th><th>Aux Recall@0.50</th><th>True CFA</th><th>Source CFA</th><th>Target CFA</th><th>Remapped</th><th>Native Exact</th><th>Native >= Target</th></tr></thead>
+    <thead><tr><th>Resolution</th><th>Reference Recall@0.50</th><th>Human Recall@0.50</th><th>Perception Recall@0.50</th><th>Fusion Recall@0.50</th><th>Calibrated Precision@0.50</th><th>Calibrated Recall@0.50</th><th>Aux Recall@0.50</th><th>True CFA</th><th>Source CFA</th><th>Target CFA</th><th>Remapped</th><th>Native Exact</th><th>Native >= Target</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
   <p>Raw JSON: <code>sweep_summary.json</code></p>

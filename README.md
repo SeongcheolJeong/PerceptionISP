@@ -535,4 +535,23 @@ Use `--split eval` for held-out evidence from the original calibration split.
 Use `--split all` only as an operational full-report application, because it
 includes samples used to fit the calibrator.
 
+The same model can also be applied during normal evaluation and sweep runs, so
+the generated comparison report contains `perception_calibrated_fusion_rgb_aux`
+without a separate post-process step:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --rgb-detector yolo \
+  --proposal-calibration-model reports/perception_proposal_calibration_kitti_val_1496_detector_log/proposal_calibration_model.json \
+  --output-dir reports/perception_compare_kitti_val_calibrated
+```
+
+`--proposal-calibration-model` requires fusion to stay enabled because the
+artifact is trained on `perception_fusion_rgb_aux` proposals.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
