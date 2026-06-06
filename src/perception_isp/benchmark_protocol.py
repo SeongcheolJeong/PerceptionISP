@@ -17,6 +17,7 @@ COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
+CONDITION_METRICS_SUMMARY = "condition_metrics_summary.json"
 
 HUMAN_INPUTS = {"human_rgb"}
 PERCEPTION_INPUTS = {
@@ -43,6 +44,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-rollup", default=None, help="training_rollup_summary.json path/dir.")
     parser.add_argument("--claim-gate", action="append", default=[], help="claim_gate_summary.json path/dir. Repeatable.")
     parser.add_argument("--task-metrics", default=None, help="task_metrics_summary.json path/dir.")
+    parser.add_argument("--condition-metrics", default=None, help="condition_metrics_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
     parser.add_argument("--output-dir", default="reports/perception_benchmark_protocol")
     args = parser.parse_args(argv)
@@ -53,6 +55,7 @@ def main(argv: Any = None) -> int:
         training_rollup=args.training_rollup,
         claim_gates=args.claim_gate,
         task_metrics=args.task_metrics,
+        condition_metrics=args.condition_metrics,
         min_samples=int(args.min_samples),
     )
     html_path = write_protocol_coverage(summary, args.output_dir)
@@ -81,6 +84,7 @@ def build_protocol_coverage(
     training_rollup: str | Path | None = None,
     claim_gates: Sequence[str | Path] = (),
     task_metrics: str | Path | None = None,
+    condition_metrics: str | Path | None = None,
     min_samples: int = 1000,
 ) -> Dict[str, Any]:
     evidence = _collect_evidence(
@@ -89,6 +93,7 @@ def build_protocol_coverage(
         training_rollup=training_rollup,
         claim_gates=claim_gates,
         task_metrics=task_metrics,
+        condition_metrics=condition_metrics,
     )
     requirements = _requirements(evidence, min_samples=int(min_samples))
     missing_required = [row["id"] for row in requirements if row["scope"] == "claim_required" and row["status"] != "covered"]
@@ -134,6 +139,7 @@ def _collect_evidence(
     training_rollup: str | Path | None,
     claim_gates: Sequence[str | Path],
     task_metrics: str | Path | None,
+    condition_metrics: str | Path | None,
 ) -> Dict[str, Any]:
     input_names: set[str] = set()
     run_configs: list[Dict[str, Any]] = []
@@ -172,6 +178,7 @@ def _collect_evidence(
     training = _load_training(training_rollup)
     gates = [_load_gate(path) for path in claim_gates]
     task = _load_task_metrics(task_metrics)
+    condition = _load_condition_metrics(condition_metrics)
 
     return {
         "comparison_reports": comparison_paths,
@@ -186,6 +193,7 @@ def _collect_evidence(
         "training": training,
         "claim_gates": gates,
         "task_metrics": task,
+        "condition_metrics": condition,
     }
 
 
@@ -196,6 +204,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     consistency = evidence.get("run_config_consistency", {}) if isinstance(evidence.get("run_config_consistency"), Mapping) else {}
     gates = evidence.get("claim_gates", ()) if isinstance(evidence.get("claim_gates", ()), Sequence) else ()
     task = evidence.get("task_metrics", {}) if isinstance(evidence.get("task_metrics"), Mapping) else {}
+    condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
 
     return [
         _row(
@@ -245,6 +254,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(task.get("available")),
             str(task.get("summary", "missing")),
             "Task-level groups are required before VRU/person/small-object claims.",
+        ),
+        _row(
+            "condition_metrics",
+            "Condition-specific metrics available",
+            "claim_required",
+            bool(condition.get("available")),
+            str(condition.get("summary", "missing")),
+            "Condition-specific metrics are required before broad RAW/sensor-native claims because aggregate averages can hide low-light, HDR, weather, or focus regressions.",
         ),
         _row(
             "naive_raw_baseline",
@@ -350,6 +367,24 @@ def _load_task_metrics(path: str | Path | None) -> Dict[str, Any]:
         "group_count": len(data.get("groups", ())),
         "label_agnostic": bool(data.get("label_agnostic", True)),
         "summary": f"{len(data.get('groups', ()))} groups, {'label agnostic' if bool(data.get('label_agnostic', True)) else 'label aware'}",
+    }
+
+
+def _load_condition_metrics(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "summary": "missing"}
+    summary_path = _summary_path(path, CONDITION_METRICS_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    conditions = [row for row in data.get("conditions", ()) if isinstance(row, Mapping)]
+    non_all = [row for row in conditions if str(row.get("name", "")) != "all"]
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "condition_count": len(conditions),
+        "non_all_condition_count": len(non_all),
+        "label_agnostic": bool(data.get("label_agnostic", True)),
+        "summary": f"{len(conditions)} condition slices, {len(non_all)} non-all, {'label agnostic' if bool(data.get('label_agnostic', True)) else 'label aware'}",
     }
 
 
@@ -510,6 +545,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     evidence = summary.get("evidence", {}) if isinstance(summary.get("evidence"), Mapping) else {}
     training = evidence.get("training", {}) if isinstance(evidence.get("training"), Mapping) else {}
     task = evidence.get("task_metrics", {}) if isinstance(evidence.get("task_metrics"), Mapping) else {}
+    condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -546,6 +582,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Claim gates</th><td>{html_lib.escape(_gate_outcome_text(summary.get('claim_gate_outcomes', {})))}</td></tr>
       <tr><th>Training</th><td>{_optional_link(training, destination)} {html_lib.escape(str(training.get('summary', 'missing')))}</td></tr>
       <tr><th>Task metrics</th><td>{_optional_link(task, destination)} {html_lib.escape(str(task.get('summary', 'missing')))}</td></tr>
+      <tr><th>Condition metrics</th><td>{_optional_link(condition, destination)} {html_lib.escape(str(condition.get('summary', 'missing')))}</td></tr>
     </tbody>
   </table>
   <p>Raw JSON: <code>protocol_coverage_summary.json</code></p>

@@ -11,6 +11,7 @@ from .aux_training_rollup import build_training_rollup, write_training_rollup
 from .benchmark_protocol import build_protocol_coverage, write_protocol_coverage
 from .claim_dashboard import build_claim_dashboard, write_claim_dashboard
 from .claim_gate import build_claim_gate, write_claim_gate
+from .condition_metrics import build_condition_metrics, write_condition_metrics
 from .task_metrics import build_task_metrics, write_task_metrics
 from .types import json_ready
 
@@ -123,6 +124,15 @@ def run_claim_readiness(
     )
     task_html = write_task_metrics(task_summary, task_metrics_dir)
 
+    condition_metrics_dir = destination / "condition_metrics"
+    condition_summary = build_condition_metrics(
+        report,
+        source_report=report_path,
+        baseline_input=str(human_baseline_input),
+        inputs=tuple(dict.fromkeys((str(human_baseline_input), str(fusion_baseline_input), str(target_input)))),
+    )
+    condition_html = write_condition_metrics(condition_summary, condition_metrics_dir)
+
     training_rollup_path = None
     if training_summaries:
         training_summary = build_training_rollup(training_summaries)
@@ -139,6 +149,7 @@ def run_claim_readiness(
         training_rollup=training_rollup_path,
         claim_gates=[broad_dir, fp_dir],
         task_metrics=task_metrics_dir,
+        condition_metrics=condition_metrics_dir,
         min_samples=int(min_samples),
     )
     protocol_html = write_protocol_coverage(protocol_summary, protocol_dir)
@@ -186,6 +197,11 @@ def run_claim_readiness(
         "task_metrics": {
             "report": str(task_html),
             "summary_json": str(task_html.parent / "task_metrics_summary.json"),
+        },
+        "condition_metrics": {
+            "report": str(condition_html),
+            "summary_json": str(condition_html.parent / "condition_metrics_summary.json"),
+            "condition_count": len(condition_summary.get("conditions", ())),
         },
         "benchmark_protocol": {
             "report": str(protocol_html),
@@ -242,6 +258,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "broad_superiority": summary.get("broad_superiority"),
         "fp_reducer": summary.get("fp_reducer"),
         "task_metrics": summary.get("task_metrics"),
+        "condition_metrics": summary.get("condition_metrics"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],

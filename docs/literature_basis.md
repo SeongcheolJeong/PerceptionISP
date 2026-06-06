@@ -33,7 +33,9 @@ include these rows under a fixed detector and training recipe:
    compression.
 4. Task-aware PerceptionISP or adapter path.
 5. RAW-domain adaptation or pretraining compared with sRGB-domain pretraining.
-6. Optional auxiliary-map variants, such as noise, saturation, HDR-source, or
+6. Condition-specific metrics for low light, HDR/glare, weather, visibility,
+   and other adverse slices.
+7. Optional auxiliary-map variants, such as noise, saturation, HDR-source, or
    demosaic-confidence channels.
 
 The current project now covers rows 1-4 at the software-reference level on

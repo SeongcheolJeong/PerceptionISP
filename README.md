@@ -866,9 +866,10 @@ The readiness bundle now writes
 `benchmark_protocol/index.html`. This checklist encodes the minimum evidence
 matrix from the RAW/perception-ISP literature: paired HumanISP and
 PerceptionISP streams, enough held-out samples, fixed detector recipe,
-CI-backed claim gates, task metrics, naive RAW/minimal adaptation, classical
-lightweight RAW transform, and a task-aware or aux-assisted path. Missing rows
-are blockers for broad HumanISP or RAW/sensor-native superiority claims.
+CI-backed claim gates, task metrics, condition-specific metrics, naive
+RAW/minimal adaptation, classical lightweight RAW transform, and a task-aware
+or aux-assisted path. Missing rows are blockers for broad HumanISP or
+RAW/sensor-native superiority claims.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -881,6 +882,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_broad_vs_human \
   --claim-gate reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
+  --condition-metrics reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -890,6 +892,7 @@ The latest extended-inclusive protocol report is:
 ```text
 reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
+reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 ```
 
 It marks `coverage_status=coverage_complete`, including the recommended

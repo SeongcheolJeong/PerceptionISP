@@ -18,12 +18,14 @@ class BenchmarkProtocolTest(unittest.TestCase):
             training = _write_training_rollup(root / "training")
             gate = _write_claim_gate(root / "gate")
             task = _write_task_metrics(root / "task")
+            condition = _write_condition_metrics(root / "condition")
 
             summary = build_protocol_coverage(
                 comparison_reports=[report],
                 training_rollup=training,
                 claim_gates=[gate],
                 task_metrics=task,
+                condition_metrics=condition,
                 min_samples=3,
             )
 
@@ -49,6 +51,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             training = _write_training_rollup(root / "training")
             gate = _write_claim_gate(root / "gate")
             task = _write_task_metrics(root / "task")
+            condition = _write_condition_metrics(root / "condition")
 
             summary = build_protocol_coverage(
                 comparison_reports=[classical, naive],
@@ -56,6 +59,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 training_rollup=training,
                 claim_gates=[gate],
                 task_metrics=task,
+                condition_metrics=condition,
                 min_samples=3,
             )
 
@@ -71,6 +75,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             root = Path(tmp)
             report = _write_comparison_report(root / "comparison", tone_mapping="log", demosaic_method="edge_aware")
             task = _write_task_metrics(root / "task")
+            condition = _write_condition_metrics(root / "condition")
             gate = _write_claim_gate(root / "gate")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -82,6 +87,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(gate),
                         "--task-metrics",
                         str(task),
+                        "--condition-metrics",
+                        str(condition),
                         "--min-samples",
                         "3",
                         "--output-dir",
@@ -170,6 +177,18 @@ def _write_task_metrics(path: Path) -> Path:
         "metrics": {},
     }
     (path / "task_metrics_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_condition_metrics(path: Path) -> Path:
+    path.mkdir()
+    payload = {
+        "inputs": ["human_rgb", "perception_fusion_rgb_aux"],
+        "conditions": [{"name": "all", "sample_count": 3}, {"name": "low_light_proxy", "sample_count": 1}],
+        "label_agnostic": False,
+        "metrics": {},
+    }
+    (path / "condition_metrics_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

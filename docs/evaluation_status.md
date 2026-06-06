@@ -226,11 +226,17 @@ It reports `coverage_status=coverage_complete` for evidence coverage, including
 the recommended `extended_sensor_native_tensor` row, while the metric side
 stays narrow as `metric_claim_status=fp_reducer_only`. That means the configured
 protocol has the expected rows, not that the target wins every metric. The
-corresponding dashboard keeps the decision narrow:
+protocol now also includes condition-specific metrics:
 
 ```text
+reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
 ```
+
+The current condition report has 9 slices from explicit/sample-derived
+metadata, including `low_light_proxy`, `low_visibility_proxy`,
+`glare_or_over_exposure_proxy`, `true_cfa_mosaic`, and `camerae2e_raw`.
+The corresponding dashboard keeps the decision narrow:
 
 It supports recall-budgeted FP reduction versus HumanISP, rejects broad
 HumanISP superiority, rejects VRU/person recall improvement, and marks the
@@ -485,6 +491,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
 | Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
 | Task-level VRU/person recall improvement | Not supported when task-metric recall deltas are negative; current evidence supports only the narrower FP-reduction claim |
+| Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
@@ -498,8 +505,9 @@ reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/protoc
 This protocol coverage is a blocker checklist, not a metric result. It checks
 whether the evidence includes the minimum matrix needed for broad claims:
 paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
-detector recipe, CI-backed gates, task metrics, naive RAW/minimal adaptation,
-classical lightweight RAW transform, and task-aware/aux-assisted paths.
+detector recipe, CI-backed gates, task metrics, condition-specific metrics,
+naive RAW/minimal adaptation, classical lightweight RAW transform, and
+task-aware/aux-assisted paths.
 
 The current naive RAW-like KITTI val baseline is:
 
