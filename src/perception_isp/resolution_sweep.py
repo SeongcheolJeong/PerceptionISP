@@ -31,6 +31,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-camerae2e", action="store_true")
     parser.add_argument("--no-visuals", action="store_true")
     parser.add_argument("--no-fusion", action="store_true")
+    parser.add_argument("--load-progress-interval", type=int, default=0)
     parser.add_argument("--output-dir", default="reports/perception_resolution_sweep")
     args = parser.parse_args(argv)
 
@@ -57,6 +58,8 @@ def main(argv: Any = None) -> int:
             height=height,
             cfa_pattern=args.cfa,
             use_camerae2e=not bool(args.no_camerae2e),
+            progress_interval=int(args.load_progress_interval),
+            progress_label=f"load:{args.source}:{width}x{height}",
         )
         result = compare_dataset(
             samples,
@@ -82,6 +85,7 @@ def main(argv: Any = None) -> int:
             "label_agnostic": not bool(args.label_aware),
             "visuals": not bool(args.no_visuals),
             "fusion": not bool(args.no_fusion),
+            "load_progress_interval": int(args.load_progress_interval),
             "tone_mapping": args.tone_mapping,
             "denoise_strength": float(args.denoise_strength),
             "demosaic_method": str(args.demosaic_method),
@@ -165,6 +169,8 @@ def _load_samples(
     height: int,
     cfa_pattern: str,
     use_camerae2e: bool,
+    progress_interval: int = 0,
+    progress_label: str = "load_resolution_sweep",
 ) -> Sequence[Any]:
     if source == "kitti-dataset":
         from .kitti_dataset import load_kitti_detection_samples
@@ -177,6 +183,8 @@ def _load_samples(
             height=height,
             cfa_pattern=cfa_pattern,
             use_camerae2e=use_camerae2e,
+            progress_interval=int(progress_interval),
+            progress_label=str(progress_label),
         )
     from .yolo_dataset import load_yolo_detection_samples
 
@@ -188,6 +196,8 @@ def _load_samples(
         height=height,
         cfa_pattern=cfa_pattern,
         use_camerae2e=use_camerae2e,
+        progress_interval=int(progress_interval),
+        progress_label=str(progress_label),
     )
 
 

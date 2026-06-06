@@ -368,11 +368,41 @@ PYTHONPATH=src \
   --ground-truth-label-map kitti-coco \
   --no-visuals \
   --progress-interval 374 \
+  --load-progress-interval 374 \
   --output-dir reports/perception_yolo_kitti_val_1496_camerae2e_fusion
 ```
 
 The `kitti-coco` label map is required because YOLO11n emits COCO labels such
 as `person` and `bicycle`, while KITTI labels use `pedestrian`, `cyclist`, and
 `van`.
+
+Before spending time on full KITTI reruns, sweep the PerceptionISP image
+formation settings against a fixed HumanISP baseline:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.isp_sweep \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 64 \
+  --width 640 --height 192 \
+  --cfa auto \
+  --rgb-detector yolo \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --load-progress-interval 16 \
+  --tone-mappings log,srgb,linear \
+  --denoise-strengths 0.0,0.18,0.30 \
+  --demosaic-methods edge_aware \
+  --demosaic-artifact-suppressions 0.20 \
+  --output-dir reports/perception_isp_sweep_kitti_val_64
+```
+
+The sweep report keeps the HumanISP baseline fixed while PerceptionISP settings
+change, then ranks configs by delta recall against HumanISP. Treat the best
+subset result as a candidate, then rerun it on the full validation set.
 
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.

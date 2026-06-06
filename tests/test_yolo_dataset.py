@@ -3,6 +3,8 @@ from __future__ import annotations
 import tempfile
 import unittest
 import os
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -40,6 +42,36 @@ class YoloDatasetAdapterTest(unittest.TestCase):
             self.assertEqual(samples[0].reference_rgb.shape, (48, 64, 3))
             self.assertEqual(len(samples[0].ground_truth), 1)
             self.assertEqual(samples[0].ground_truth[0].label, "car")
+
+    def test_load_progress_interval_writes_status_to_stderr(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image_dir = root / "images" / "val"
+            label_dir = root / "labels" / "val"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            for index in range(2):
+                Image.fromarray(rgb).save(image_dir / f"sample_{index}.jpg")
+                (label_dir / f"sample_{index}.txt").write_text("0 0.5 0.5 0.25 0.25\n")
+            (root / "data.yaml").write_text("path: .\nval: images/val\nnames: ['car']\n")
+
+            stream = StringIO()
+            with redirect_stderr(stream):
+                samples = load_yolo_detection_samples(
+                    root / "data.yaml",
+                    split="val",
+                    limit=2,
+                    width=64,
+                    height=48,
+                    use_camerae2e=False,
+                    progress_interval=1,
+                    progress_label="unit-load",
+                )
+
+            self.assertEqual(len(samples), 2)
+            self.assertIn("[unit-load] loaded 1/2 samples", stream.getvalue())
+            self.assertIn("[unit-load] loaded 2/2 samples", stream.getvalue())
 
     def test_coco_root_without_yaml_uses_coco_class_names(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

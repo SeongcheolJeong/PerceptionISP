@@ -7,10 +7,11 @@ from io import StringIO
 
 import numpy as np
 
-from perception_isp.comparison import compare_dataset, write_comparison_report
+from perception_isp.comparison import build_pipeline_images, compare_dataset, write_comparison_report
 from perception_isp.detectors import fuse_rgb_aux_results
 from perception_isp.eval_types import BoundingBox, Detection, DetectorResult
 from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
+from perception_isp.types import PerceptionISPConfig
 
 
 class ComparisonHarnessTest(unittest.TestCase):
@@ -57,6 +58,16 @@ class ComparisonHarnessTest(unittest.TestCase):
         result = compare_dataset(samples)
         self.assertIn("reference_rgb", result["aggregate"])
         self.assertIn("reference_rgb", result["samples"][0]["metrics"])
+
+    def test_build_pipeline_images_can_keep_human_baseline_config_separate(self) -> None:
+        sample = make_synthetic_evaluation_samples(count=1, width=96, height=64)[0]
+        images = build_pipeline_images(
+            sample,
+            config=PerceptionISPConfig(tone_mapping="linear", denoise_strength=0.0),
+            human_config=PerceptionISPConfig(tone_mapping="log", denoise_strength=0.18),
+        )
+        self.assertEqual(images.metadata["processing"]["tone_mapping"], "linear")
+        self.assertEqual(images.human_metadata["processing"]["tone_mapping"], "log")
 
     def test_progress_interval_writes_status_to_stderr(self) -> None:
         samples = make_synthetic_evaluation_samples(count=2, width=48, height=32)

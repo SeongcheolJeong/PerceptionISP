@@ -16,6 +16,8 @@ Labels are expected as ``class cx cy width height`` in normalized YOLO format.
 
 from __future__ import annotations
 
+import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -40,6 +42,8 @@ def load_yolo_detection_samples(
     height: int = 240,
     cfa_pattern: str = "auto",
     use_camerae2e: bool = True,
+    progress_interval: int = 0,
+    progress_label: str = "load_yolo_detection_samples",
 ) -> Tuple[EvaluationSample, ...]:
     """Load a YOLO-format detection dataset as PerceptionISP samples."""
 
@@ -60,6 +64,9 @@ def load_yolo_detection_samples(
         image_paths = image_paths[: max(int(limit), 0)]
 
     samples: List[EvaluationSample] = []
+    total = int(len(image_paths))
+    interval = max(int(progress_interval), 0)
+    started = time.perf_counter()
     for index, image_path in enumerate(image_paths):
         rgb, original_size = _load_rgb(image_path, width=int(width), height=int(height))
         label_path = _label_path_for_image(label_dir, image_dir, image_path)
@@ -100,7 +107,22 @@ def load_yolo_detection_samples(
                 reference_rgb=rgb,
             )
         )
+        sample_index = index + 1
+        if interval and (sample_index == total or sample_index % interval == 0):
+            _print_load_progress(str(progress_label), sample_index, total, started)
     return tuple(samples)
+
+
+def _print_load_progress(label: str, sample_index: int, total: int, started: float) -> None:
+    elapsed = max(time.perf_counter() - float(started), 1.0e-9)
+    rate = float(sample_index / elapsed)
+    remaining = float((int(total) - int(sample_index)) / max(rate, 1.0e-12))
+    print(
+        f"[{label}] loaded {sample_index}/{total} samples "
+        f"elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={remaining:.1f}s",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _resolve_dataset(dataset: str | Path) -> Tuple[Path, Dict[str, Any]]:

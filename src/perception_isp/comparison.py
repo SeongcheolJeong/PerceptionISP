@@ -25,9 +25,15 @@ PIPELINE_INPUT_NAMES = ("human_rgb", "perception_rgb", "perception_aux_rgb")
 AREA_BUCKETS = ("small", "medium", "large")
 
 
-def build_pipeline_images(sample: EvaluationSample, config: PerceptionISPConfig | None = None) -> PipelineImageSet:
+def build_pipeline_images(
+    sample: EvaluationSample,
+    config: PerceptionISPConfig | None = None,
+    *,
+    human_config: PerceptionISPConfig | None = None,
+) -> PipelineImageSet:
     result = PerceptionISPPipeline(config=config).run(sample.raw)
-    human = result.human_rgb if result.human_rgb is not None else result.vision_rgb
+    human_result = result if human_config is None else PerceptionISPPipeline(config=human_config).run(sample.raw)
+    human = human_result.human_rgb if human_result.human_rgb is not None else human_result.vision_rgb
     aux_rgb = np.stack(
         [
             np.asarray(result.maps["edge_strength"], dtype=np.float64),
@@ -43,6 +49,7 @@ def build_pipeline_images(sample: EvaluationSample, config: PerceptionISPConfig 
         perception_aux_rgb=np.asarray(aux_rgb, dtype=np.float64),
         fast_tensor_preview=fast_preview,
         metadata=result.metadata,
+        human_metadata=human_result.metadata,
     )
 
 
@@ -53,12 +60,13 @@ def compare_sample(
     aux_detector: DetectorAdapter | None = None,
     rgb_aux_detector: DetectorAdapter | None = None,
     config: PerceptionISPConfig | None = None,
+    human_config: PerceptionISPConfig | None = None,
     label_agnostic: bool = True,
     include_images: bool = False,
     include_fusion: bool = True,
     fusion_options: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    images = build_pipeline_images(sample, config=config)
+    images = build_pipeline_images(sample, config=config, human_config=human_config)
     rgb_model = rgb_detector or NumpyRiskObjectDetector()
     aux_model = aux_detector or AuxMapRiskDetector()
     detector_results = []
@@ -99,6 +107,7 @@ def compare_sample(
         "ground_truth": [box.to_dict() for box in sample.ground_truth],
         "metadata": dict(sample.metadata),
         "isp_metadata": images.metadata,
+        "human_isp_metadata": images.human_metadata,
         "detectors": [item.to_dict() for item in detector_results],
         "metrics": metric_rows,
         "breakdown": _sample_breakdown(detector_results, sample.ground_truth, label_agnostic=label_agnostic),
@@ -127,6 +136,7 @@ def compare_dataset(
     aux_detector: DetectorAdapter | None = None,
     rgb_aux_detector: DetectorAdapter | None = None,
     config: PerceptionISPConfig | None = None,
+    human_config: PerceptionISPConfig | None = None,
     label_agnostic: bool = True,
     include_images: bool = False,
     include_fusion: bool = True,
@@ -146,6 +156,7 @@ def compare_dataset(
                 aux_detector=aux_detector,
                 rgb_aux_detector=rgb_aux_detector,
                 config=config,
+                human_config=human_config,
                 label_agnostic=label_agnostic,
                 include_images=include_images,
                 include_fusion=include_fusion,

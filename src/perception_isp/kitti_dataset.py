@@ -23,6 +23,8 @@ KITTI labels are expected in the native object-detection text format:
 
 from __future__ import annotations
 
+import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
@@ -58,6 +60,8 @@ def load_kitti_detection_samples(
     cfa_pattern: str = "auto",
     use_camerae2e: bool = True,
     include_dontcare: bool = False,
+    progress_interval: int = 0,
+    progress_label: str = "load_kitti_detection_samples",
 ) -> Tuple[EvaluationSample, ...]:
     """Load KITTI object-detection labels as PerceptionISP samples."""
 
@@ -71,6 +75,9 @@ def load_kitti_detection_samples(
         image_paths = image_paths[: max(int(limit), 0)]
 
     samples: List[EvaluationSample] = []
+    total = int(len(image_paths))
+    interval = max(int(progress_interval), 0)
+    started = time.perf_counter()
     for index, image_path in enumerate(image_paths):
         rgb, original_size = _load_rgb(image_path, width=int(width), height=int(height))
         label_path = (label_dir / image_path.relative_to(image_dir)).with_suffix(".txt")
@@ -117,7 +124,22 @@ def load_kitti_detection_samples(
                 reference_rgb=rgb,
             )
         )
+        sample_index = index + 1
+        if interval and (sample_index == total or sample_index % interval == 0):
+            _print_load_progress(str(progress_label), sample_index, total, started)
     return tuple(samples)
+
+
+def _print_load_progress(label: str, sample_index: int, total: int, started: float) -> None:
+    elapsed = max(time.perf_counter() - float(started), 1.0e-9)
+    rate = float(sample_index / elapsed)
+    remaining = float((int(total) - int(sample_index)) / max(rate, 1.0e-12))
+    print(
+        f"[{label}] loaded {sample_index}/{total} samples "
+        f"elapsed={elapsed:.1f}s rate={rate:.2f}/s eta={remaining:.1f}s",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _resolve_kitti_dirs(root: Path, split: str) -> Tuple[Path, Path]:

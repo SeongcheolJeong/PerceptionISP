@@ -277,6 +277,40 @@ reports/perception_yolo_kitti_val_1496_camerae2e_fusion/index.html
 reports/perception_yolo_coco_kitti_rollup/index.html
 ```
 
+## KITTI ISP Tuning Sweep
+
+The first KITTI tuning pass keeps the HumanISP baseline fixed at the default
+evaluation config, then sweeps only PerceptionISP image formation settings. This
+avoids a misleading comparison where both HumanISP and PerceptionISP move when
+the same runtime config changes.
+
+KITTI val 64-sample sweep:
+
+```text
+reports/perception_isp_sweep_kitti_val_64/index.html
+```
+
+Sweep grid:
+
+```text
+tone_mapping: log, srgb, linear
+denoise_strength: 0.0, 0.18, 0.30
+demosaic_method: edge_aware
+demosaic_artifact_suppression: 0.20
+```
+
+Best Perception RGB candidate on this small subset:
+
+| Candidate | Human Recall@0.50 | Perception Recall@0.50 | Delta Recall@0.50 | Delta Precision@0.50 | Delta Recall@0.75 | Delta Small Recall@0.50 | Delta FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `tone=srgb`, `denoise=0.30`, `edge_aware`, `artifact=0.20` | 0.4749 | 0.4865 | +0.0116 | +0.0270 | -0.0064 | +0.0221 | -0.1563 |
+
+This is a useful tuning signal, not a performance claim. The same candidate
+needs a 512-sample and full-val rerun. A 512-sample attempt exposed a tooling
+problem: dataset loading creates all CameraE2E RAW samples before compare
+progress starts, so long runs can appear stalled. The loaders and CLIs now have
+`--load-progress-interval` to make the raw-preparation phase visible.
+
 ## Required Before Performance Claims
 
 Use a real labeled driving dataset subset and report at least:
