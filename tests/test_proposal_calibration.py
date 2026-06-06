@@ -15,6 +15,7 @@ from perception_isp.proposal_calibration import (
     split_sample_indices,
     write_proposal_calibration,
 )
+from perception_isp.proposal_calibration_apply import main as proposal_calibration_apply_main
 
 
 class ProposalCalibrationTest(unittest.TestCase):
@@ -206,6 +207,66 @@ class ProposalCalibrationTest(unittest.TestCase):
             self.assertTrue((output_dir / "proposal_calibration_model_score_label.json").exists())
             self.assertTrue((output_dir / "proposal_calibration_model_score_label_aux.json").exists())
             self.assertEqual(len(printed["feature_model_json"]), 2)
+
+    def test_apply_cli_handles_multiple_models_and_rollup(self) -> None:
+        report = {
+            "sample_count": 4,
+            "run_config": {"label_agnostic": False, "source": "unit", "count": 4},
+            "samples": [_sample(index) for index in range(4)],
+        }
+        summary = build_proposal_calibration(
+            report,
+            input_name="perception_fusion_rgb_aux",
+            feature_sets=("score_label", "score_label_aux"),
+            thresholds=(0.50,),
+            baseline_input="human_rgb",
+            train_fraction=0.5,
+            split_strategy="sequential",
+            epochs=20,
+            learning_rate=0.05,
+            l2=0.0,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "comparison_summary.json"
+            calibration_dir = root / "calibration"
+            apply_dir = root / "applied"
+            rollup_dir = root / "rollup"
+            report_path.write_text(json.dumps(report) + "\n")
+            write_proposal_calibration(
+                summary,
+                calibration_dir,
+                feature_artifact_sets=("score_label", "score_label_aux"),
+            )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = proposal_calibration_apply_main(
+                    [
+                        str(report_path),
+                        "--model",
+                        str(calibration_dir / "proposal_calibration_model_score_label.json"),
+                        "--model",
+                        str(calibration_dir / "proposal_calibration_model_score_label_aux.json"),
+                        "--output-dir",
+                        str(apply_dir),
+                        "--rollup-output-dir",
+                        str(rollup_dir),
+                        "--include-source-report-in-rollup",
+                    ]
+                )
+            printed = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(printed["report_count"], 2)
+            first_aggregate = printed["reports"][0]["aggregate"]
+            self.assertIn("perception_calibrated_score_label_fusion_rgb_aux", first_aggregate)
+            calibrated_metrics = first_aggregate["perception_calibrated_score_label_fusion_rgb_aux"]
+            self.assertIn("precision@0.50_mean", calibrated_metrics)
+            self.assertNotIn("precision@0.50_min", calibrated_metrics)
+            self.assertTrue((apply_dir / "score_label" / "comparison_summary.json").exists())
+            self.assertTrue((apply_dir / "score_label_aux" / "comparison_summary.json").exists())
+            rollup = json.loads((rollup_dir / "rollup_summary.json").read_text())
+            self.assertEqual(rollup["run_count"], 3)
+            self.assertEqual(printed["rollup"], str(rollup_dir / "index.html"))
 
     def test_model_artifact_can_select_feature_set_and_threshold(self) -> None:
         summary = {

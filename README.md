@@ -549,6 +549,22 @@ PYTHONPATH=src \
   --output-dir reports/perception_calibrated_fusion_kitti_val_1496_detector_log_eval
 ```
 
+Apply several feature-specific artifacts and generate a rollup in one pass:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.proposal_calibration_apply \
+  reports/perception_compare_kitti_val_1496_detector_log_calibrated_harness \
+  --model reports/perception_proposal_calibration_kitti_train512_detector_log/proposal_calibration_model_score_aux.json \
+  --model reports/perception_proposal_calibration_kitti_train512_detector_log/proposal_calibration_model_score_label.json \
+  --model reports/perception_proposal_calibration_kitti_train512_detector_log/proposal_calibration_model_score_label_aux.json \
+  --split all \
+  --output-dir reports/perception_calibrated_fusion_kitti_train512_to_val1496_features \
+  --rollup-output-dir reports/perception_train512_calibration_feature_ablation_rollup \
+  --include-source-report-in-rollup
+```
+
 Use `--split eval` for held-out evidence from the original calibration split.
 Use `--split all` only as an operational full-report application, because it
 includes samples used to fit the calibrator.
