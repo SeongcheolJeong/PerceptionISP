@@ -92,6 +92,53 @@ class YoloDatasetAdapterTest(unittest.TestCase):
             self.assertEqual(len(samples), 1)
             self.assertEqual(samples[0].metadata["image_path"].count("coco128"), 1)
 
+    def test_data_yaml_inside_named_root_does_not_duplicate_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "kitti"
+            image_dir = root / "images" / "val"
+            label_dir = root / "labels" / "val"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            Image.fromarray(rgb).save(image_dir / "sample.jpg")
+            (label_dir / "sample.txt").write_text("0 0.5 0.5 0.25 0.25\n")
+            (root / "data.yaml").write_text("path: kitti\nval: images/val\nnames: ['car']\n")
+
+            samples = load_yolo_detection_samples(
+                root / "data.yaml",
+                split="val",
+                limit=1,
+                width=64,
+                height=48,
+                use_camerae2e=False,
+            )
+
+            self.assertEqual(len(samples), 1)
+            self.assertNotIn("kitti/kitti", samples[0].metadata["image_path"])
+
+    def test_kitti_root_without_yaml_names_uses_kitti_class_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "kitti"
+            image_dir = root / "images" / "val"
+            label_dir = root / "labels" / "val"
+            image_dir.mkdir(parents=True)
+            label_dir.mkdir(parents=True)
+            rgb = np.zeros((24, 32, 3), dtype=np.uint8)
+            Image.fromarray(rgb).save(image_dir / "sample.jpg")
+            (label_dir / "sample.txt").write_text("3 0.5 0.5 0.25 0.25\n")
+
+            samples = load_yolo_detection_samples(
+                root,
+                split="val",
+                limit=1,
+                width=64,
+                height=48,
+                use_camerae2e=False,
+            )
+
+            self.assertEqual(len(samples), 1)
+            self.assertEqual(samples[0].ground_truth[0].label, "pedestrian")
+
     def test_offset_skips_images_before_limit(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

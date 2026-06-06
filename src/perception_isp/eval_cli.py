@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from .comparison import compare_dataset, write_comparison_report
 from .detectors import UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
+from .eval_types import BoundingBox, EvaluationSample
 from .synthetic_eval import make_camerae2e_synthetic_evaluation_samples, make_synthetic_evaluation_samples
 from .types import PerceptionISPConfig, json_ready
 
@@ -44,6 +46,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--fusion-score-gain", type=float, default=0.08, help="Score gain for detections with strong aux support.")
     parser.add_argument("--fusion-score-penalty", type=float, default=0.06, help="Score penalty for low-score detections with weak aux support.")
     parser.add_argument("--progress-interval", type=int, default=0, help="Print progress every N samples to stderr; 0 disables progress logging.")
+    parser.add_argument("--ground-truth-label-map", default=None, help="Comma-separated src=dst labels, or preset 'kitti-coco'.")
     args = parser.parse_args(argv)
 
     rgb_detector = (
@@ -117,6 +120,9 @@ def main(argv: Any = None) -> int:
             height=args.height,
             cfa_pattern=args.cfa,
         )
+    label_map = parse_label_map(args.ground_truth_label_map)
+    if label_map:
+        samples = remap_sample_labels(samples, label_map)
 
     config = PerceptionISPConfig(
         tone_mapping=args.tone_mapping,
@@ -165,6 +171,7 @@ def main(argv: Any = None) -> int:
         "fusion": not bool(args.no_fusion),
         "fusion_options": fusion_options,
         "progress_interval": int(args.progress_interval),
+        "ground_truth_label_map": label_map,
         "tone_mapping": args.tone_mapping,
         "denoise_strength": float(args.denoise_strength),
         "demosaic_method": str(args.demosaic_method),
@@ -173,6 +180,53 @@ def main(argv: Any = None) -> int:
     html_path = write_comparison_report(result, args.output_dir)
     print(json.dumps(json_ready({"report": str(html_path), "aggregate": result["aggregate"], "run_config": result["run_config"]}), indent=2))
     return 0
+
+
+def parse_label_map(value: str | None) -> dict[str, str]:
+    if value is None or not str(value).strip():
+        return {}
+    normalized = str(value).strip()
+    if normalized.lower().replace("_", "-") in {"kitti-coco", "kitti-to-coco"}:
+        return {
+            "car": "car",
+            "van": "car",
+            "truck": "truck",
+            "pedestrian": "person",
+            "person_sitting": "person",
+            "Person_sitting": "person",
+            "cyclist": "bicycle",
+            "tram": "train",
+        }
+    mapping: dict[str, str] = {}
+    for token in normalized.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "=" not in token:
+            raise ValueError("label map entries must be formatted as src=dst")
+        source, target = (part.strip() for part in token.split("=", 1))
+        if not source or not target:
+            raise ValueError("label map entries must have non-empty src and dst labels")
+        mapping[source] = target
+    return mapping
+
+
+def remap_sample_labels(samples: Sequence[EvaluationSample], label_map: Mapping[str, str]) -> tuple[EvaluationSample, ...]:
+    if not label_map:
+        return tuple(samples)
+    remapped = []
+    for sample in samples:
+        boxes = []
+        changed = 0
+        for box in sample.ground_truth:
+            label = str(label_map.get(box.label, box.label))
+            changed += int(label != box.label)
+            boxes.append(BoundingBox(box.xyxy, label=label))
+        metadata = dict(sample.metadata)
+        metadata["ground_truth_label_map"] = dict(label_map)
+        metadata["ground_truth_label_remapped_count"] = int(changed)
+        remapped.append(replace(sample, ground_truth=tuple(boxes), metadata=metadata))
+    return tuple(remapped)
 
 
 if __name__ == "__main__":

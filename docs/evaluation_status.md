@@ -225,6 +225,58 @@ sharded with `--offset`, monitored with `--progress-interval`, and merged with
 verified against the 1k report and reproduced the original aggregate metrics
 exactly.
 
+## KITTI Driving Evidence
+
+KITTI is a more relevant driving dataset than COCO, but the pretrained YOLO11n
+detector is trained on COCO labels. For label-aware metrics, the evaluation must
+map KITTI labels to compatible COCO labels:
+
+```text
+car -> car
+van -> car
+truck -> truck
+pedestrian/person_sitting/Person_sitting -> person
+cyclist -> bicycle
+tram -> train
+```
+
+This is available as:
+
+```bash
+--ground-truth-label-map kitti-coco
+```
+
+The current KITTI val result uses the Ultralytics KITTI YOLO-format dataset,
+CameraE2E-backed RAW, `640x192`, YOLO11n, `--label-aware`, and the
+`kitti-coco` label map:
+
+| Dataset | Samples | Input | Precision@0.50 | Recall@0.50 | Recall@0.75 | Small Recall@0.50 |
+| --- | ---: | --- | ---: | ---: | ---: | ---: |
+| KITTI val | 1,496 | Reference RGB | 0.6189 | 0.5351 | 0.3616 | 0.3291 |
+| KITTI val | 1,496 | HumanISP RGB | 0.6073 | 0.4695 | 0.3038 | 0.2794 |
+| KITTI val | 1,496 | PerceptionISP RGB | 0.5991 | 0.4491 | 0.2890 | 0.2624 |
+| KITTI val | 1,496 | RGB+Aux Fusion | 0.5974 | 0.4427 | 0.2851 | 0.2603 |
+
+On KITTI val, PerceptionISP RGB is worse than HumanISP RGB:
+
+- Precision@0.50: `-0.0082`
+- Recall@0.50: `-0.0204`
+- Small Recall@0.50: `-0.0170`
+
+This is an important negative result. The COCO val subset suggests the
+PerceptionISP RGB rendering can help a COCO detector, but the KITTI driving
+result does not support a broad performance claim. The likely next work is to
+tune the task-specific image formation for driving geometry and aspect ratio,
+then rerun KITTI. The current aux fusion also does not help KITTI; it slightly
+reduces detections and false positives but loses recall.
+
+Current KITTI reports:
+
+```text
+reports/perception_yolo_kitti_val_1496_camerae2e_fusion/index.html
+reports/perception_yolo_coco_kitti_rollup/index.html
+```
+
 ## Required Before Performance Claims
 
 Use a real labeled driving dataset subset and report at least:

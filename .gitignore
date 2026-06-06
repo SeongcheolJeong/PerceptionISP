@@ -31,6 +31,7 @@ data/**/README.txt
 data/sample_images/
 data/.cache/
 data/coco_val*/
+data/kitti*/
 
 # Model weights and large ML artifacts
 *.pt

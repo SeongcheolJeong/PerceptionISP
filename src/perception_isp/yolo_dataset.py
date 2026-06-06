@@ -109,14 +109,14 @@ def _resolve_dataset(dataset: str | Path) -> Tuple[Path, Dict[str, Any]]:
         config = _read_yaml_like(path)
         root = Path(config.get("path", path.parent)).expanduser()
         if not root.is_absolute():
-            root = path.parent / root
+            root = path.parent if root == Path(path.parent.name) else path.parent / root
         return root.resolve(), config
     config_path = path / "data.yaml"
     if config_path.exists():
         config = _read_yaml_like(config_path)
         root = Path(config.get("path", path)).expanduser()
         if not root.is_absolute():
-            root = path / root
+            root = path if root == Path(path.name) else path / root
     else:
         config = {}
         root = path.expanduser()
@@ -162,7 +162,21 @@ def _class_names(config: Mapping[str, Any], root: Path | None = None) -> Dict[in
             return parsed
     if root is not None and str(root.name).lower().startswith("coco"):
         return {index: value for index, value in enumerate(COCO80_CLASS_NAMES)}
+    if root is not None and str(root.name).lower().startswith("kitti"):
+        return {index: value for index, value in enumerate(KITTI_CLASS_NAMES)}
     return {}
+
+
+KITTI_CLASS_NAMES = (
+    "car",
+    "van",
+    "truck",
+    "pedestrian",
+    "Person_sitting",
+    "cyclist",
+    "tram",
+    "misc",
+)
 
 
 COCO80_CLASS_NAMES = (

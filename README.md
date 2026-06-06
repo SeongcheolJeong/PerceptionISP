@@ -351,4 +351,28 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
 Supported KITTI layouts are `training/image_2` + `training/label_2` and compact
 `image_2` + `label_2` subsets.
 
+Run the Ultralytics YOLO-format KITTI dataset with COCO YOLO label remapping:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 1496 \
+  --width 640 --height 192 \
+  --cfa auto \
+  --rgb-detector yolo \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --progress-interval 374 \
+  --output-dir reports/perception_yolo_kitti_val_1496_camerae2e_fusion
+```
+
+The `kitti-coco` label map is required because YOLO11n emits COCO labels such
+as `person` and `bicycle`, while KITTI labels use `pedestrian`, `cyclist`, and
+`van`.
+
 This is a runnable SW reference, not a product ISP. The intentional next step is to compare these outputs against task metrics such as small-object recall, VRU recall, traffic-light state accuracy, and AEB early-warning lead time.
