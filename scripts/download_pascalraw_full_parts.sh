@@ -3,6 +3,7 @@ set -euo pipefail
 
 DEST="data/raw_datasets/pascalraw_full_archive"
 PART_COUNT=2
+START_PART=1
 DRY_RUN=0
 JOBS=4
 SEGMENT_MIB=128
@@ -27,15 +28,20 @@ PART_SIZES=(
 
 usage() {
   cat <<'EOF'
-Usage: scripts/download_pascalraw_full_parts.sh [--parts N] [--dest DIR] [--jobs N] [--segment-mib N] [--dry-run]
+Usage: scripts/download_pascalraw_full_parts.sh [--start-part N] [--parts N] [--dest DIR] [--jobs N] [--segment-mib N] [--dry-run]
 
 Downloads the first N split chunks of Stanford PASCALRAW full-resolution RAW archive.
 The complete archive is PASCALRAW.tar.gzaa through PASCALRAW.tar.gzan.
+--start-part is 1-based, so --start-part 3 starts at PASCALRAW.tar.gzac.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --start-part)
+      START_PART="$2"
+      shift 2
+      ;;
     --parts)
       PART_COUNT="$2"
       shift 2
@@ -72,6 +78,16 @@ if [[ "$PART_COUNT" -lt 1 || "$PART_COUNT" -gt "${#PART_SUFFIXES[@]}" ]]; then
   echo "--parts must be between 1 and ${#PART_SUFFIXES[@]}" >&2
   exit 2
 fi
+if [[ "$START_PART" -lt 1 || "$START_PART" -gt "${#PART_SUFFIXES[@]}" ]]; then
+  echo "--start-part must be between 1 and ${#PART_SUFFIXES[@]}" >&2
+  exit 2
+fi
+START_INDEX=$(( START_PART - 1 ))
+END_INDEX=$(( START_INDEX + PART_COUNT ))
+if [[ "$END_INDEX" -gt "${#PART_SUFFIXES[@]}" ]]; then
+  echo "--start-part + --parts exceeds ${#PART_SUFFIXES[@]} archive chunks" >&2
+  exit 2
+fi
 if [[ "$JOBS" -lt 1 ]]; then
   echo "--jobs must be >= 1" >&2
   exit 2
@@ -84,12 +100,8 @@ fi
 SEGMENT_BYTES=$(( SEGMENT_MIB * 1024 * 1024 ))
 
 mkdir -p "$DEST"
-LOCK_DIR="${DEST}/.download.lock"
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  echo "Another PASCALRAW download appears to be active: ${LOCK_DIR}" >&2
-  exit 1
-fi
-trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+ACTIVE_LOCK=""
+trap 'if [[ -n "$ACTIVE_LOCK" ]]; then rmdir "$ACTIVE_LOCK" 2>/dev/null || true; fi' EXIT
 
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -283,16 +295,25 @@ download_part_parallel() {
   log "complete ${name} size=${expected}"
 }
 
-for (( index = 0; index < PART_COUNT; index++ )); do
+for (( index = START_INDEX; index < END_INDEX; index++ )); do
   suffix="${PART_SUFFIXES[$index]}"
   expected="${PART_SIZES[$index]}"
   name="PASCALRAW.tar.gz${suffix}"
   url="${BASE_URL}/${name}"
   final="${DEST}/${name}"
   partial="${final}.partial"
+  part_lock="${final}.lock"
+
+  if ! mkdir "$part_lock" 2>/dev/null; then
+    echo "Another download appears to be active for ${name}: ${part_lock}" >&2
+    exit 1
+  fi
+  ACTIVE_LOCK="$part_lock"
 
   if [[ "$(file_size "$final")" == "$expected" ]]; then
     log "skip complete ${name} size=${expected}"
+    rmdir "$part_lock"
+    ACTIVE_LOCK=""
     continue
   fi
   if [[ -f "$final" && "$(file_size "$final")" != "$expected" ]]; then
@@ -303,6 +324,8 @@ for (( index = 0; index < PART_COUNT; index++ )); do
   log "download ${name} expected=${expected} dest=${final}"
   if [[ "$DRY_RUN" == "1" ]]; then
     log "dry-run ${name} url=${url} segments=$(( (expected + SEGMENT_BYTES - 1) / SEGMENT_BYTES )) jobs=${JOBS}"
+    rmdir "$part_lock"
+    ACTIVE_LOCK=""
     continue
   fi
 
@@ -311,6 +334,8 @@ for (( index = 0; index < PART_COUNT; index++ )); do
     log "incomplete ${name} actual=${actual} expected=${expected}; leaving partial for resume"
     exit 1
   fi
+  rmdir "$part_lock"
+  ACTIVE_LOCK=""
 done
 
-log "requested PASCALRAW full archive parts complete parts=${PART_COUNT} dest=${DEST}"
+log "requested PASCALRAW full archive parts complete start_part=${START_PART} parts=${PART_COUNT} dest=${DEST}"
