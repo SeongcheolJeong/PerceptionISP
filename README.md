@@ -964,8 +964,10 @@ those oracles. In the current synthetic case, LensPSF sigma from `0.0` to
 `1.6` sensor pixels reduces absolute sensor-edge P95 from `0.0546` to `0.0362`
 (`ratio=0.6624`), so the PSF effect is visible. If PSF sigma is much smaller
 than the sensor pixel pitch, or if PSF is applied only after low-resolution
-sensor sampling, this effect can be nearly invisible. Treat this as front-end
-edge-fidelity evidence across CFA/LensPSF, not detector-performance evidence.
+sensor sampling, this effect can be nearly invisible. The report's LensPSF
+Visibility table makes this explicit with ratio-vs-nominal and delta-vs-previous
+edge-contrast metrics. Treat this as front-end edge-fidelity evidence across
+CFA/LensPSF, not detector-performance evidence.
 
 To verify that the test is not merely passing an RGB scene through both ISPs,
 run the scene-information stress suite. It creates a higher-resolution scene

@@ -108,6 +108,7 @@ def build_edge_fidelity_suite(
         "seed": int(seed),
         "cases": cases,
         "checks": checks,
+        "psf_visibility": _psf_visibility(cases),
         "rankings": _rankings(cases),
         "status": "pass" if all(row["status"] == "pass" for row in checks) else "fail",
         "interpretation": (
@@ -412,6 +413,52 @@ def _psf_response(cases: Sequence[Mapping[str, Any]], *, sigmas: Sequence[float]
     return {"pass": ratio <= 0.85, "baseline": baseline, "target": target, "delta": delta, "ratio": ratio}
 
 
+def _psf_visibility(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
+    by_sigma: Dict[float, list[Mapping[str, Any]]] = {}
+    for case in cases:
+        metrics = case.get("metrics", {}) if isinstance(case.get("metrics"), Mapping) else {}
+        by_sigma.setdefault(float(case.get("psf_sigma", 0.0)), []).append(metrics)
+
+    rows: list[Dict[str, Any]] = []
+    baseline: float | None = None
+    previous: float | None = None
+    for sigma, metrics_rows in sorted(by_sigma.items()):
+        sensor_edge_p95 = _mean_metric(metrics_rows, "sensor_edge_strength_p95")
+        if baseline is None:
+            baseline = sensor_edge_p95
+        ratio = sensor_edge_p95 / max(float(baseline), 1.0e-12)
+        delta_previous = None if previous is None else sensor_edge_p95 - previous
+        rows.append(
+            {
+                "psf_sigma": float(sigma),
+                "sensor_edge_strength_p95_mean": float(sensor_edge_p95),
+                "sensor_edge_strength_p95_ratio_vs_nominal": float(ratio),
+                "sensor_edge_strength_p95_delta_vs_previous": None if delta_previous is None else float(delta_previous),
+                "mean_human_object_edge_f1": _mean_metric(metrics_rows, "human_object_edge_f1"),
+                "mean_perception_object_edge_f1": _mean_metric(metrics_rows, "perception_object_edge_f1"),
+                "mean_aux_object_edge_f1": _mean_metric(metrics_rows, "aux_object_edge_f1"),
+                "visibility_status": _psf_visibility_status(float(sigma), float(ratio)),
+            }
+        )
+        previous = sensor_edge_p95
+    return rows
+
+
+def _mean_metric(rows: Sequence[Mapping[str, Any]], metric: str) -> float:
+    values = [float(row.get(metric, 0.0)) for row in rows]
+    return float(np.mean(values)) if values else 0.0
+
+
+def _psf_visibility_status(sigma: float, ratio_vs_nominal: float) -> str:
+    if sigma <= 0.0:
+        return "nominal"
+    if ratio_vs_nominal >= 0.95:
+        return "weak_or_subpixel"
+    if ratio_vs_nominal <= 0.85:
+        return "visible"
+    return "moderate"
+
+
 def _rankings(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
     by_sigma: Dict[float, list[Mapping[str, Any]]] = {}
     for case in cases:
@@ -613,6 +660,7 @@ def _to_uint8_gray(image: np.ndarray) -> np.ndarray:
 def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     check_rows = "".join(_check_row(row) for row in summary.get("checks", ()))
     case_rows = "".join(_case_row(row, destination) for row in summary.get("cases", ()))
+    psf_visibility_rows = "".join(_psf_visibility_row(row) for row in summary.get("psf_visibility", ()))
     ranking_rows = "".join(_ranking_row(row) for row in summary.get("rankings", ()))
     status = str(summary.get("status", ""))
     return f"""<!doctype html>
@@ -641,6 +689,12 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   <table>
     <thead><tr><th>Status</th><th>Check</th><th>Description</th><th>Criteria</th></tr></thead>
     <tbody>{check_rows}</tbody>
+  </table>
+  <h2>LensPSF Visibility</h2>
+  <div class=\"note\">PSF sigma is expressed in sensor pixels and is applied on the high-resolution scene plane before sensor sampling. If the PSF footprint is far below one sensor pixel, the edge contrast change can be weak or invisible after sampling.</div>
+  <table>
+    <thead><tr><th>LensPSF Sigma</th><th>Sensor Edge P95 Mean</th><th>Ratio vs Nominal</th><th>Delta vs Previous</th><th>Human Obj F1 Mean</th><th>Perception Obj F1 Mean</th><th>Aux Obj F1 Mean</th><th>Status</th></tr></thead>
+    <tbody>{psf_visibility_rows}</tbody>
   </table>
   <h2>CFA Rankings</h2>
   <table>
@@ -695,6 +749,22 @@ def _ranking_row(row: Mapping[str, Any]) -> str:
             f"confSep={_fmt(item.get('edge_confidence_separation'), signed=True)}"
         )
     return f"<tr><td>{_fmt(row.get('psf_sigma'))}</td><td>{html_lib.escape(' | '.join(ranked))}</td></tr>"
+
+
+def _psf_visibility_row(row: Mapping[str, Any]) -> str:
+    status = str(row.get("visibility_status", ""))
+    return (
+        "<tr>"
+        f"<td>{_fmt(row.get('psf_sigma'))}</td>"
+        f"<td>{_fmt(row.get('sensor_edge_strength_p95_mean'))}</td>"
+        f"<td>{_fmt(row.get('sensor_edge_strength_p95_ratio_vs_nominal'))}</td>"
+        f"<td>{_fmt(row.get('sensor_edge_strength_p95_delta_vs_previous'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('mean_human_object_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('mean_perception_object_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('mean_aux_object_edge_f1'))}</td>"
+        f"<td><code>{html_lib.escape(status)}</code></td>"
+        "</tr>"
+    )
 
 
 def _case_row(row: Mapping[str, Any], destination: Path) -> str:

@@ -27,6 +27,12 @@ class EdgeFidelitySuiteTest(unittest.TestCase):
         self.assertEqual(checks["edge_fidelity_metrics_bounded"]["status"], "pass")
         self.assertEqual(checks["lens_psf_reduces_sensor_edge_contrast"]["status"], "pass")
         self.assertGreaterEqual(len(summary["rankings"]), 2)
+        visibility = summary["psf_visibility"]
+        self.assertEqual([row["psf_sigma"] for row in visibility], [0.0, 1.2])
+        self.assertEqual(visibility[0]["visibility_status"], "nominal")
+        self.assertEqual(visibility[-1]["visibility_status"], "visible")
+        self.assertLessEqual(visibility[-1]["sensor_edge_strength_p95_ratio_vs_nominal"], 0.85)
+        self.assertLess(visibility[-1]["sensor_edge_strength_p95_delta_vs_previous"], 0.0)
 
         cases = summary["cases"]
         self.assertEqual(len(cases), 6)
@@ -49,9 +55,12 @@ class EdgeFidelitySuiteTest(unittest.TestCase):
             )
             html_path = write_edge_fidelity_suite(summary, root / "report")
             self.assertTrue(html_path.exists())
-            self.assertIn("PerceptionISP Object Edge Fidelity", html_path.read_text())
+            html = html_path.read_text()
+            self.assertIn("PerceptionISP Object Edge Fidelity", html)
+            self.assertIn("LensPSF Visibility", html)
             persisted = json.loads((html_path.parent / "edge_fidelity_suite_summary.json").read_text())
             self.assertEqual(persisted["status"], "pass")
+            self.assertIn("psf_visibility", persisted)
             self.assertNotIn("_assets_source", persisted["cases"][0])
             self.assertGreater(len(list((html_path.parent / "assets").glob("*.png"))), 0)
 
