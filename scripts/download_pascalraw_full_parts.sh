@@ -214,7 +214,7 @@ download_part_parallel() {
   local final="$4"
   local partial="$5"
   local segment_dir="${final}.segments"
-  local segment_count segment_index batch_count pid failures
+  local segment_count segment_index batch_count pid_count pid failures
   local segment_path start end segment_expected actual
   local -a pids
 
@@ -227,6 +227,7 @@ download_part_parallel() {
 
   failures=0
   batch_count=0
+  pid_count=0
   pids=()
   for (( segment_index = 0; segment_index < segment_count; segment_index++ )); do
     segment_path="${segment_dir}/$(printf 'segment_%06d' "$segment_index")"
@@ -243,15 +244,17 @@ download_part_parallel() {
 
     download_segment "$url" "$segment_path" "$start" "$end" "$segment_expected" &
     pids+=("$!")
+    pid_count=$(( pid_count + 1 ))
     batch_count=$(( batch_count + 1 ))
 
-    if [[ "${#pids[@]}" -ge "$JOBS" ]]; then
+    if [[ "$pid_count" -ge "$JOBS" ]]; then
       for pid in "${pids[@]}"; do
         if ! wait "$pid"; then
           failures=$(( failures + 1 ))
         fi
       done
       pids=()
+      pid_count=0
       log "segment batch complete ${name} downloaded_or_checked=${batch_count}/${segment_count} failures=${failures}"
       if [[ "$failures" -ne 0 ]]; then
         return 1
@@ -259,11 +262,13 @@ download_part_parallel() {
     fi
   done
 
-  for pid in "${pids[@]}"; do
-    if ! wait "$pid"; then
-      failures=$(( failures + 1 ))
-    fi
-  done
+  if [[ "$pid_count" -gt 0 ]]; then
+    for pid in "${pids[@]}"; do
+      if ! wait "$pid"; then
+        failures=$(( failures + 1 ))
+      fi
+    done
+  fi
   if [[ "$failures" -ne 0 ]]; then
     return 1
   fi
