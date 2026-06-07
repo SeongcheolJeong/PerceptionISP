@@ -63,10 +63,11 @@ include these rows under a fixed detector and training recipe:
 The current project now covers rows 1-4 at the software-reference level on
 KITTI-derived evidence, exercises row 8 through auxiliary-map tensor export,
 training, and direct dense evaluation, covers row 9 with a synthetic front-end
-mechanism report, covers row 10 with a synthetic CFA stress sweep, and covers
-row 11 with a synthetic edge-confidence suite. It covers row 12 with a
-synthetic object edge-fidelity suite. It covers row 13 with a
-proposal-calibration aux contribution audit. It covers row 14 with a synthetic
+mechanism report, covers row 10 with a synthetic CFA stress sweep and a val32
+CFA/LensPSF detector/proposal bridge, and covers row 11 with a synthetic
+edge-confidence suite. It covers row 12 with a synthetic object edge-fidelity
+suite. It covers row 13 with a proposal-calibration aux contribution audit and
+CFA/LensPSF proposal-edge audit. It covers row 14 with a synthetic
 scene-information stress suite. It does not yet cover claim-quality RAW-domain
 pretraining or large adverse-condition RAW datasets.
 

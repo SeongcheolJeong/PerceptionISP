@@ -46,6 +46,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir used as condition detector evidence.")
+    parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir used as condition proposal bridge evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
 
@@ -71,6 +72,7 @@ def main(argv: Any = None) -> int:
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
+        cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -100,6 +102,7 @@ def run_claim_readiness(
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
+    cfa_lenspsf_proposal_audit: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
     destination = Path(output_dir).expanduser()
@@ -231,6 +234,7 @@ def run_claim_readiness(
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
         cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
+        cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
         comparison_rollup_specs=comparison_rollups,
     )
     dashboard_html = write_claim_dashboard(dashboard, dashboard_dir)
@@ -304,6 +308,7 @@ def run_claim_readiness(
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
         "cfa_lenspsf_detector_sweep": _cfa_lenspsf_detector_sweep_summary(cfa_lenspsf_detector_sweep),
+        "cfa_lenspsf_proposal_audit": _cfa_lenspsf_proposal_audit_summary(cfa_lenspsf_proposal_audit),
         "benchmark_protocol": {
             "report": str(protocol_html),
             "summary_json": str(protocol_html.parent / "protocol_coverage_summary.json"),
@@ -589,6 +594,35 @@ def _cfa_lenspsf_detector_sweep_summary(path: str | Path | None) -> Dict[str, An
     }
 
 
+def _cfa_lenspsf_proposal_audit_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "cfa_lenspsf_proposal_audit_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"CFA/LensPSF proposal audit summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "failed_checks": failed,
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "removed_fp_count": int(aggregate.get("removed_fp_count", 0)),
+        "removed_tp_count": int(aggregate.get("removed_tp_count", 0)),
+        "fp_delta_count": int(aggregate.get("fp_delta_count", 0)),
+        "scene_edge_positive_condition_count": int(aggregate.get("scene_edge_positive_condition_count", 0)),
+        "edge_positive_condition_count": int(aggregate.get("edge_positive_condition_count", 0)),
+    }
+
+
 def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "summary_json": summary.get("summary_json"),
@@ -607,6 +641,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
+        "cfa_lenspsf_proposal_audit": summary.get("cfa_lenspsf_proposal_audit"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],

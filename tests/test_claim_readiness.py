@@ -26,6 +26,7 @@ class ClaimReadinessTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -41,6 +42,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 output_dir=root / "readiness",
             )
 
@@ -66,6 +68,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("scene_edge_confidence", summary)
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
+            self.assertIn("cfa_lenspsf_proposal_audit", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -73,6 +76,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
+            self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertEqual(summary["cfa_lenspsf_proposal_audit"]["removed_fp_count"], 5)
             self.assertEqual(summary["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
@@ -102,6 +107,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -538,6 +544,65 @@ def _write_aux_contribution_audit(path: Path) -> Path:
         "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},
     }
     (path / "aux_contribution_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "condition_count": 1,
+        "expected_condition_count": 1,
+        "cfa_patterns": ["GRBG"],
+        "psf_sigmas": [0.0],
+        "checks": [
+            {"id": "condition_bridges_available", "status": "pass", "evidence": "bridges=1 expected=1"},
+            {"id": "removed_fp_observed_across_conditions", "status": "pass", "evidence": "removed_fp=5 removed_tp=0"},
+            {"id": "source_scene_edge_predicts_removed_fp_in_some_conditions", "status": "pass", "evidence": "positive_conditions=1/1"},
+            {"id": "aux_edge_predicts_removed_fp_in_some_conditions", "status": "pass", "evidence": "positive_conditions=1/1"},
+        ],
+        "aggregate": {
+            "condition_count": 1,
+            "removed_fp_count": 5,
+            "removed_tp_count": 0,
+            "fp_delta_count": -5,
+            "tp_delta_count": 0,
+            "scene_edge_positive_condition_count": 1,
+            "edge_positive_condition_count": 1,
+            "best_scene_edge_auc_condition": {
+                "run_id": "cfa-grbg_psf-0p00",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "scene_edge_auc_low_predicts_removed_fp": 0.62,
+            },
+            "best_edge_auc_condition": {
+                "run_id": "cfa-grbg_psf-0p00",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "edge_auc_low_predicts_removed_fp": 0.53,
+            },
+        },
+        "conditions": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "report": str(path / "001_cfa-grbg_psf-0p00" / "comparison_summary.json"),
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "sample_count": 3,
+                "removed_fp_count": 5,
+                "removed_tp_count": 0,
+                "fp_delta_count": -5,
+                "edge_support_delta_removed_fp_minus_kept_tp": -0.05,
+                "edge_auc_low_predicts_removed_fp": 0.53,
+                "scene_edge_support_delta_removed_fp_minus_kept_tp": -0.02,
+                "scene_edge_auc_low_predicts_removed_fp": 0.62,
+            }
+        ],
+        "interpretation": "unit CFA/LensPSF proposal-edge audit",
+        "claim_boundary": "unit proposal boundary",
+    }
+    (path / "cfa_lenspsf_proposal_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

@@ -766,6 +766,31 @@ CameraE2E source CFA is GRBG, the non-GRBG rows show
 `pattern_remapped_fraction=1.0`; use those rows as bridge-remap sensitivity
 evidence, not as native sensor-CFA proof.
 
+Join the same condition sweep to proposal-level edge and source-scene-edge
+evidence:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.cfa_lenspsf_proposal_audit \
+  reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf \
+  --output-dir reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf
+```
+
+The current proposal-edge audit report is:
+
+```text
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf/index.html
+```
+
+It passes all four diagnostic checks across the same 12 conditions. The
+calibrated proposal path removes 121 FP proposals and 0 TP proposals versus the
+RGB+Aux fusion proposal baseline. Source scene-edge support is directionally
+positive in 10/12 conditions, with best low-scene-edge AUC `0.6635` at
+`GRBG`, PSF `0.0`; aux-edge support is directionally positive in 3/12
+conditions, with best low-edge AUC `0.5216` at `GRBG`, PSF `1.6`. This is a
+post-hoc proposal bridge for the calibrated path, not an incremental aux-only
+ablation, not a trained RGB+Aux DNN result, and not native-CFA proof for the
+remapped non-GRBG rows.
+
 For stricter evidence, train the proposal calibrator on a KITTI train report and
 apply it to the KITTI val report. An earlier comparison branch uses a
 512-sample train subset and writes:
@@ -913,6 +938,7 @@ PYTHONPATH=src \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf \
+  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
@@ -1314,6 +1340,7 @@ reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf/index.html
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
@@ -1336,12 +1363,16 @@ that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 The same dashboard's `Performance Evidence Map` now includes a diagnostic
-CFA/LensPSF detector condition sweep row. It lists five next evidence targets:
-scene-edge proposal correlation across
-CFA/LensPSF, CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune gate,
-high-information real-scene expansion, and a failure/slice casebook. The
-previous aux-edge, source scene-edge same-sample proposal correlations, and
-val32 CFA/LensPSF detector sweep are now part of the current evidence rows.
+CFA/LensPSF detector condition sweep row and a CFA/LensPSF proposal-edge bridge
+row. The proposal bridge removes 121 FP and 0 TP proposals across the val32
+condition sweep; source scene-edge evidence is directionally positive in 10/12
+conditions, while aux-edge evidence is positive in 3/12. It lists five next
+evidence targets: larger/native CFA-separated scene-edge proposal correlation
+across CFA/LensPSF, a larger CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune
+gate, high-information real-scene expansion, and a failure/slice casebook. The
+previous aux-edge, source scene-edge same-sample proposal correlations, val32
+CFA/LensPSF detector sweep, and val32 CFA/LensPSF proposal-edge bridge are now
+part of the current evidence rows.
 
 The current 1496-image naive RAW-like baseline is:
 

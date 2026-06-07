@@ -612,6 +612,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Edge-confidence suite | `pass` for synthetic low-light, glare, and low-MTF difficult-edge checks; this is front-end confidence evidence, not detector performance evidence |
 | Object edge-fidelity suite | `pass`; object/sensor edge oracles are compared against HumanISP RGB edges, PerceptionISP RGB edges, and aux edge maps across CFA/LensPSF. LensPSF sigma `0.0 -> 1.6` sensor pixels reduces absolute sensor-edge P95 `0.0546 -> 0.0362` (`ratio=0.6624`). `psf_sigma_map` now feeds PSF blur-confidence and PSF edge-likelihood aux maps. This is front-end edge evidence, not detector performance evidence |
 | CFA/LensPSF detector sweep | `pass` as diagnostic condition evidence; `reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf` covers GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6`, 32 KITTI val samples per condition, fixed YOLO11n recipe, and calibrated score-label-aux proposals. PSF provenance is recorded for `384/384` samples. Best calibrated downstream FP delta is `-0.4062` at GRBG/PSF `0.8`. Non-GRBG CameraE2E rows are bridge-remapped from source GRBG (`max_remap=1.0`), so this is condition sensitivity evidence, not native sensor-CFA proof or broad superiority |
+| CFA/LensPSF proposal-edge bridge | `pass` as diagnostic proposal bridge evidence; `reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf` joins the same 12 CFA/LensPSF detector conditions to same-sample proposal edge and source-scene-edge support. The calibrated proposal path removes 121 FP and 0 TP proposals versus RGB+Aux fusion. Source scene-edge support is directionally positive in 10/12 conditions, best low-scene-edge AUC `0.6635` at GRBG/PSF `0.0`; aux-edge support is positive in 3/12, best low-edge AUC `0.5216` at GRBG/PSF `1.6`. This is post-hoc calibrated proposal evidence, not incremental aux-only ablation, trained-DNN proof, native-CFA proof, or broad superiority |
 | Scene edge-confidence suite | `pass`; a `640 x 480` real sample image is fed through CameraE2E to a `320 x 240` `GRBG` sensor target with no CFA remap. Against the high-resolution scene-edge proxy, HumanISP RGB proxy F1 is `0.6644`, PerceptionISP RGB proxy F1 is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and aux edge-confidence F1 is `0.3727`. This is front-end scene-edge evidence, not object-boundary or detector performance evidence |
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622`. In the same-sample bridge, incremental aux scoring removes 95 FP and 16 TP proposals; removed FP has lower aux edge support than kept TP (`delta=-0.0596`, low-edge AUC `0.6904`) and lower source scene-edge support (`delta=-0.0302`, low-scene-edge AUC `0.6681`) |
@@ -987,8 +988,18 @@ reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf/cfa_lenspsf_
 
 It is intentionally not claim-grade scale. It shows that the detector path can
 be swept across CFA and LensPSF while preserving RAW provenance and PSF
-conditioning; the next step is to increase sample scale and join the same
-conditions to proposal-level edge/scene-edge correlations.
+conditioning. The matching proposal-edge bridge is:
+
+```text
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf/index.html
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf/cfa_lenspsf_proposal_audit_summary.json
+```
+
+It links the same 12 conditions to proposal-level edge/scene-edge correlations:
+the calibrated proposal path removes 121 FP and 0 TP proposals, source
+scene-edge support is positive in 10/12 conditions, and aux-edge support is
+positive in 3/12. The next step is to increase sample scale and separate native
+CFA simulation from bridge-remap sensitivity.
 
 Live normal-harness verification:
 

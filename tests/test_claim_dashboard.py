@@ -28,6 +28,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -43,6 +44,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
+                cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -65,6 +67,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
+            self.assertTrue(dashboard["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertEqual(
                 dashboard["evidence_map"]["claim_posture"]["recommended_claim"],
                 "Use a narrow recall-budgeted FP-reduction claim, with front-end/aux evidence as feasibility support.",
@@ -75,6 +78,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("High-information scene edge similarity", evidence_areas)
             self.assertIn("Aux evidence used downstream", evidence_areas)
             self.assertIn("CFA/LensPSF detector condition sweep", evidence_areas)
+            self.assertIn("CFA/LensPSF proposal-edge bridge", evidence_areas)
             self.assertTrue(
                 any(
                     row["area"] == "Broad HumanISP superiority" and row["status"] == "not_supported"
@@ -119,6 +123,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "CFA/LensPSF detector sweep is available as condition-level detector evidence; use it for sensitivity analysis, not broad superiority.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "CFA/LensPSF proposal-edge audit passed as condition-level bridge evidence: removed FP 7, removed TP 1, source scene-edge positive conditions 2.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertTrue(
@@ -167,6 +175,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Edge Confidence Suite", html)
             self.assertIn("Object Edge Fidelity", html)
             self.assertIn("Scene Edge Confidence", html)
+            self.assertIn("CFA/LensPSF Proposal Edge Bridge", html)
+            self.assertIn("Proposal Edge Bridge By Condition", html)
             self.assertIn("Evidence Report", html)
             self.assertIn("RGB Delta", html)
             self.assertIn("Front-end/downstream bridge is directionally positive", html)
@@ -190,6 +200,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -218,6 +229,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(aux_contribution),
                         "--cfa-lenspsf-detector-sweep",
                         str(cfa_lenspsf_detector),
+                        "--cfa-lenspsf-proposal-audit",
+                        str(cfa_lenspsf_proposal),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -237,6 +250,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_detector_sweep"]["pass"])
+            self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -876,6 +890,68 @@ def _write_cfa_lenspsf_detector_sweep(path: Path) -> Path:
         "claim_boundary": "unit boundary",
     }
     (path / "cfa_lenspsf_detector_sweep_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    condition_dir = path / "001_cfa-grbg_psf-0p00"
+    condition_dir.mkdir()
+    (condition_dir / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "condition_count": 2,
+        "expected_condition_count": 2,
+        "cfa_patterns": ["GRBG"],
+        "psf_sigmas": [0.0, 1.2],
+        "checks": [
+            {"id": "condition_bridges_available", "status": "pass", "evidence": "bridges=2 expected=2"},
+            {"id": "removed_fp_observed_across_conditions", "status": "pass", "evidence": "removed_fp=7 removed_tp=1"},
+            {"id": "source_scene_edge_predicts_removed_fp_in_some_conditions", "status": "pass", "evidence": "positive_conditions=2/2"},
+            {"id": "aux_edge_predicts_removed_fp_in_some_conditions", "status": "pass", "evidence": "positive_conditions=1/2"},
+        ],
+        "aggregate": {
+            "condition_count": 2,
+            "removed_fp_count": 7,
+            "removed_tp_count": 1,
+            "fp_delta_count": -7,
+            "tp_delta_count": -1,
+            "scene_edge_positive_condition_count": 2,
+            "edge_positive_condition_count": 1,
+            "best_scene_edge_auc_condition": {
+                "run_id": "cfa-grbg_psf-0p00",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "scene_edge_auc_low_predicts_removed_fp": 0.66,
+            },
+            "best_edge_auc_condition": {
+                "run_id": "cfa-grbg_psf-1p20",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 1.2,
+                "edge_auc_low_predicts_removed_fp": 0.53,
+            },
+        },
+        "conditions": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "report": str(condition_dir / "comparison_summary.json"),
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "sample_count": 16,
+                "removed_fp_count": 4,
+                "removed_tp_count": 0,
+                "fp_delta_count": -4,
+                "edge_support_delta_removed_fp_minus_kept_tp": -0.04,
+                "edge_auc_low_predicts_removed_fp": 0.52,
+                "scene_edge_support_delta_removed_fp_minus_kept_tp": -0.03,
+                "scene_edge_auc_low_predicts_removed_fp": 0.66,
+            }
+        ],
+        "interpretation": "unit CFA/LensPSF proposal-edge audit",
+        "claim_boundary": "unit proposal boundary",
+    }
+    (path / "cfa_lenspsf_proposal_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

@@ -235,6 +235,22 @@ def write_aux_contribution_audit(summary: Mapping[str, Any], output_dir: str | P
     return html_path
 
 
+def sample_bridge_from_comparison_report(
+    report: str | Path,
+    *,
+    baseline_input: str,
+    target_input: str,
+) -> Dict[str, Any] | None:
+    """Build a same-sample proposal bridge from two inputs in one comparison report."""
+
+    summary_path = _summary_path(report, "comparison_summary.json")
+    inputs = {
+        str(baseline_input): {"summary_path": str(summary_path)},
+        str(target_input): {"summary_path": str(summary_path)},
+    }
+    return _sample_bridge_from_inputs(inputs, baseline_input=str(baseline_input), target_input=str(target_input))
+
+
 def _collect_inputs(rollup: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
     inputs: Dict[str, Dict[str, Any]] = {}
     for run in rollup.get("runs", ()):

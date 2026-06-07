@@ -61,6 +61,13 @@ Known limits:
   run fixed-detector CFA/LensPSF condition sweeps and report remap/provenance
   checks. The current KITTI val32 sweep is diagnostic only; it is not enough to
   claim detector robustness across lens blur or native CFA conditions.
+- `cfa_lenspsf_proposal_audit` joins the KITTI val32 CFA/LensPSF detector sweep
+  to same-sample proposal edge and source-scene-edge correlations. The current
+  report removes 121 FP and 0 TP proposals across 12 conditions, with
+  source-scene-edge support directionally positive in 10/12 conditions and
+  aux-edge support positive in 3/12. This is calibrated proposal-path bridge
+  evidence, not native-CFA proof, not incremental aux-only ablation, and not a
+  trained RGB+aux DNN result.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor
