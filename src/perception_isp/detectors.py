@@ -301,8 +301,7 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
         tensor = _as_rgb_aux_chw(image, expected_channels=self.input_channels)
         rows, cols = int(tensor.shape[1]), int(tensor.shape[2])
         with self.torch.no_grad():
-            x = apply_channel_mask(self.torch.from_numpy(tensor[None, :, :, :]).to(self.device), self.channel_mask)
-            pred = self.model(x)[0].detach().cpu()
+            pred = self._predict_tensor(tensor)
             objectness = self.torch.sigmoid(pred[0]).numpy()
             boxes = self.torch.sigmoid(pred[1:5]).numpy()
             class_scores = self.torch.softmax(pred[5:], dim=0).numpy()
@@ -356,6 +355,19 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
         pruned = _nms_detections(detections, iou_threshold=self.nms_iou, max_detections=self.max_detections)
         elapsed = (time.perf_counter() - start) * 1000.0
         return DetectorResult(self.name, input_name, tuple(pruned), elapsed)
+
+    def _predict_tensor(self, tensor: np.ndarray) -> Any:
+        x = apply_channel_mask(self.torch.from_numpy(tensor[None, :, :, :]).to(self.device), self.channel_mask)
+        try:
+            return self.model(x)[0].detach().cpu()
+        except RuntimeError as exc:
+            message = str(exc).lower()
+            if getattr(self.device, "type", "") == "mps" and "adaptive" in message and "mps" in message:
+                self.device = self.torch.device("cpu")
+                self.model.to(self.device)
+                x = apply_channel_mask(self.torch.from_numpy(tensor[None, :, :, :]).to(self.device), self.channel_mask)
+                return self.model(x)[0].detach().cpu()
+            raise
 
 
 def rgb_aux_detector_from_checkpoint(
