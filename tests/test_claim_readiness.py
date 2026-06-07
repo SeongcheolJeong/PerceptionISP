@@ -24,6 +24,7 @@ class ClaimReadinessTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            object_boundary = _write_object_boundary_edge(root / "object_boundary")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -49,6 +50,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                object_boundary_edge=object_boundary,
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
@@ -81,6 +83,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("cfa_stress_sweep", summary)
             self.assertIn("edge_confidence_suite", summary)
             self.assertIn("edge_fidelity_suite", summary)
+            self.assertIn("object_boundary_edge", summary)
             self.assertIn("scene_edge_confidence", summary)
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
@@ -123,6 +126,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
+            self.assertTrue(summary["object_boundary_edge"]["pass"])
+            self.assertEqual(summary["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -144,6 +149,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
             self.assertTrue(dashboard_summary["edge_fidelity_suite"]["pass"])
+            self.assertTrue(dashboard_summary["object_boundary_edge"]["pass"])
             self.assertTrue(dashboard_summary["scene_edge_confidence"]["pass"])
             self.assertEqual(dashboard_summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
@@ -172,6 +178,7 @@ class ClaimReadinessTest(unittest.TestCase):
             cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
             rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
+            object_boundary = _write_object_boundary_edge(root / "object_boundary")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = readiness_main(
@@ -191,6 +198,8 @@ class ClaimReadinessTest(unittest.TestCase):
                         str(rgb_aux_dnn_gate),
                         "--rgb-aux-dnn-sweep",
                         str(rgb_aux_dnn_sweep),
+                        "--object-boundary-edge",
+                        str(object_boundary),
                         "--cfa-lenspsf-aux-ablation",
                         str(cfa_lenspsf_aux_ablation),
                         "--output-dir",
@@ -207,6 +216,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("condition_gate", printed)
             self.assertFalse(printed["rgb_aux_dnn_gate"]["pass"])
             self.assertFalse(printed["rgb_aux_dnn_sweep"]["pass"])
+            self.assertTrue(printed["object_boundary_edge"]["pass"])
+            self.assertEqual(printed["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             self.assertTrue(printed["adverse_native_slice"]["pass"])
             self.assertTrue(printed["adverse_task_slice"]["pass"])
             self.assertEqual(printed["adverse_task_slice"]["claim_status"], "adverse_task_gate_partially_supported")
@@ -675,6 +686,39 @@ def _write_edge_fidelity_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_fidelity_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_object_boundary_edge(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "pass": True,
+        "claim_status": "object_boundary_edge_diagnostic",
+        "sample_count": 4,
+        "box_count": 6,
+        "included_labels": ["car", "pedestrian"],
+        "checks": [
+            {"id": "finite_object_boundary_outputs", "status": "pass"},
+            {"id": "object_box_boundaries_present", "status": "pass"},
+            {"id": "object_boundary_metrics_bounded", "status": "pass"},
+            {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
+        ],
+        "aggregate": {
+            "human_rgb_edge_boundary_f1_mean": 0.030,
+            "perception_rgb_edge_boundary_f1_mean": 0.031,
+            "aux_edge_strength_boundary_f1_mean": 0.032,
+            "aux_edge_confidence_boundary_f1_mean": 0.035,
+            "aux_confidence_minus_human_boundary_f1_mean": 0.005,
+            "aux_confidence_minus_human_boundary_f1_win_rate": 0.67,
+        },
+        "label_breakdown": [],
+        "area_breakdown": [],
+        "interpretation": "unit object-boundary edge proxy",
+        "claim_boundary": "unit box-boundary proxy; not segmentation-contour or detector-performance evidence",
+    }
+    (path / "object_boundary_edge_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

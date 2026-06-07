@@ -1212,6 +1212,7 @@ PYTHONPATH=src \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
+  --object-boundary-edge reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1 \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
@@ -1244,13 +1245,17 @@ validation is shown as front-end feasibility evidence only, not as detector
 performance evidence, and the CFA stress sweep is shown as diagnostic
 condition/CFA evidence only. The edge-confidence suite is also shown as
 diagnostic difficult-edge evidence, the object edge-fidelity suite is shown as
-diagnostic CFA/LensPSF edge evidence, the scene-information stress suite is
-shown as diagnostic scene-to-sensor evidence, and the aux contribution audit is
-shown as detector-side calibration evidence, not as DNN detector-performance
-evidence. When scene-edge deltas and aux contribution deltas are both positive
-in the expected direction, the dashboard also reports a diagnostic
-front-end/downstream bridge; this is co-observed evidence, not same-sample
-causal correlation. The dashboard also includes a `Performance Evidence Map`
+diagnostic CFA/LensPSF edge evidence, and the KITTI object-box-boundary proxy is
+shown as a diagnostic box-boundary edge comparison. The box-boundary proxy uses
+KITTI labels around object boxes, not segmentation contours, so it is not
+object-contour accuracy and not detector-performance evidence. The
+scene-information stress suite is shown as diagnostic scene-to-sensor evidence,
+and the aux contribution audit is shown as detector-side calibration evidence,
+not as DNN detector-performance evidence. When scene-edge deltas and aux
+contribution deltas are both positive in the expected direction, the dashboard
+also reports a diagnostic front-end/downstream bridge; this is co-observed
+evidence, not same-sample causal correlation. The dashboard also includes a
+`Performance Evidence Map`
 section that summarizes the recommended claim posture, blocked claims, current
 evidence rows, and the next evidence to build. For the current bundle, the
 recommended posture is a narrow recall-budgeted FP-reduction claim with
@@ -1463,6 +1468,47 @@ and `psf_edge_likelihood` aux maps, including the extended RGB+aux DNN tensor.
 Treat this as front-end edge-fidelity evidence across CFA/LensPSF, not
 detector-performance evidence.
 
+To compare edge confidence around actual KITTI object boxes, run the
+object-box-boundary edge proxy suite:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.object_boundary_edge_suite \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 128 \
+  --offset 384 \
+  --width 640 \
+  --height 192 \
+  --cfa auto \
+  --raw-cache-dir data/.cache/perception_isp_raw \
+  --include-labels car,pedestrian,cyclist \
+  --tone-mapping detector_log \
+  --denoise-strength 0.30 \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.20 \
+  --output-dir reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1
+```
+
+The current report is:
+
+```text
+reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1/index.html
+```
+
+It evaluates 128 KITTI `val` samples from the held-out eval portion of the
+quick RGB+Aux DNN split, with 614 car/pedestrian/cyclist boxes. The aggregate
+box-boundary proxy F1 values are HumanISP RGB `0.0340`, PerceptionISP RGB
+`0.0338`, aux edge-strength `0.0327`, and aux edge-confidence `0.0354`.
+Aux edge-confidence has a small positive mean delta versus HumanISP
+(`+0.0014`) and a `0.5554` win rate, with the clearest positive signal on
+small boxes (`0.0313` vs HumanISP `0.0241`). The important limitation is that
+KITTI provides boxes, not segmentation contours; this report is a diagnostic
+object-box boundary proxy, not true object edge accuracy and not detector
+performance proof.
+
 To compare edge evidence on a higher-information real scene, run the scene-edge
 confidence suite:
 
@@ -1635,6 +1681,7 @@ PYTHONPATH=src \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
+  --object-boundary-edge reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1 \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
@@ -1710,6 +1757,7 @@ reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
+reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1/index.html
@@ -1741,8 +1789,11 @@ that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 The same dashboard's `Performance Evidence Map` now includes diagnostic
 CFA/LensPSF detector condition sweep, native-CFA separation, proposal-edge bridge,
-and visual casebook rows, plus the 1496-image visual success/failure casebook
-row. The native_bayer_v1 proposal
+object-box-boundary edge proxy, and visual casebook rows, plus the 1496-image
+visual success/failure casebook row. The object-box proxy uses 128 KITTI `val`
+eval-split samples and 614 boxes; aux edge-confidence is slightly above HumanISP
+on mean proxy F1 (`+0.0014`) with a `0.5554` win rate, but this is not a
+segmentation-contour or detector metric. The native_bayer_v1 proposal
 bridge removes 334 FP and 3 TP proposals across the val128 condition sweep;
 source scene-edge evidence is directionally positive in 12/12 conditions, while
 aux-edge evidence is positive in 12/12. Mean source scene-edge delta/AUC is

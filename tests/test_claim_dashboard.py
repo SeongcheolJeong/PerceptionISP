@@ -69,6 +69,7 @@ class ClaimDashboardTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            object_boundary = _write_object_boundary_edge(root / "object_boundary")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -94,6 +95,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                object_boundary_edge=object_boundary,
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
@@ -123,6 +125,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard["edge_confidence_suite"]["pass"])
             self.assertTrue(dashboard["edge_fidelity_suite"]["pass"])
+            self.assertTrue(dashboard["object_boundary_edge"]["pass"])
+            self.assertEqual(dashboard["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             self.assertTrue(dashboard["scene_edge_confidence"]["pass"])
             self.assertEqual(dashboard["scene_edge_confidence"]["report_count"], 2)
             self.assertEqual(dashboard["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
@@ -173,6 +177,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA/LensPSF score-label aux ablation", evidence_areas)
             self.assertIn("RGB+Aux DNN fine-tune gate", evidence_areas)
             self.assertIn("RGB+Aux DNN operating-point sweep", evidence_areas)
+            self.assertIn("KITTI object-box boundary edge proxy", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -204,6 +209,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Object edge-fidelity suite passed; HumanISP, PerceptionISP, and aux edge maps are compared against object/sensor edge oracles across CFA and LensPSF, but this is not detector-performance evidence.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Object-box-boundary edge proxy report passed; HumanISP RGB, PerceptionISP RGB, aux edge-strength, and aux edge-confidence are compared around GT box boundaries, but this is not segmentation-contour or detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
 
@@ -316,6 +325,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
             self.assertIn("Object Edge Fidelity", html)
+            self.assertIn("Object Box Boundary Edge Proxy", html)
+            self.assertIn("object_boundary_edge_diagnostic", html)
             self.assertIn("Scene Edge Confidence", html)
             self.assertIn("CFA/LensPSF Proposal Edge Bridge", html)
             self.assertIn("CFA/LensPSF Native-CFA Separation", html)
@@ -375,6 +386,7 @@ class ClaimDashboardTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            object_boundary = _write_object_boundary_edge(root / "object_boundary")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -409,6 +421,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(edge_confidence),
                         "--edge-fidelity-suite",
                         str(edge_fidelity),
+                        "--object-boundary-edge",
+                        str(object_boundary),
                         "--scene-edge-confidence",
                         str(scene_edge),
                         "--scene-edge-confidence",
@@ -451,6 +465,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(summary["edge_confidence_suite"]["pass"])
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
+            self.assertTrue(summary["object_boundary_edge"]["pass"])
+            self.assertEqual(summary["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(summary["scene_information_stress"]["pass"])
@@ -1012,6 +1028,79 @@ def _write_edge_fidelity_suite(path: Path) -> Path:
                 ],
                 "interpretation": "unit edge fidelity",
                 "claim_boundary": "unit diagnostic boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_object_boundary_edge(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "object_boundary_edge_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "pass": True,
+                "claim_status": "object_boundary_edge_diagnostic",
+                "sample_count": 4,
+                "box_count": 6,
+                "included_labels": ["car", "pedestrian"],
+                "checks": [
+                    {"id": "finite_object_boundary_outputs", "status": "pass"},
+                    {"id": "object_box_boundaries_present", "status": "pass"},
+                    {"id": "object_boundary_metrics_bounded", "status": "pass"},
+                    {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
+                ],
+                "aggregate": {
+                    "human_rgb_edge_boundary_f1_mean": 0.030,
+                    "perception_rgb_edge_boundary_f1_mean": 0.031,
+                    "aux_edge_strength_boundary_f1_mean": 0.032,
+                    "aux_edge_confidence_boundary_f1_mean": 0.035,
+                    "perception_rgb_minus_human_boundary_f1_mean": 0.001,
+                    "perception_rgb_minus_human_boundary_f1_win_rate": 0.50,
+                    "aux_strength_minus_human_boundary_f1_mean": 0.002,
+                    "aux_strength_minus_human_boundary_f1_win_rate": 0.50,
+                    "aux_confidence_minus_human_boundary_f1_mean": 0.005,
+                    "aux_confidence_minus_human_boundary_f1_win_rate": 0.67,
+                },
+                "label_breakdown": [
+                    {
+                        "label": "car",
+                        "box_count": 4,
+                        "human_rgb_edge_boundary_f1_mean": 0.034,
+                        "perception_rgb_edge_boundary_f1_mean": 0.034,
+                        "aux_edge_strength_boundary_f1_mean": 0.033,
+                        "aux_edge_confidence_boundary_f1_mean": 0.036,
+                        "perception_rgb_minus_human_boundary_f1_mean": 0.0,
+                        "aux_strength_minus_human_boundary_f1_mean": -0.001,
+                    },
+                    {
+                        "label": "pedestrian",
+                        "box_count": 2,
+                        "human_rgb_edge_boundary_f1_mean": 0.024,
+                        "perception_rgb_edge_boundary_f1_mean": 0.025,
+                        "aux_edge_strength_boundary_f1_mean": 0.026,
+                        "aux_edge_confidence_boundary_f1_mean": 0.033,
+                        "perception_rgb_minus_human_boundary_f1_mean": 0.001,
+                        "aux_strength_minus_human_boundary_f1_mean": 0.002,
+                    },
+                ],
+                "area_breakdown": [
+                    {
+                        "area_bucket": "small",
+                        "box_count": 3,
+                        "human_rgb_edge_boundary_f1_mean": 0.024,
+                        "perception_rgb_edge_boundary_f1_mean": 0.024,
+                        "aux_edge_strength_boundary_f1_mean": 0.024,
+                        "aux_edge_confidence_boundary_f1_mean": 0.031,
+                        "perception_rgb_minus_human_boundary_f1_mean": 0.0,
+                        "aux_strength_minus_human_boundary_f1_mean": 0.0,
+                    }
+                ],
+                "interpretation": "unit object-boundary edge proxy",
+                "claim_boundary": "unit box-boundary proxy; not segmentation-contour or detector-performance evidence",
             }
         )
         + "\n"

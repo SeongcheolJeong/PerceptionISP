@@ -24,6 +24,7 @@ MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
 EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
+OBJECT_BOUNDARY_EDGE_SUMMARY = "object_boundary_edge_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
@@ -51,6 +52,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir.")
+    parser.add_argument("--object-boundary-edge", default=None, help="Object-box-boundary edge evidence summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
@@ -78,6 +80,7 @@ def main(argv: Any = None) -> int:
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
         edge_fidelity_suite=args.edge_fidelity_suite,
+        object_boundary_edge=args.object_boundary_edge,
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
@@ -121,6 +124,7 @@ def build_claim_dashboard(
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
+    object_boundary_edge: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
@@ -145,6 +149,7 @@ def build_claim_dashboard(
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
     edge_fidelity = _load_edge_fidelity_suite(edge_fidelity_suite) if edge_fidelity_suite is not None else None
+    object_boundary = _load_object_boundary_edge(object_boundary_edge) if object_boundary_edge is not None else None
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
@@ -189,6 +194,7 @@ def build_claim_dashboard(
         cfa_stress,
         edge_confidence,
         edge_fidelity,
+        object_boundary,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -213,6 +219,7 @@ def build_claim_dashboard(
         cfa_stress,
         edge_confidence,
         edge_fidelity,
+        object_boundary,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -237,6 +244,7 @@ def build_claim_dashboard(
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
         "edge_fidelity_suite": edge_fidelity,
+        "object_boundary_edge": object_boundary,
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
@@ -620,6 +628,33 @@ def _load_edge_fidelity_suite(spec: str | Path) -> Dict[str, Any]:
         "psf_sigmas": [_maybe_float(value) for value in data.get("psf_sigmas", ())],
         "top_rows": top_rows,
         "cases": cases[:12],
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_object_boundary_edge(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, OBJECT_BOUNDARY_EDGE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": bool(data.get("pass")) and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "sample_count": int(data.get("sample_count", 0)),
+        "box_count": int(data.get("box_count", 0)),
+        "included_labels": [str(value) for value in data.get("included_labels", ())],
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "aggregate": aggregate,
+        "label_breakdown": [row for row in data.get("label_breakdown", ()) if isinstance(row, Mapping)],
+        "area_breakdown": [row for row in data.get("area_breakdown", ()) if isinstance(row, Mapping)],
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1508,6 +1543,7 @@ def _build_evidence_map(
     cfa_stress_sweep: Mapping[str, Any] | None,
     edge_confidence_suite: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
+    object_boundary_edge: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -1634,6 +1670,18 @@ def _build_evidence_map(
                 "evidence": _edge_fidelity_evidence(edge_fidelity_suite),
                 "claim_boundary": "Front-end edge fidelity evidence only; object-boundary fidelity is not detector accuracy.",
                 "next_evidence": "Convert edge-fidelity deltas into detector confidence/FP/TP deltas per object and CFA.",
+            }
+        )
+
+    if object_boundary_edge is not None:
+        current.append(
+            {
+                "area": "KITTI object-box boundary edge proxy",
+                "status": "diagnostic" if bool(object_boundary_edge.get("pass")) else "not_supported",
+                "claim_strength": str(object_boundary_edge.get("claim_status", "object_boundary_edge_diagnostic")),
+                "evidence": _object_boundary_edge_evidence(object_boundary_edge),
+                "claim_boundary": "Box-boundary edge proxy only; KITTI boxes are not segmentation contours and this is not detector accuracy.",
+                "next_evidence": "Use segmentation/object contour GT or correlate boundary-edge metrics with TP/FP confidence on the same samples.",
             }
         )
 
@@ -2106,6 +2154,21 @@ def _edge_fidelity_evidence(edge_fidelity: Mapping[str, Any]) -> str:
     return f"cases={int(edge_fidelity.get('case_count', 0))}; CFA={cfas}; LensPSF={psf}; {top or 'no top rows'}"
 
 
+def _object_boundary_edge_evidence(object_boundary: Mapping[str, Any]) -> str:
+    aggregate = object_boundary.get("aggregate", {}) if isinstance(object_boundary.get("aggregate"), Mapping) else {}
+    labels = ", ".join(str(value) for value in object_boundary.get("included_labels", ())) or "none"
+    return (
+        f"samples={int(object_boundary.get('sample_count', 0))}; boxes={int(object_boundary.get('box_count', 0))}; "
+        f"labels={labels}; "
+        f"HumanF1={_fmt(aggregate.get('human_rgb_edge_boundary_f1_mean'))}; "
+        f"PerceptionF1={_fmt(aggregate.get('perception_rgb_edge_boundary_f1_mean'))}; "
+        f"AuxStrengthF1={_fmt(aggregate.get('aux_edge_strength_boundary_f1_mean'))}; "
+        f"AuxConfidenceF1={_fmt(aggregate.get('aux_edge_confidence_boundary_f1_mean'))}; "
+        f"AuxConfidence dF1={_fmt(aggregate.get('aux_confidence_minus_human_boundary_f1_mean'), signed=True)}; "
+        f"AuxConfidence win={_fmt(aggregate.get('aux_confidence_minus_human_boundary_f1_win_rate'))}"
+    )
+
+
 def _scene_edge_evidence(scene_edge: Mapping[str, Any]) -> str:
     cfas = ", ".join(str(value) for value in scene_edge.get("cfa_patterns", ())) or "none"
     psf = ", ".join(_fmt(value) for value in scene_edge.get("psf_sigmas", ()) if value is not None) or "none"
@@ -2491,6 +2554,7 @@ def _claim_decisions(
     cfa_stress_sweep: Mapping[str, Any] | None,
     edge_confidence_suite: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
+    object_boundary_edge: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -2594,6 +2658,17 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in edge_fidelity_suite.get("failed_checks", ())) or "configured object edge-fidelity checks"
             decisions.append({"status": "not_supported", "claim": f"Object edge-fidelity suite failed for {failed}; do not use edge fidelity as feasibility evidence yet."})
+    if object_boundary_edge is not None:
+        if bool(object_boundary_edge.get("pass")):
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": "Object-box-boundary edge proxy report passed; HumanISP RGB, PerceptionISP RGB, aux edge-strength, and aux edge-confidence are compared around GT box boundaries, but this is not segmentation-contour or detector-performance evidence.",
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in object_boundary_edge.get("failed_checks", ())) or "configured object-box-boundary checks"
+            decisions.append({"status": "not_supported", "claim": f"Object-box-boundary edge proxy report failed for {failed}; do not use it as object-edge feasibility evidence yet."})
     if scene_edge_confidence is not None:
         if bool(scene_edge_confidence.get("pass")):
             decisions.append(
@@ -3095,6 +3170,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     edge_confidence_html = _edge_confidence_html(edge_confidence, destination) if isinstance(edge_confidence, Mapping) else "<p>No edge-confidence suite summary was provided.</p>"
     edge_fidelity = dashboard.get("edge_fidelity_suite")
     edge_fidelity_html = _edge_fidelity_html(edge_fidelity, destination) if isinstance(edge_fidelity, Mapping) else "<p>No object edge-fidelity suite summary was provided.</p>"
+    object_boundary = dashboard.get("object_boundary_edge")
+    object_boundary_html = (
+        _object_boundary_edge_html(object_boundary, destination)
+        if isinstance(object_boundary, Mapping)
+        else "<p>No object-box-boundary edge summary was provided.</p>"
+    )
     cfa_lenspsf_detector = dashboard.get("cfa_lenspsf_detector_sweep")
     cfa_lenspsf_detector_html = (
         _cfa_lenspsf_detector_html(cfa_lenspsf_detector, destination)
@@ -3198,6 +3279,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {edge_confidence_html}
   <h2>Object Edge Fidelity</h2>
   {edge_fidelity_html}
+  <h2>Object Box Boundary Edge Proxy</h2>
+  {object_boundary_html}
   <h2>CFA/LensPSF Detector Sweep</h2>
   {cfa_lenspsf_detector_html}
   <h2>CFA/LensPSF Proposal Edge Bridge</h2>
@@ -3942,6 +4025,54 @@ def _edge_fidelity_html(edge_fidelity: Mapping[str, Any], destination: Path) -> 
     )
 
 
+def _object_boundary_edge_html(object_boundary: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(object_boundary.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in object_boundary.get("failed_checks", ())) or "none"
+    labels = ", ".join(str(value) for value in object_boundary.get("included_labels", ())) or "none"
+    aggregate = object_boundary.get("aggregate", {}) if isinstance(object_boundary.get("aggregate"), Mapping) else {}
+    label_rows = "".join(
+        _object_boundary_group_row(row, key="label")
+        for row in object_boundary.get("label_breakdown", ())
+        if isinstance(row, Mapping)
+    )
+    if not label_rows:
+        label_rows = '<tr><td colspan="9">No label breakdown was available.</td></tr>'
+    area_rows = "".join(
+        _object_boundary_group_row(row, key="area_bucket")
+        for row in object_boundary.get("area_breakdown", ())
+        if isinstance(row, Mapping)
+    )
+    if not area_rows:
+        area_rows = '<tr><td colspan="9">No area-bucket breakdown was available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(object_boundary.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(object_boundary.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(object_boundary.get('interpretation', '')))} "
+        f"{html_lib.escape(str(object_boundary.get('claim_boundary', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Samples</th><th>Boxes</th><th>Labels</th><th>Failed</th><th>Human F1</th><th>Perception F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th><th>Aux Confidence dF1</th><th>Aux Confidence Win</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(object_boundary, destination)}</td>"
+        f"<td>{int(object_boundary.get('sample_count', 0))}</td>"
+        f"<td>{int(object_boundary.get('box_count', 0))}</td>"
+        f"<td>{html_lib.escape(labels)}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        f"<td>{_fmt(aggregate.get('human_rgb_edge_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('perception_rgb_edge_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('aux_edge_strength_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('aux_edge_confidence_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('aux_confidence_minus_human_boundary_f1_mean'), signed=True)}</td>"
+        f"<td>{_fmt(aggregate.get('aux_confidence_minus_human_boundary_f1_win_rate'))}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Label</th><th>Boxes</th><th>Human F1</th><th>Perception F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th><th>Perception dF1</th><th>Aux Strength dF1</th><th>Aux Confidence dF1</th></tr></thead>"
+        f"<tbody>{label_rows}</tbody></table>"
+        "<table>"
+        "<thead><tr><th>Area</th><th>Boxes</th><th>Human F1</th><th>Perception F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th><th>Perception dF1</th><th>Aux Strength dF1</th><th>Aux Confidence dF1</th></tr></thead>"
+        f"<tbody>{area_rows}</tbody></table>"
+    )
+
+
 def _cfa_lenspsf_detector_html(sweep: Mapping[str, Any], destination: Path) -> str:
     status_class = "supported" if bool(sweep.get("pass")) else "not_supported"
     failed = ", ".join(str(value) for value in sweep.get("failed_checks", ())) or "none"
@@ -4316,6 +4447,37 @@ def _edge_fidelity_case_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('aux_object_edge_f1'))}</td>"
         "</tr>"
     )
+
+
+def _object_boundary_group_row(row: Mapping[str, Any], *, key: str) -> str:
+    aux_confidence_delta = row.get("aux_confidence_minus_human_boundary_f1_mean")
+    if aux_confidence_delta is None:
+        aux_confidence_delta = _delta(
+            row.get("aux_edge_confidence_boundary_f1_mean"),
+            row.get("human_rgb_edge_boundary_f1_mean"),
+        )
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get(key, '')))}</code></td>"
+        f"<td>{int(row.get('box_count', 0))}</td>"
+        f"<td>{_fmt(row.get('human_rgb_edge_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('perception_rgb_edge_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('aux_edge_strength_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('aux_edge_confidence_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('perception_rgb_minus_human_boundary_f1_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('aux_strength_minus_human_boundary_f1_mean'), signed=True)}</td>"
+        f"<td>{_fmt(aux_confidence_delta, signed=True)}</td>"
+        "</tr>"
+    )
+
+
+def _delta(value: Any, baseline: Any) -> float | None:
+    if value is None or baseline is None:
+        return None
+    try:
+        return float(value) - float(baseline)
+    except (TypeError, ValueError):
+        return None
 
 
 def _scene_edge_html(scene_edge: Mapping[str, Any], destination: Path) -> str:
