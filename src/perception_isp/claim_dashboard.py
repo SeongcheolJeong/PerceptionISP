@@ -27,6 +27,7 @@ SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
 CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
+CASEBOOK_SUMMARY = "casebook_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -45,6 +46,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir.")
+    parser.add_argument("--casebook", default=None, help="Success/failure casebook summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -64,6 +66,7 @@ def main(argv: Any = None) -> int:
         aux_contribution_audit=args.aux_contribution_audit,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
+        casebook=args.casebook,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -99,6 +102,7 @@ def build_claim_dashboard(
     aux_contribution_audit: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
+    casebook: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
@@ -123,6 +127,7 @@ def build_claim_dashboard(
         if cfa_lenspsf_proposal_audit is not None
         else None
     )
+    casebook_data = _load_casebook(casebook) if casebook is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
     decisions = _claim_decisions(
         claims,
@@ -139,6 +144,7 @@ def build_claim_dashboard(
         aux_contribution,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
+        casebook_data,
     )
     evidence_map = _build_evidence_map(
         claims,
@@ -155,6 +161,7 @@ def build_claim_dashboard(
         aux_contribution,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
+        casebook_data,
     )
     return {
         "claims": claims,
@@ -171,6 +178,7 @@ def build_claim_dashboard(
         "aux_contribution_audit": aux_contribution,
         "cfa_lenspsf_detector_sweep": cfa_lenspsf_detector,
         "cfa_lenspsf_proposal_audit": cfa_lenspsf_proposal,
+        "casebook": casebook_data,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "evidence_map": evidence_map,
@@ -755,6 +763,60 @@ def _load_cfa_lenspsf_proposal_audit(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_casebook(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, CASEBOOK_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    categories: Dict[str, Any] = {}
+    for name, payload in (data.get("categories", {}) if isinstance(data.get("categories"), Mapping) else {}).items():
+        if not isinstance(payload, Mapping):
+            continue
+        cases = []
+        for row in payload.get("cases", ())[:8]:
+            if not isinstance(row, Mapping):
+                continue
+            cases.append(
+                {
+                    "sample_id": str(row.get("sample_id", "")),
+                    "category": str(row.get("category", "")),
+                    "visual_path": str(row.get("visual_path", "")),
+                    "tp_delta@0.50": int(row.get("tp_delta@0.50", 0)),
+                    "fp_delta@0.50": int(row.get("fp_delta@0.50", 0)),
+                    "baseline_tp@0.50": int(row.get("baseline_tp@0.50", 0)),
+                    "baseline_fp@0.50": int(row.get("baseline_fp@0.50", 0)),
+                    "target_tp@0.50": int(row.get("target_tp@0.50", 0)),
+                    "target_fp@0.50": int(row.get("target_fp@0.50", 0)),
+                    "cfa_pattern": str(row.get("cfa_pattern", "")),
+                    "pattern_remapped": bool(row.get("pattern_remapped", False)),
+                }
+            )
+        categories[str(name)] = {
+            "case_count": int(payload.get("case_count", 0)),
+            "selected_case_count": int(payload.get("selected_case_count", 0)),
+            "cases": cases,
+        }
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "sample_count": int(data.get("sample_count", 0)),
+        "selected_case_count": int(data.get("selected_case_count", 0)),
+        "baseline_input": str(data.get("baseline_input", "")),
+        "target_input": str(data.get("target_input", "")),
+        "aggregate": data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {},
+        "checks": checks,
+        "failed_checks": failed,
+        "categories": categories,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
 def _dashboard_primary_downstream_input(run: Mapping[str, Any]) -> str:
     metrics = run.get("metrics", {}) if isinstance(run.get("metrics"), Mapping) else {}
     for input_name in metrics:
@@ -917,6 +979,7 @@ def _build_evidence_map(
     aux_contribution_audit: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
+    casebook: Mapping[str, Any] | None,
 ) -> Dict[str, Any]:
     current: list[Dict[str, Any]] = []
     broad = _first_claim(claims, "broad_superiority")
@@ -1087,6 +1150,18 @@ def _build_evidence_map(
             }
         )
 
+    if casebook is not None:
+        current.append(
+            {
+                "area": "Visual success/failure casebook",
+                "status": "diagnostic" if bool(casebook.get("pass")) else "not_supported",
+                "claim_strength": "qualitative_review",
+                "evidence": _casebook_evidence(casebook),
+                "claim_boundary": "Qualitative case review only; does not replace held-out gates, native RAW/CFA coverage, or DNN evaluation.",
+                "next_evidence": "Expand the casebook with native-CFA/adverse-condition slices and reviewable TP-loss counterexamples.",
+            }
+        )
+
     if training is not None:
         training_status = str(training.get("status", ""))
         current.append(
@@ -1110,6 +1185,7 @@ def _build_evidence_map(
             cfa_stress_sweep=cfa_stress_sweep,
             cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
             cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
+            casebook=casebook,
             training=training,
         ),
     }
@@ -1246,6 +1322,21 @@ def _cfa_lenspsf_proposal_evidence(audit: Mapping[str, Any]) -> str:
     )
 
 
+def _casebook_evidence(casebook: Mapping[str, Any]) -> str:
+    categories = casebook.get("categories", {}) if isinstance(casebook.get("categories"), Mapping) else {}
+    parts = [
+        f"samples={int(casebook.get('sample_count', 0))}",
+        f"selected={int(casebook.get('selected_case_count', 0))}",
+    ]
+    for name in ("fp_reduction_success", "recall_tradeoff", "recall_loss_failure", "fp_regression_failure"):
+        payload = categories.get(name, {}) if isinstance(categories.get(name), Mapping) else {}
+        parts.append(f"{name}={int(payload.get('case_count', 0))}/{int(payload.get('selected_case_count', 0))}")
+    aggregate = casebook.get("aggregate", {}) if isinstance(casebook.get("aggregate"), Mapping) else {}
+    parts.append(f"dTP={int(aggregate.get('tp_delta_count', 0))}")
+    parts.append(f"dFP={int(aggregate.get('fp_delta_count', 0))}")
+    return "; ".join(parts)
+
+
 def _edge_confidence_evidence(edge_confidence: Mapping[str, Any]) -> str:
     deltas = "; ".join(
         f"{row.get('metric', '')} {row.get('check', '')}={_fmt(row.get('delta'), signed=True)}"
@@ -1345,6 +1436,7 @@ def _future_evidence_rows(
     cfa_stress_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
+    casebook: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
@@ -1368,6 +1460,11 @@ def _future_evidence_rows(
     else:
         cfa_gap = "Need CFA/LensPSF front-end diagnostics first."
     training_status = str(training.get("status", "")) if training is not None else "missing"
+    casebook_gap = (
+        "Visual success/failure casebook exists; next step is native-CFA/adverse-condition expansion."
+        if casebook is not None
+        else "Dashboard has gates and aggregate slices, but not a curated visual failure/success report."
+    )
     return [
         {
             "priority": "P0",
@@ -1401,7 +1498,7 @@ def _future_evidence_rows(
             "priority": "P1",
             "evidence": "Failure and slice report",
             "why": "Makes the feasibility claim more credible by showing where PerceptionISP helps, where it is neutral, and where it hurts.",
-            "current_gap": "Dashboard has gates and aggregate slices, but not a curated visual failure/success report.",
+            "current_gap": casebook_gap,
             "implementation_path": "Collect representative FP removals, TP losses, CFA/PSF wins, and counterexamples into a visual casebook.",
         },
     ]
@@ -1459,6 +1556,7 @@ def _claim_decisions(
     aux_contribution_audit: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
+    casebook: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -1601,6 +1699,26 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in aux_contribution_audit.get("failed_checks", ())) or "configured aux contribution checks"
             decisions.append({"status": "not_supported", "claim": f"Aux contribution audit failed for {failed}; do not claim aux helps proposal scoring yet."})
+    if casebook is not None:
+        if bool(casebook.get("pass")):
+            categories = casebook.get("categories", {}) if isinstance(casebook.get("categories"), Mapping) else {}
+            success = categories.get("fp_reduction_success", {}) if isinstance(categories.get("fp_reduction_success"), Mapping) else {}
+            counterexamples = sum(
+                int((categories.get(name, {}) if isinstance(categories.get(name), Mapping) else {}).get("selected_case_count", 0))
+                for name in ("recall_tradeoff", "recall_loss_failure", "fp_regression_failure")
+            )
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "Visual success/failure casebook is available for qualitative review: "
+                        f"selected FP-reduction successes {int(success.get('selected_case_count', 0))}, selected counterexamples {counterexamples}."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in casebook.get("failed_checks", ())) or "configured casebook checks"
+            decisions.append({"status": "not_supported", "claim": f"Visual success/failure casebook failed for {failed}; do not use it as review evidence yet."})
     bridge = _scene_aux_downstream_bridge(scene_edge_confidence, aux_contribution_audit)
     if bridge is not None:
         decisions.append(bridge)
@@ -1816,6 +1934,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
     aux_contribution = dashboard.get("aux_contribution_audit")
     aux_contribution_html = _aux_contribution_html(aux_contribution, destination) if isinstance(aux_contribution, Mapping) else "<p>No aux contribution audit was provided.</p>"
+    casebook = dashboard.get("casebook")
+    casebook_html = _casebook_html(casebook, destination) if isinstance(casebook, Mapping) else "<p>No success/failure casebook was provided.</p>"
     task_metrics = dashboard.get("task_metrics")
     task_metrics_html = _task_metrics_html(task_metrics, destination) if isinstance(task_metrics, Mapping) else "<p>No task metrics summary was provided.</p>"
     task_gate = dashboard.get("task_gate")
@@ -1891,6 +2011,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {training_html}
   <h2>Aux Contribution Audit</h2>
   {aux_contribution_html}
+  <h2>Success/Failure Casebook</h2>
+  {casebook_html}
   <h2>Task Metrics</h2>
   {task_metrics_html}
   <h2>Task Gate</h2>
@@ -2067,6 +2189,61 @@ def _aux_contribution_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('delta_fp@0.50'), signed=True)}</td>"
         "</tr>"
     )
+
+
+def _casebook_html(casebook: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(casebook.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in casebook.get("failed_checks", ())) or "none"
+    aggregate = casebook.get("aggregate", {}) if isinstance(casebook.get("aggregate"), Mapping) else {}
+    category_rows = "".join(
+        _casebook_category_row(name, payload)
+        for name, payload in (casebook.get("categories", {}) if isinstance(casebook.get("categories"), Mapping) else {}).items()
+        if isinstance(payload, Mapping)
+    )
+    if not category_rows:
+        category_rows = '<tr><td colspan="5">No case categories were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(casebook.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(casebook.get('interpretation', '')))} "
+        f"{html_lib.escape(str(casebook.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Samples</th><th>Selected Cases</th><th>Baseline</th><th>Target</th><th>dTP</th><th>dFP</th><th>Failed</th></tr></thead><tbody>"
+        f"<tr><td>{_report_link(casebook, destination)}</td>"
+        f"<td>{int(casebook.get('sample_count', 0))}</td>"
+        f"<td>{int(casebook.get('selected_case_count', 0))}</td>"
+        f"<td><code>{html_lib.escape(str(casebook.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(casebook.get('target_input', '')))}</code></td>"
+        f"<td>{int(aggregate.get('tp_delta_count', 0))}</td>"
+        f"<td>{int(aggregate.get('fp_delta_count', 0))}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<table><thead><tr><th>Category</th><th>Total Samples</th><th>Selected</th><th>Example Samples</th><th>Meaning</th></tr></thead>"
+        f"<tbody>{category_rows}</tbody></table>"
+    )
+
+
+def _casebook_category_row(name: str, payload: Mapping[str, Any]) -> str:
+    examples = ", ".join(
+        str(row.get("sample_id", ""))
+        for row in payload.get("cases", ())[:5]
+        if isinstance(row, Mapping)
+    )
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(name))}</code></td>"
+        f"<td>{int(payload.get('case_count', 0))}</td>"
+        f"<td>{int(payload.get('selected_case_count', 0))}</td>"
+        f"<td>{html_lib.escape(examples or 'none')}</td>"
+        f"<td>{html_lib.escape(_casebook_category_description(str(name)))}</td>"
+        "</tr>"
+    )
+
+
+def _casebook_category_description(name: str) -> str:
+    return {
+        "fp_reduction_success": "Target reduces FP while preserving same-sample TP count.",
+        "recall_tradeoff": "Target reduces FP but loses same-sample TP count.",
+        "recall_loss_failure": "Target loses same-sample TP without an FP reduction.",
+        "fp_regression_failure": "Target adds same-sample FP versus baseline.",
+    }.get(name, "")
 
 
 def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:

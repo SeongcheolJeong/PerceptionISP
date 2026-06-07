@@ -939,6 +939,7 @@ PYTHONPATH=src \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf \
+  --casebook reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
@@ -965,6 +966,32 @@ section that summarizes the recommended claim posture, blocked claims, current
 evidence rows, and the next evidence to build. For the current bundle, the
 recommended posture is a narrow recall-budgeted FP-reduction claim with
 front-end/aux feasibility support; broad HumanISP superiority remains blocked.
+
+Build a visual success/failure casebook from the same 1496-image claim report:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.casebook \
+  reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496 \
+  --baseline-input human_rgb \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
+  --max-cases-per-category 8 \
+  --output-dir reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human
+```
+
+The current casebook report is:
+
+```text
+reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
+```
+
+It selects 32 visual cases from the claim-gate comparison: 8 FP-reduction
+successes, 8 recall tradeoffs, 8 recall-loss failures, and 8 FP-regression
+failures. Across all 1496 samples, the same sample-level accounting gives
+`fp_reduction_success=304`, `recall_tradeoff=24`, `recall_loss_failure=56`,
+and `fp_regression_failure=57`, with net detection counts `dFP=-336` and
+`dTP=-55`. This is qualitative review evidence only; it is useful for showing
+where the claim helps and where it fails, but it does not replace held-out
+gates, native RAW/CFA coverage, or trained RGB+Aux DNN evaluation.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -1341,6 +1368,7 @@ reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf/index.html
+reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
@@ -1364,15 +1392,17 @@ that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 The same dashboard's `Performance Evidence Map` now includes a diagnostic
 CFA/LensPSF detector condition sweep row and a CFA/LensPSF proposal-edge bridge
-row. The proposal bridge removes 121 FP and 0 TP proposals across the val32
+row, plus a visual success/failure casebook row. The proposal bridge removes 121 FP and 0 TP proposals across the val32
 condition sweep; source scene-edge evidence is directionally positive in 10/12
-conditions, while aux-edge evidence is positive in 3/12. It lists five next
-evidence targets: larger/native CFA-separated scene-edge proposal correlation
-across CFA/LensPSF, a larger CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune
-gate, high-information real-scene expansion, and a failure/slice casebook. The
-previous aux-edge, source scene-edge same-sample proposal correlations, val32
-CFA/LensPSF detector sweep, and val32 CFA/LensPSF proposal-edge bridge are now
-part of the current evidence rows.
+conditions, while aux-edge evidence is positive in 3/12. The casebook selects
+32 review images and keeps both wins and counterexamples visible. It lists five
+next evidence targets: larger/native CFA-separated scene-edge proposal
+correlation across CFA/LensPSF, a larger CFA/LensPSF detector sweep, RGB+Aux DNN
+fine-tune gate, high-information real-scene expansion, and native/adverse
+condition casebook expansion. The previous aux-edge, source scene-edge
+same-sample proposal correlations, val32 CFA/LensPSF detector sweep, val32
+CFA/LensPSF proposal-edge bridge, and visual casebook are now part of the
+current evidence rows.
 
 The current 1496-image naive RAW-like baseline is:
 

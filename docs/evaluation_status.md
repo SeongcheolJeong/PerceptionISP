@@ -616,6 +616,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Scene edge-confidence suite | `pass`; a `640 x 480` real sample image is fed through CameraE2E to a `320 x 240` `GRBG` sensor target with no CFA remap. Against the high-resolution scene-edge proxy, HumanISP RGB proxy F1 is `0.6644`, PerceptionISP RGB proxy F1 is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and aux edge-confidence F1 is `0.3727`. This is front-end scene-edge evidence, not object-boundary or detector performance evidence |
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622`. In the same-sample bridge, incremental aux scoring removes 95 FP and 16 TP proposals; removed FP has lower aux edge support than kept TP (`delta=-0.0596`, low-edge AUC `0.6904`) and lower source scene-edge support (`delta=-0.0302`, low-scene-edge AUC `0.6681`) |
+| Visual success/failure casebook | `pass` as qualitative review evidence; `reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human` selects 32 visual cases from the same 1496-image claim report: 8 FP-reduction successes, 8 recall tradeoffs, 8 recall-loss failures, and 8 FP-regression failures. Across all samples, `fp_reduction_success=304`, `recall_tradeoff=24`, `recall_loss_failure=56`, `fp_regression_failure=57`, with net `dFP=-336` and `dTP=-55`. This helps explain where the narrow FP-reduction claim works and fails, but it is not a replacement for held-out gates, native RAW/CFA coverage, or trained RGB+Aux DNN evaluation |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
@@ -1000,6 +1001,19 @@ the calibrated proposal path removes 121 FP and 0 TP proposals, source
 scene-edge support is positive in 10/12 conditions, and aux-edge support is
 positive in 3/12. The next step is to increase sample scale and separate native
 CFA simulation from bridge-remap sensitivity.
+
+The qualitative success/failure casebook for the current HumanISP-relative
+claim is:
+
+```text
+reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
+reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/casebook_summary.json
+```
+
+It renders 32 visual examples with ground-truth, baseline-only, target-only, and
+common detection overlays. It deliberately includes both successes and
+counterexamples so the FP-reduction claim is not presented as broad
+superiority.
 
 Live normal-harness verification:
 

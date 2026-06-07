@@ -84,6 +84,12 @@ Known limits:
   identifies removed FP proposals versus kept TP proposals with AUC `0.6904`,
   and source scene-edge support inside the same proposal boxes gives AUC
   `0.6681`.
+- The success/failure casebook renders representative sample-level wins and
+  counterexamples from the same comparison report used by claim gates. The
+  current KITTI val1496 casebook selects 32 visual cases and shows
+  `fp_reduction_success=304`, `recall_tradeoff=24`, `recall_loss_failure=56`,
+  and `fp_regression_failure=57` across the full run. It is qualitative review
+  evidence, not a replacement for metric gates or native RAW/CFA coverage.
 - The condition gate currently uses KITTI metadata/proxy slices; it does not replace real night/rain/fog/HDR RAW datasets.
 - The benchmark-protocol checklist is a claim blocker/coverage tool; it does not create missing real-RAW or adverse-condition evidence by itself.
 - CameraE2E integration is optional and environment-dependent.

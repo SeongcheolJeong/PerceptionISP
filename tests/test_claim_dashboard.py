@@ -29,6 +29,7 @@ class ClaimDashboardTest(unittest.TestCase):
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            casebook = _write_casebook(root / "casebook")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -45,6 +46,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 aux_contribution_audit=aux_contribution,
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
+                casebook=casebook,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -68,6 +70,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertTrue(dashboard["casebook"]["pass"])
             self.assertEqual(
                 dashboard["evidence_map"]["claim_posture"]["recommended_claim"],
                 "Use a narrow recall-budgeted FP-reduction claim, with front-end/aux evidence as feasibility support.",
@@ -79,6 +82,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Aux evidence used downstream", evidence_areas)
             self.assertIn("CFA/LensPSF detector condition sweep", evidence_areas)
             self.assertIn("CFA/LensPSF proposal-edge bridge", evidence_areas)
+            self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
                     row["area"] == "Broad HumanISP superiority" and row["status"] == "not_supported"
@@ -129,6 +133,10 @@ class ClaimDashboardTest(unittest.TestCase):
                 "CFA/LensPSF proposal-edge audit passed as condition-level bridge evidence: removed FP 7, removed TP 1, source scene-edge positive conditions 2.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
+            self.assertIn(
+                "Visual success/failure casebook is available for qualitative review: selected FP-reduction successes 2, selected counterexamples 3.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
             self.assertTrue(
                 any(
                     item["claim"].startswith("Front-end/downstream bridge is directionally positive")
@@ -167,6 +175,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
+            self.assertIn("Success/Failure Casebook", html)
+            self.assertIn("fp_reduction_success", html)
             self.assertIn("Removed FP Edge Delta vs Kept TP", html)
             self.assertIn("Low-Edge AUC", html)
             self.assertIn("Source Scene Edge AUC", html)
@@ -201,6 +211,7 @@ class ClaimDashboardTest(unittest.TestCase):
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            casebook = _write_casebook(root / "casebook")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -231,6 +242,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(cfa_lenspsf_detector),
                         "--cfa-lenspsf-proposal-audit",
                         str(cfa_lenspsf_proposal),
+                        "--casebook",
+                        str(casebook),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -251,6 +264,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertTrue(summary["casebook"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -952,6 +966,39 @@ def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
         "claim_boundary": "unit proposal boundary",
     }
     (path / "cfa_lenspsf_proposal_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_casebook(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "visual.png").write_text("placeholder")
+    payload = {
+        "status": "pass",
+        "sample_count": 16,
+        "selected_case_count": 5,
+        "baseline_input": "human_rgb",
+        "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+        "aggregate": {"tp_delta_count": -1, "fp_delta_count": -6},
+        "checks": [
+            {"id": "casebook_has_selected_cases", "status": "pass", "evidence": "selected_cases=5"},
+            {"id": "casebook_includes_fp_reduction_successes", "status": "pass", "evidence": "selected_successes=2"},
+            {"id": "casebook_includes_counterexamples", "status": "pass", "evidence": "selected_counterexamples=3"},
+        ],
+        "categories": {
+            "fp_reduction_success": {
+                "case_count": 9,
+                "selected_case_count": 2,
+                "cases": [{"sample_id": "success", "visual_path": str(path / "visual.png"), "category": "fp_reduction_success"}],
+            },
+            "recall_tradeoff": {"case_count": 3, "selected_case_count": 1, "cases": [{"sample_id": "tradeoff"}]},
+            "recall_loss_failure": {"case_count": 2, "selected_case_count": 1, "cases": [{"sample_id": "recall_loss"}]},
+            "fp_regression_failure": {"case_count": 1, "selected_case_count": 1, "cases": [{"sample_id": "fp_regression"}]},
+        },
+        "interpretation": "unit casebook",
+        "claim_boundary": "unit casebook boundary",
+    }
+    (path / "casebook_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

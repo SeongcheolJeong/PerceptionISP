@@ -27,6 +27,7 @@ class ClaimReadinessTest(unittest.TestCase):
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            casebook = _write_casebook(root / "casebook")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -43,6 +44,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
+                casebook=casebook,
                 output_dir=root / "readiness",
             )
 
@@ -69,6 +71,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("cfa_lenspsf_proposal_audit", summary)
+            self.assertIn("casebook", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -78,6 +81,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertEqual(summary["cfa_lenspsf_proposal_audit"]["removed_fp_count"], 5)
+            self.assertTrue(summary["casebook"]["pass"])
+            self.assertEqual(summary["casebook"]["selected_case_count"], 4)
             self.assertEqual(summary["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
@@ -108,6 +113,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertTrue(dashboard_summary["casebook"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -603,6 +609,34 @@ def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
         "claim_boundary": "unit proposal boundary",
     }
     (path / "cfa_lenspsf_proposal_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_casebook(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "sample_count": 3,
+        "selected_case_count": 4,
+        "baseline_input": "human_rgb",
+        "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
+        "aggregate": {"tp_delta_count": 0, "fp_delta_count": -3},
+        "checks": [
+            {"id": "casebook_has_selected_cases", "status": "pass", "evidence": "selected_cases=4"},
+            {"id": "casebook_includes_fp_reduction_successes", "status": "pass", "evidence": "selected_successes=1"},
+            {"id": "casebook_includes_counterexamples", "status": "pass", "evidence": "selected_counterexamples=3"},
+        ],
+        "categories": {
+            "fp_reduction_success": {"case_count": 1, "selected_case_count": 1, "cases": [{"sample_id": "success"}]},
+            "recall_tradeoff": {"case_count": 1, "selected_case_count": 1, "cases": [{"sample_id": "tradeoff"}]},
+            "recall_loss_failure": {"case_count": 1, "selected_case_count": 1, "cases": [{"sample_id": "recall_loss"}]},
+            "fp_regression_failure": {"case_count": 1, "selected_case_count": 1, "cases": [{"sample_id": "fp_regression"}]},
+        },
+        "interpretation": "unit casebook",
+        "claim_boundary": "unit casebook boundary",
+    }
+    (path / "casebook_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 
