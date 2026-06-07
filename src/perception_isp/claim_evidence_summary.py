@@ -26,6 +26,7 @@ PERFORMANCE_AREAS = {
 }
 BOUNDARY_AREAS = {
     "Benchmark protocol coverage",
+    "Large held-out native RAW benchmark",
     "CFA/LensPSF native-CFA separation",
 }
 

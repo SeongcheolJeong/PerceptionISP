@@ -27,6 +27,7 @@ EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 OBJECT_BOUNDARY_EDGE_SUMMARY = "object_boundary_edge_summary.json"
 OBJECT_BOUNDARY_DETECTION_BRIDGE_SUMMARY = "object_boundary_detection_bridge_summary.json"
 DETECTOR_BOX_SUPPORT_AUDIT_SUMMARY = "detector_box_support_audit_summary.json"
+NATIVE_HELDOUT_BENCHMARK_AUDIT_SUMMARY = "native_heldout_benchmark_audit_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
@@ -57,6 +58,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--object-boundary-edge", default=None, help="Object-box-boundary edge evidence summary path/dir.")
     parser.add_argument("--object-boundary-detection-bridge", default=None, help="Object-box-boundary edge to detector TP/miss bridge summary path/dir.")
     parser.add_argument("--detector-box-support-audit", default=None, help="Detector-box FP/TP support audit summary path/dir.")
+    parser.add_argument("--native-heldout-benchmark-audit", default=None, help="Large held-out native RAW benchmark audit summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
@@ -87,6 +89,7 @@ def main(argv: Any = None) -> int:
         object_boundary_edge=args.object_boundary_edge,
         object_boundary_detection_bridge=args.object_boundary_detection_bridge,
         detector_box_support_audit=args.detector_box_support_audit,
+        native_heldout_benchmark_audit=args.native_heldout_benchmark_audit,
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
@@ -133,6 +136,7 @@ def build_claim_dashboard(
     object_boundary_edge: str | Path | None = None,
     object_boundary_detection_bridge: str | Path | None = None,
     detector_box_support_audit: str | Path | None = None,
+    native_heldout_benchmark_audit: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
@@ -160,6 +164,11 @@ def build_claim_dashboard(
     object_boundary = _load_object_boundary_edge(object_boundary_edge) if object_boundary_edge is not None else None
     object_boundary_bridge = _load_object_boundary_detection_bridge(object_boundary_detection_bridge) if object_boundary_detection_bridge is not None else None
     detector_box_support = _load_detector_box_support_audit(detector_box_support_audit) if detector_box_support_audit is not None else None
+    native_heldout = (
+        _load_native_heldout_benchmark_audit(native_heldout_benchmark_audit)
+        if native_heldout_benchmark_audit is not None
+        else None
+    )
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
@@ -207,6 +216,7 @@ def build_claim_dashboard(
         object_boundary,
         object_boundary_bridge,
         detector_box_support,
+        native_heldout,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -234,6 +244,7 @@ def build_claim_dashboard(
         object_boundary,
         object_boundary_bridge,
         detector_box_support,
+        native_heldout,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -261,6 +272,7 @@ def build_claim_dashboard(
         "object_boundary_edge": object_boundary,
         "object_boundary_detection_bridge": object_boundary_bridge,
         "detector_box_support_audit": detector_box_support,
+        "native_heldout_benchmark_audit": native_heldout,
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
@@ -727,6 +739,36 @@ def _load_detector_box_support_audit(spec: str | Path) -> Dict[str, Any]:
         "input_summaries": [row for row in data.get("input_summaries", ()) if isinstance(row, Mapping)],
         "target_summary": data.get("target_summary", {}) if isinstance(data.get("target_summary"), Mapping) else {},
         "transition_bridge": data.get("transition_bridge", {}) if isinstance(data.get("transition_bridge"), Mapping) else {},
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_native_heldout_benchmark_audit(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, NATIVE_HELDOUT_BENCHMARK_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    provenance = data.get("provenance", {}) if isinstance(data.get("provenance"), Mapping) else {}
+    metric_summary = data.get("metric_summary", {}) if isinstance(data.get("metric_summary"), Mapping) else {}
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": bool(data.get("pass")) and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "sample_count": int(data.get("sample_count", 0)),
+        "min_samples": int(data.get("min_samples", 0)),
+        "baseline_input": str(data.get("baseline_input", "")),
+        "target_input": str(data.get("target_input", "")),
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "provenance": dict(provenance),
+        "metric_summary": dict(metric_summary),
+        "source_comparison_summary": str(data.get("source_comparison_summary", "")),
+        "source_comparison_html": str(data.get("source_comparison_html", "")),
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1618,6 +1660,7 @@ def _build_evidence_map(
     object_boundary_edge: Mapping[str, Any] | None,
     object_boundary_detection_bridge: Mapping[str, Any] | None,
     detector_box_support_audit: Mapping[str, Any] | None,
+    native_heldout_benchmark_audit: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -1780,6 +1823,21 @@ def _build_evidence_map(
                 "evidence": _detector_box_support_evidence(detector_box_support_audit),
                 "claim_boundary": "Detector-box support metadata only; not true contour-boundary accuracy, not a global edge-only FP classifier, and not trained-DNN evidence.",
                 "next_evidence": "Recompute true box-boundary edge maps for FP proposals or train/evaluate an RGB+Aux detector on larger held-out/adverse splits.",
+            }
+        )
+
+    if native_heldout_benchmark_audit is not None:
+        current.append(
+            {
+                "area": "Large held-out native RAW benchmark",
+                "status": "diagnostic" if bool(native_heldout_benchmark_audit.get("pass")) else "not_supported",
+                "claim_strength": str(native_heldout_benchmark_audit.get("claim_status", "native_heldout_benchmark_not_supported")),
+                "evidence": _native_heldout_benchmark_evidence(native_heldout_benchmark_audit),
+                "claim_boundary": (
+                    str(native_heldout_benchmark_audit.get("claim_boundary", ""))
+                    or "Large native RAW provenance evidence only; it does not prove all-CFA, real adverse RAW, or trained RGB+Aux DNN superiority."
+                ),
+                "next_evidence": "Repeat the same protocol on real RAW datasets such as AODRaw, ROD, or LOD, then add RGB+Aux DNN fine-tuning.",
             }
         )
 
@@ -2322,6 +2380,24 @@ def _detector_box_support_evidence(audit: Mapping[str, Any]) -> str:
     )
 
 
+def _native_heldout_benchmark_evidence(audit: Mapping[str, Any]) -> str:
+    provenance = audit.get("provenance", {}) if isinstance(audit.get("provenance"), Mapping) else {}
+    metrics = audit.get("metric_summary", {}) if isinstance(audit.get("metric_summary"), Mapping) else {}
+    deltas = metrics.get("deltas", {}) if isinstance(metrics.get("deltas"), Mapping) else {}
+    return (
+        f"samples={int(audit.get('sample_count', 0))}/{int(audit.get('min_samples', 0))}; "
+        f"claimStatus={audit.get('claim_status', '')}; "
+        f"CameraE2E={_fmt(provenance.get('camerae2e_used_fraction'))}; "
+        f"trueCFA={_fmt(provenance.get('true_sensor_cfa_mosaic_fraction'))}; "
+        f"remapped={int(provenance.get('pattern_remapped_count', 0))}; "
+        f"sourceCFA={provenance.get('source_cfa_patterns', {})}; targetCFA={provenance.get('target_cfa_patterns', {})}; "
+        f"dP50={_fmt(deltas.get('precision@0.50_mean'), signed=True)}; "
+        f"dR50={_fmt(deltas.get('recall@0.50_mean'), signed=True)}; "
+        f"dSmallR50={_fmt(deltas.get('small_recall@0.50_mean'), signed=True)}; "
+        f"dFP50={_fmt(deltas.get('fp@0.50_mean'), signed=True)}"
+    )
+
+
 def _detector_box_correlation(correlations: Mapping[str, Any], feature: str) -> Mapping[str, Any] | None:
     for row in correlations.get("rows", ()):
         if isinstance(row, Mapping) and str(row.get("feature", "")) == str(feature):
@@ -2732,6 +2808,7 @@ def _claim_decisions(
     object_boundary_edge: Mapping[str, Any] | None,
     object_boundary_detection_bridge: Mapping[str, Any] | None,
     detector_box_support_audit: Mapping[str, Any] | None,
+    native_heldout_benchmark_audit: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -2894,6 +2971,33 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in detector_box_support_audit.get("failed_checks", ())) or "configured detector-box support checks"
             decisions.append({"status": "not_supported", "claim": f"Detector-box support audit failed for {failed}; do not use it as FP/TP support evidence yet."})
+    if native_heldout_benchmark_audit is not None:
+        if bool(native_heldout_benchmark_audit.get("pass")):
+            metrics = native_heldout_benchmark_audit.get("metric_summary", {}) if isinstance(native_heldout_benchmark_audit.get("metric_summary"), Mapping) else {}
+            deltas = metrics.get("deltas", {}) if isinstance(metrics.get("deltas"), Mapping) else {}
+            claim_status = str(native_heldout_benchmark_audit.get("claim_status", ""))
+            tradeoff_clause = (
+                " It remains a recall tradeoff, not broad HumanISP superiority."
+                if claim_status == "large_native_fp_reducer_with_recall_tradeoff"
+                else ""
+            )
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "Large held-out native RAW benchmark audit passed: "
+                        f"samples {int(native_heldout_benchmark_audit.get('sample_count', 0))}, "
+                        f"claim status {claim_status}, "
+                        f"dP50 {_fmt(deltas.get('precision@0.50_mean'), signed=True)}, "
+                        f"dR50 {_fmt(deltas.get('recall@0.50_mean'), signed=True)}, "
+                        f"dFP50 {_fmt(deltas.get('fp@0.50_mean'), signed=True)}."
+                        f"{tradeoff_clause}"
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in native_heldout_benchmark_audit.get("failed_checks", ())) or "configured native held-out checks"
+            decisions.append({"status": "not_supported", "claim": f"Large held-out native RAW benchmark audit failed for {failed}; do not use it as large native RAW evidence yet."})
     if scene_edge_confidence is not None:
         if bool(scene_edge_confidence.get("pass")):
             decisions.append(
@@ -3413,6 +3517,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(detector_box_support, Mapping)
         else "<p>No detector-box support audit summary was provided.</p>"
     )
+    native_heldout = dashboard.get("native_heldout_benchmark_audit")
+    native_heldout_html = (
+        _native_heldout_benchmark_html(native_heldout, destination)
+        if isinstance(native_heldout, Mapping)
+        else "<p>No large held-out native RAW benchmark audit summary was provided.</p>"
+    )
     cfa_lenspsf_detector = dashboard.get("cfa_lenspsf_detector_sweep")
     cfa_lenspsf_detector_html = (
         _cfa_lenspsf_detector_html(cfa_lenspsf_detector, destination)
@@ -3522,6 +3632,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {object_boundary_bridge_html}
   <h2>Detector Box Support Audit</h2>
   {detector_box_support_html}
+  <h2>Large Held-Out Native RAW Benchmark</h2>
+  {native_heldout_html}
   <h2>CFA/LensPSF Detector Sweep</h2>
   {cfa_lenspsf_detector_html}
   <h2>CFA/LensPSF Proposal Edge Bridge</h2>
@@ -4398,6 +4510,36 @@ def _detector_box_support_html(audit: Mapping[str, Any], destination: Path) -> s
         "<h3>Input FP/TP Support</h3>"
         "<table><thead><tr><th>Input</th><th>Detections</th><th>TP</th><th>FP</th><th>Precision Proxy</th><th>Score d/AUC</th><th>Edge d/AUC</th><th>Scene d/AUC</th></tr></thead>"
         f"<tbody>{input_rows}</tbody></table>"
+    )
+
+
+def _native_heldout_benchmark_html(audit: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(audit.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in audit.get("failed_checks", ())) or "none"
+    provenance = audit.get("provenance", {}) if isinstance(audit.get("provenance"), Mapping) else {}
+    metrics = audit.get("metric_summary", {}) if isinstance(audit.get("metric_summary"), Mapping) else {}
+    deltas = metrics.get("deltas", {}) if isinstance(metrics.get("deltas"), Mapping) else {}
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(audit.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(audit.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(audit.get('interpretation', '')))} "
+        f"{html_lib.escape(str(audit.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Samples</th><th>Baseline</th><th>Target</th><th>CameraE2E</th><th>True CFA</th><th>Remapped</th><th>Source CFA</th><th>Target CFA</th><th>dP50</th><th>dR50</th><th>dSmallR50</th><th>dFP50</th><th>Failed</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(audit, destination)}</td>"
+        f"<td>{int(audit.get('sample_count', 0))}/{int(audit.get('min_samples', 0))}</td>"
+        f"<td><code>{html_lib.escape(str(audit.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(audit.get('target_input', '')))}</code></td>"
+        f"<td>{_fmt(provenance.get('camerae2e_used_fraction'))}</td>"
+        f"<td>{_fmt(provenance.get('true_sensor_cfa_mosaic_fraction'))}</td>"
+        f"<td>{int(provenance.get('pattern_remapped_count', 0))}</td>"
+        f"<td>{html_lib.escape(str(provenance.get('source_cfa_patterns', {})))}</td>"
+        f"<td>{html_lib.escape(str(provenance.get('target_cfa_patterns', {})))}</td>"
+        f"<td>{_fmt(deltas.get('precision@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('recall@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('small_recall@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('fp@0.50_mean'), signed=True)}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr></tbody></table>"
     )
 
 

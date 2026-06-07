@@ -72,6 +72,7 @@ class ClaimDashboardTest(unittest.TestCase):
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
             object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
             detector_box_support = _write_detector_box_support_audit(root / "detector_box_support")
+            native_heldout = _write_native_heldout_benchmark_audit(root / "native_heldout")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -100,6 +101,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 object_boundary_edge=object_boundary,
                 object_boundary_detection_bridge=object_boundary_bridge,
                 detector_box_support_audit=detector_box_support,
+                native_heldout_benchmark_audit=native_heldout,
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
@@ -135,6 +137,9 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["object_boundary_detection_bridge"]["claim_status"], "object_boundary_detection_bridge_diagnostic")
             self.assertTrue(dashboard["detector_box_support_audit"]["pass"])
             self.assertEqual(dashboard["detector_box_support_audit"]["claim_status"], "detector_box_support_diagnostic")
+            self.assertTrue(dashboard["native_heldout_benchmark_audit"]["pass"])
+            self.assertEqual(dashboard["native_heldout_benchmark_audit"]["claim_status"], "large_native_fp_reducer_with_recall_tradeoff")
+            self.assertEqual(dashboard["native_heldout_benchmark_audit"]["sample_count"], 1496)
             self.assertTrue(dashboard["scene_edge_confidence"]["pass"])
             self.assertEqual(dashboard["scene_edge_confidence"]["report_count"], 2)
             self.assertEqual(dashboard["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
@@ -188,6 +193,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("KITTI object-box boundary edge proxy", evidence_areas)
             self.assertIn("KITTI object-boundary detection bridge", evidence_areas)
             self.assertIn("Detector-box FP/TP support audit", evidence_areas)
+            self.assertIn("Large held-out native RAW benchmark", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -232,6 +238,10 @@ class ClaimDashboardTest(unittest.TestCase):
                     and "aux edge-confidence target-detected AUC" in item["claim"]
                     for item in dashboard["decisions"]
                 )
+            )
+            self.assertIn(
+                "Large held-out native RAW benchmark audit passed: samples 1496, claim status large_native_fp_reducer_with_recall_tradeoff, dP50 +0.0300, dR50 -0.0060, dFP50 -0.3500. It remains a recall tradeoff, not broad HumanISP superiority.",
+                [item["claim"] for item in dashboard["decisions"]],
             )
 
             self.assertIn(
@@ -349,6 +359,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("object_boundary_detection_bridge_diagnostic", html)
             self.assertIn("Detector Box Support Audit", html)
             self.assertIn("detector_box_support_diagnostic", html)
+            self.assertIn("Large Held-Out Native RAW Benchmark", html)
+            self.assertIn("large_native_fp_reducer_with_recall_tradeoff", html)
             self.assertIn("Scene Edge Confidence", html)
             self.assertIn("CFA/LensPSF Proposal Edge Bridge", html)
             self.assertIn("CFA/LensPSF Native-CFA Separation", html)
@@ -411,6 +423,7 @@ class ClaimDashboardTest(unittest.TestCase):
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
             object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
             detector_box_support = _write_detector_box_support_audit(root / "detector_box_support")
+            native_heldout = _write_native_heldout_benchmark_audit(root / "native_heldout")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -451,6 +464,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(object_boundary_bridge),
                         "--detector-box-support-audit",
                         str(detector_box_support),
+                        "--native-heldout-benchmark-audit",
+                        str(native_heldout),
                         "--scene-edge-confidence",
                         str(scene_edge),
                         "--scene-edge-confidence",
@@ -499,6 +514,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["object_boundary_detection_bridge"]["claim_status"], "object_boundary_detection_bridge_diagnostic")
             self.assertTrue(summary["detector_box_support_audit"]["pass"])
             self.assertEqual(summary["detector_box_support_audit"]["claim_status"], "detector_box_support_diagnostic")
+            self.assertTrue(summary["native_heldout_benchmark_audit"]["pass"])
+            self.assertEqual(summary["native_heldout_benchmark_audit"]["claim_status"], "large_native_fp_reducer_with_recall_tradeoff")
             self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(summary["scene_information_stress"]["pass"])
@@ -1334,6 +1351,77 @@ def _write_detector_box_support_audit(path: Path) -> Path:
         "claim_boundary": "unit support metadata boundary",
     }
     (path / "detector_box_support_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_native_heldout_benchmark_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "pass": True,
+        "claim_status": "large_native_fp_reducer_with_recall_tradeoff",
+        "sample_count": 1496,
+        "min_samples": 1000,
+        "baseline_input": "human_rgb",
+        "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+        "provenance": {
+            "camerae2e_used_count": 1496,
+            "camerae2e_used_fraction": 1.0,
+            "true_sensor_cfa_mosaic_count": 1496,
+            "true_sensor_cfa_mosaic_fraction": 1.0,
+            "pattern_remapped_count": 0,
+            "pattern_remapped_fraction": 0.0,
+            "source_target_cfa_match_count": 1496,
+            "source_target_cfa_match_fraction": 1.0,
+            "native_resolution_matches_target_count": 1496,
+            "native_resolution_matches_target_fraction": 1.0,
+            "native_resolution_at_least_target_count": 1496,
+            "native_resolution_at_least_target_fraction": 1.0,
+            "source_cfa_patterns": {"GRBG": 1496},
+            "target_cfa_patterns": {"GRBG": 1496},
+            "requested_cfa_patterns": {"GRBG": 1496},
+            "bridges": {"native_bayer_v1": 1496},
+            "raw_source_keys": {"camerae2e_scene": 1496},
+            "source_shapes": {"(375, 1242)": 1496},
+            "target_shapes": {"(375, 1242)": 1496},
+        },
+        "metric_summary": {
+            "baseline_input": "human_rgb",
+            "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "baseline": {
+                "precision@0.50_mean": 0.45,
+                "recall@0.50_mean": 0.78,
+                "small_recall@0.50_mean": 0.18,
+                "fp@0.50_mean": 2.10,
+            },
+            "target": {
+                "precision@0.50_mean": 0.48,
+                "recall@0.50_mean": 0.774,
+                "small_recall@0.50_mean": 0.181,
+                "fp@0.50_mean": 1.75,
+            },
+            "deltas": {
+                "precision@0.50_mean": 0.03,
+                "recall@0.50_mean": -0.006,
+                "small_recall@0.50_mean": 0.001,
+                "fp@0.50_mean": -0.35,
+            },
+            "metrics_present": True,
+        },
+        "checks": [
+            {"id": "large_heldout_sample_count", "status": "pass", "evidence": "samples=1496 min=1000"},
+            {"id": "camerae2e_used_for_all_samples", "status": "pass", "evidence": "camerae2e=1496/1496"},
+            {"id": "true_sensor_cfa_mosaic_for_all_samples", "status": "pass", "evidence": "true_cfa=1496/1496"},
+            {"id": "no_pattern_remap", "status": "pass", "evidence": "remapped=0/1496"},
+            {"id": "source_and_target_cfa_match", "status": "pass", "evidence": "match=1496/1496"},
+            {"id": "baseline_and_target_metrics_present", "status": "pass", "evidence": "baseline=human_rgb target=perception"},
+            {"id": "native_fp_reduction_observed", "status": "pass", "evidence": "dFP50=-0.3500"},
+        ],
+        "interpretation": "unit large native held-out audit",
+        "claim_boundary": "unit native held-out boundary",
+    }
+    (path / "native_heldout_benchmark_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

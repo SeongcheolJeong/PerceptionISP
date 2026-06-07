@@ -33,6 +33,7 @@ class ClaimEvidenceSummaryTest(unittest.TestCase):
             self.assertTrue(any("false-positive reduction" in text for text in summary["allowed_language"]))
             self.assertTrue(any("Do not claim broad HumanISP superiority" in text for text in summary["disallowed_language"]))
             self.assertTrue(any(row["area"] == "CFA/LensPSF visual casebook" for row in summary["diagnostic_support"]))
+            self.assertTrue(any(row["area"] == "Large held-out native RAW benchmark" for row in summary["claim_boundaries"]))
             checks = {row["id"]: row["status"] for row in summary["checks"]}
             self.assertEqual(checks["supported_claims_are_narrow_when_fp_reducer_only"], "pass")
             self.assertEqual(checks["broad_superiority_blocked"], "pass")
@@ -110,6 +111,14 @@ def _write_dashboard(path: Path) -> Path:
                     "evidence": "coverage=coverage_complete; metric_claim_status=fp_reducer_only; missing=none",
                     "claim_boundary": "Coverage can be complete while the metric claim remains narrow.",
                     "next_evidence": "Keep protocol rows covered.",
+                },
+                {
+                    "area": "Large held-out native RAW benchmark",
+                    "status": "diagnostic",
+                    "claim_strength": "large_native_fp_reducer_with_recall_tradeoff",
+                    "evidence": "samples=1496/1000; dP50=+0.0300; dR50=-0.0060; dFP50=-0.3500",
+                    "claim_boundary": "Large native RAW provenance only; not all-CFA or real adverse RAW proof.",
+                    "next_evidence": "Repeat on real RAW datasets.",
                 },
                 {
                     "area": "CFA/LensPSF visual casebook",
