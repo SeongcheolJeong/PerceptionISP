@@ -8,6 +8,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import numpy as np
+
 from .comparison import compare_dataset, write_comparison_report
 from .detectors import UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
 from .eval_types import BoundingBox, EvaluationSample
@@ -28,6 +30,12 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--height", type=int, default=90)
     parser.add_argument("--cfa", default="auto", help="auto uses CameraE2E sensor-native CFA when available.")
+    parser.add_argument(
+        "--psf-sigma",
+        type=float,
+        default=None,
+        help="Optional LensPSF sigma in sensor pixels injected into RAW calibration.",
+    )
     parser.add_argument("--rgb-detector", default="numpy", help="numpy or yolo")
     parser.add_argument("--rgb-detector-model", default="yolo11n.pt", help="Model path/name for --rgb-detector yolo.")
     parser.add_argument("--rgb-detector-confidence", type=float, default=0.25, help="Confidence threshold for --rgb-detector yolo.")
@@ -144,6 +152,7 @@ def main(argv: Any = None) -> int:
     label_map = parse_label_map(args.ground_truth_label_map)
     if label_map:
         samples = remap_sample_labels(samples, label_map)
+    samples = apply_psf_sigma_to_samples(samples, args.psf_sigma)
 
     config = PerceptionISPConfig(
         tone_mapping=args.tone_mapping,
@@ -180,6 +189,7 @@ def main(argv: Any = None) -> int:
         "width": int(args.width),
         "height": int(args.height),
         "cfa": str(args.cfa),
+        "psf_sigma": None if args.psf_sigma is None else max(float(args.psf_sigma), 0.0),
         "dataset": args.dataset,
         "split": args.split,
         "use_camerae2e": not bool(args.no_camerae2e),
@@ -287,6 +297,55 @@ def remap_sample_labels(samples: Sequence[EvaluationSample], label_map: Mapping[
         metadata["ground_truth_label_remapped_count"] = int(changed)
         remapped.append(replace(sample, ground_truth=tuple(boxes), metadata=metadata))
     return tuple(remapped)
+
+
+def apply_psf_sigma_to_samples(
+    samples: Sequence[EvaluationSample],
+    psf_sigma: float | None,
+) -> tuple[EvaluationSample, ...]:
+    if psf_sigma is None:
+        return tuple(samples)
+    sigma = max(float(psf_sigma), 0.0)
+    conditioned = []
+    for sample in samples:
+        raw = sample.raw
+        height, width = raw_height_width(raw.data)
+        raw_metadata = replace(
+            raw.metadata,
+            calibration_id=f"{raw.metadata.calibration_id}_psf_{sigma:.2f}",
+            lens_profile_id=f"{raw.metadata.lens_profile_id}_psf_{sigma:.2f}",
+        )
+        raw_calibration = replace(
+            raw.calibration,
+            psf_sigma_map=np.full((int(height), int(width)), sigma, dtype=np.float64),
+        )
+        conditioned_raw = replace(
+            raw,
+            metadata=raw_metadata,
+            calibration=raw_calibration,
+            provenance={**dict(raw.provenance), "eval_psf_sigma": sigma},
+        )
+        conditioned.append(
+            replace(
+                sample,
+                raw=conditioned_raw,
+                metadata={**dict(sample.metadata), "psf_sigma": sigma},
+            )
+        )
+    return tuple(conditioned)
+
+
+def raw_height_width(raw_data: Any) -> tuple[int, int]:
+    arr = np.asarray(raw_data)
+    if arr.ndim == 2:
+        return int(arr.shape[0]), int(arr.shape[1])
+    if arr.ndim == 3:
+        if arr.shape[2] <= 8 and arr.shape[1] > 8:
+            return int(arr.shape[0]), int(arr.shape[1])
+        if arr.shape[0] <= 8:
+            return int(arr.shape[1]), int(arr.shape[2])
+        return int(arr.shape[0]), int(arr.shape[1])
+    raise ValueError(f"unsupported RAW shape for PSF conditioning: {arr.shape}")
 
 
 if __name__ == "__main__":

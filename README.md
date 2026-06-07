@@ -685,6 +685,36 @@ PYTHONPATH=src \
 `--proposal-calibration-model` requires fusion to stay enabled because the
 artifact is trained on `perception_fusion_rgb_aux` proposals.
 
+Detector comparisons can now be conditioned by LensPSF as well as CFA. Use
+`--psf-sigma` to inject a constant `psf_sigma_map` into each RAW calibration;
+the value is also written into `run_config`, sample metadata, and RAW
+provenance. This is the intended path for the next CFA/LensPSF detector sweep,
+because it changes the PerceptionISP aux/confidence inputs rather than merely
+tagging the report:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.eval_cli \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 128 \
+  --width 640 \
+  --height 192 \
+  --cfa GRBG \
+  --psf-sigma 1.2 \
+  --rgb-detector yolo \
+  --rgb-detector-model yolo11n.pt \
+  --rgb-detector-confidence 0.25 \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --raw-cache-dir data/.cache/perception_isp_raw \
+  --proposal-calibration-model reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001/proposal_calibration_model.json \
+  --output-dir reports/perception_compare_kitti_val128_grbg_psf1p2_score_label_aux
+```
+
 For stricter evidence, train the proposal calibrator on a KITTI train report and
 apply it to the KITTI val report. An earlier comparison branch uses a
 512-sample train subset and writes:

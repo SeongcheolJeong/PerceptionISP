@@ -55,6 +55,11 @@ Known limits:
   PSF footprint is much smaller than the sensor pixel pitch or is applied only
   after low-resolution sampling. `psf_sigma_map` now feeds PSF blur-confidence
   and PSF edge-likelihood aux maps when calibration provides it.
+- `eval_cli` now supports `--psf-sigma`, which injects a constant
+  `psf_sigma_map` into RAW calibration and records it in run config, sample
+  metadata, and RAW provenance. This enables CFA/LensPSF detector sweeps, but
+  the sweep still needs to be run before claiming detector robustness across
+  lens blur conditions.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor
