@@ -113,7 +113,7 @@ def run_aodraw_pipeline(
         dry_run=dry_run,
     )
     import_report = write_aodraw_download_import(import_summary, import_dir)
-    availability = build_aodraw_image_availability(manifest, dataset_root=dataset_root)
+    availability = build_aodraw_image_availability(manifest, dataset_root=dataset_root, kind=kind)
     availability_report = write_aodraw_image_availability(availability, availability_dir)
 
     eval_result: Dict[str, Any] = {

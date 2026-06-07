@@ -69,6 +69,34 @@ class AODRawPipelineTest(unittest.TestCase):
             self.assertTrue((root / "aodraw" / "images_downsampled_raw" / "00000001.npy").exists())
             self.assertTrue((root / "pipeline" / "evaluation" / "comparison_summary.json").exists())
 
+    def test_raw_only_pipeline_runs_without_srgb(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            downloads = root / "Downloads"
+            _write_raw_file(downloads)
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps(_manifest()))
+
+            summary = run_aodraw_pipeline(
+                manifest=manifest,
+                download_roots=(downloads,),
+                dataset_root=root / "aodraw",
+                output_dir=root / "pipeline",
+                kind="raw",
+                skip_eval=False,
+                no_visuals=True,
+                rgb_detector="numpy",
+                count=1,
+                width=8,
+                height=8,
+            )
+
+            self.assertEqual(summary["status"], "evaluation_pass")
+            self.assertTrue(summary["evaluation_ready"])
+            self.assertEqual(summary["availability"]["kind"], "raw")
+            self.assertEqual(summary["availability"]["missing_srgb_count"], 0)
+            self.assertFalse((root / "aodraw" / "images_downsampled_srgb" / "00000001.JPG").exists())
+
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -138,16 +166,20 @@ def _manifest() -> list[dict]:
 
 
 def _write_sample_files(root: Path) -> None:
-    raw_path = root / "images_downsampled_raw" / "00000001.npy"
-    raw_path.parent.mkdir(parents=True, exist_ok=True)
-    mosaic = np.zeros((8, 8), dtype=np.uint16)
-    mosaic[2:6, 2:6] = 900
-    np.save(raw_path, mosaic)
+    _write_raw_file(root)
     srgb_path = root / "images_downsampled_srgb" / "00000001.JPG"
     srgb_path.parent.mkdir(parents=True, exist_ok=True)
     rgb = np.zeros((8, 8, 3), dtype=np.uint8)
     rgb[2:6, 2:6, :] = 180
     Image.fromarray(rgb).save(srgb_path)
+
+
+def _write_raw_file(root: Path) -> None:
+    raw_path = root / "images_downsampled_raw" / "00000001.npy"
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    mosaic = np.zeros((8, 8), dtype=np.uint16)
+    mosaic[2:6, 2:6] = 900
+    np.save(raw_path, mosaic)
 
 
 if __name__ == "__main__":
