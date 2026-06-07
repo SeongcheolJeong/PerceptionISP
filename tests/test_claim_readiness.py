@@ -21,6 +21,7 @@ class ClaimReadinessTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -32,6 +33,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
             )
 
@@ -53,6 +55,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("mechanism_validation", summary)
             self.assertIn("cfa_stress_sweep", summary)
             self.assertIn("edge_confidence_suite", summary)
+            self.assertIn("aux_contribution_audit", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -77,6 +80,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -121,6 +125,7 @@ class ClaimReadinessTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -132,6 +137,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
             )
 
@@ -146,6 +152,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
 
 
 def _write_comparison_report(
@@ -348,6 +355,29 @@ def _write_edge_confidence_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_aux_contribution_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "checks": [
+            {"id": "score_aux_uses_aux_for_fp_reduction", "status": "pass"},
+            {"id": "aux_adds_incremental_value_over_score_label", "status": "pass"},
+        ],
+        "comparisons": [
+            {
+                "id": "score_label_aux_vs_score_label",
+                "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
+                "baseline_input": "perception_calibrated_score_label_fusion_rgb_aux",
+                "deltas": {"precision@0.50_mean": 0.005, "recall@0.50_mean": -0.002, "fp@0.50_mean": -0.060},
+            }
+        ],
+        "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},
+    }
+    (path / "aux_contribution_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

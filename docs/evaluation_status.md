@@ -226,11 +226,12 @@ It reports `coverage_status=coverage_complete` for evidence coverage, including
 front-end mechanism validation and the recommended
 `extended_sensor_native_tensor` row, while the metric side stays narrow as
 `metric_claim_status=fp_reducer_only`. The protocol also records the CFA stress
-sweep and edge-confidence suite as recommended diagnostic evidence. That means
-the configured protocol has the expected required rows, not that the target
-wins every metric. The protocol now also includes a task gate,
-condition-specific metrics, a condition robustness gate, mechanism validation,
-CFA stress sweep, and edge-confidence suite:
+sweep, edge-confidence suite, and aux contribution audit as recommended
+diagnostic evidence. That means the configured protocol has the expected
+required rows, not that the target wins every metric. The protocol now also
+includes a task gate, condition-specific metrics, a condition robustness gate,
+mechanism validation, CFA stress sweep, edge-confidence suite, and aux
+contribution audit:
 
 ```text
 reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
@@ -240,6 +241,7 @@ reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/ind
 reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
+reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
 ```
 
 The current condition report has 9 slices from explicit/sample-derived
@@ -584,6 +586,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Front-end mechanism validation | `pass` for low-light, glare, low-MTF, and CFA-support checks; this is signal feasibility evidence, not detector performance evidence |
 | CFA stress sweep | Available as diagnostic evidence; `MONO` ranks highest for low-light/low-MTF synthetic scores and `RGBIR` for glare |
 | Edge-confidence suite | `pass` for synthetic low-light, glare, and low-MTF difficult-edge checks; this is front-end confidence evidence, not detector performance evidence |
+| Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622` |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
@@ -601,8 +604,8 @@ detector recipe, CI-backed gates, task metrics, a task gate,
 condition-specific metrics, a condition robustness gate, front-end mechanism
 validation, naive RAW/minimal adaptation, classical lightweight RAW transform,
 and task-aware/aux-assisted paths. Recommended diagnostic rows such as the CFA
-stress sweep and edge-confidence suite help interpret sensor-native signals but
-do not create detector performance evidence.
+stress sweep, edge-confidence suite, and aux contribution audit help interpret
+sensor-native signals but do not create detector performance evidence.
 
 The current naive RAW-like KITTI val baseline is:
 

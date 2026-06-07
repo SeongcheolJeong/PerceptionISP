@@ -22,6 +22,7 @@ class ClaimDashboardTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -32,6 +33,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                aux_contribution_audit=aux_contribution,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -45,6 +47,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
             self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
                 "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
@@ -62,6 +65,10 @@ class ClaimDashboardTest(unittest.TestCase):
                 "Edge-confidence suite passed; PerceptionISP confidence maps respond to difficult-edge stressors, but this is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
+            self.assertIn(
+                "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
             self.assertTrue(
                 any(
                     item["claim"].startswith("Benchmark protocol coverage is incomplete")
@@ -76,6 +83,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Broad HumanISP superiority gate failed", html)
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
             self.assertIn("Task Metrics", html)
+            self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
@@ -92,6 +100,7 @@ class ClaimDashboardTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -108,6 +117,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(cfa_stress),
                         "--edge-confidence-suite",
                         str(edge_confidence),
+                        "--aux-contribution-audit",
+                        str(aux_contribution),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -121,6 +132,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["mechanism_validation"]["pass"])
             self.assertTrue(summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -439,6 +451,34 @@ def _write_edge_confidence_suite(path: Path) -> Path:
                     },
                 ],
                 "interpretation": "unit edge confidence suite",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_aux_contribution_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "aux_contribution_audit_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "checks": [
+                    {"id": "score_aux_uses_aux_for_fp_reduction", "status": "pass"},
+                    {"id": "aux_adds_incremental_value_over_score_label", "status": "pass"},
+                ],
+                "comparisons": [
+                    {
+                        "id": "score_label_aux_vs_score_label",
+                        "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
+                        "baseline_input": "perception_calibrated_score_label_fusion_rgb_aux",
+                        "deltas": {"precision@0.50_mean": 0.005, "recall@0.50_mean": -0.002, "fp@0.50_mean": -0.060},
+                    }
+                ],
+                "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},
+                "interpretation": "unit aux contribution audit",
             }
         )
         + "\n"

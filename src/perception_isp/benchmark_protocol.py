@@ -23,6 +23,7 @@ CONDITION_GATE_SUMMARY = "condition_gate_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
+AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 
 HUMAN_INPUTS = {"human_rgb"}
 PERCEPTION_INPUTS = {
@@ -55,6 +56,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--mechanism-validation", default=None, help="mechanism_validation_summary.json path/dir.")
     parser.add_argument("--cfa-stress-sweep", default=None, help="cfa_stress_sweep_summary.json path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="edge_confidence_suite_summary.json path/dir.")
+    parser.add_argument("--aux-contribution-audit", default=None, help="aux_contribution_audit_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
     parser.add_argument("--output-dir", default="reports/perception_benchmark_protocol")
     args = parser.parse_args(argv)
@@ -71,6 +73,7 @@ def main(argv: Any = None) -> int:
         mechanism_validation=args.mechanism_validation,
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
+        aux_contribution_audit=args.aux_contribution_audit,
         min_samples=int(args.min_samples),
     )
     html_path = write_protocol_coverage(summary, args.output_dir)
@@ -105,6 +108,7 @@ def build_protocol_coverage(
     mechanism_validation: str | Path | None = None,
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
+    aux_contribution_audit: str | Path | None = None,
     min_samples: int = 1000,
 ) -> Dict[str, Any]:
     evidence = _collect_evidence(
@@ -119,6 +123,7 @@ def build_protocol_coverage(
         mechanism_validation=mechanism_validation,
         cfa_stress_sweep=cfa_stress_sweep,
         edge_confidence_suite=edge_confidence_suite,
+        aux_contribution_audit=aux_contribution_audit,
     )
     requirements = _requirements(evidence, min_samples=int(min_samples))
     missing_required = [row["id"] for row in requirements if row["scope"] == "claim_required" and row["status"] != "covered"]
@@ -170,6 +175,7 @@ def _collect_evidence(
     mechanism_validation: str | Path | None,
     cfa_stress_sweep: str | Path | None,
     edge_confidence_suite: str | Path | None,
+    aux_contribution_audit: str | Path | None,
 ) -> Dict[str, Any]:
     input_names: set[str] = set()
     run_configs: list[Dict[str, Any]] = []
@@ -214,6 +220,7 @@ def _collect_evidence(
     mechanism = _load_mechanism_validation(mechanism_validation)
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep)
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite)
+    aux_contribution = _load_aux_contribution_audit(aux_contribution_audit)
 
     return {
         "comparison_reports": comparison_paths,
@@ -234,6 +241,7 @@ def _collect_evidence(
         "mechanism_validation": mechanism,
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
+        "aux_contribution_audit": aux_contribution,
     }
 
 
@@ -250,6 +258,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
     cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     edge_confidence = evidence.get("edge_confidence_suite", {}) if isinstance(evidence.get("edge_confidence_suite"), Mapping) else {}
+    aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
 
     return [
         _row(
@@ -387,6 +396,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(edge_confidence.get("available")) and bool(edge_confidence.get("pass")),
             str(edge_confidence.get("summary", "missing")),
             "An edge-confidence suite helps show confidence maps react to low light, glare, and low-MTF stress before detector fine-tuning.",
+        ),
+        _row(
+            "aux_contribution_audit",
+            "Aux contribution audit available",
+            "recommended",
+            bool(aux_contribution.get("available")) and bool(aux_contribution.get("pass")),
+            str(aux_contribution.get("summary", "missing")),
+            "An aux contribution audit checks whether aux features add proposal-scoring value beyond score/label calibration.",
         ),
     ]
 
@@ -592,6 +609,28 @@ def _load_edge_confidence_suite(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _load_aux_contribution_audit(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, AUX_CONTRIBUTION_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    status = str(data.get("status", ""))
+    feature_audit = data.get("feature_audit", {}) if isinstance(data.get("feature_audit"), Mapping) else {}
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass" and not failed,
+        "status": status,
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "aux_feature_count": int(feature_audit.get("aux_feature_count", 0)),
+        "summary": f"{status}, checks={len(checks)}, failed={len(failed)}, aux_features={int(feature_audit.get('aux_feature_count', 0))}",
+    }
+
+
 def _sample_count(report: Mapping[str, Any]) -> int:
     if report.get("sample_count") is not None:
         return int(report.get("sample_count", 0))
@@ -755,6 +794,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
     cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     edge_confidence = evidence.get("edge_confidence_suite", {}) if isinstance(evidence.get("edge_confidence_suite"), Mapping) else {}
+    aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
     return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -797,6 +837,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Mechanism validation</th><td>{_optional_link(mechanism, destination)} {html_lib.escape(str(mechanism.get('summary', 'missing')))}</td></tr>
       <tr><th>CFA stress sweep</th><td>{_optional_link(cfa_stress, destination)} {html_lib.escape(str(cfa_stress.get('summary', 'missing')))}</td></tr>
       <tr><th>Edge-confidence suite</th><td>{_optional_link(edge_confidence, destination)} {html_lib.escape(str(edge_confidence.get('summary', 'missing')))}</td></tr>
+      <tr><th>Aux contribution audit</th><td>{_optional_link(aux_contribution, destination)} {html_lib.escape(str(aux_contribution.get('summary', 'missing')))}</td></tr>
     </tbody>
   </table>
   <p>Raw JSON: <code>protocol_coverage_summary.json</code></p>

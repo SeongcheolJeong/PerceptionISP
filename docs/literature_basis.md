@@ -49,13 +49,17 @@ include these rows under a fixed detector and training recipe:
     demosaic confidence, focus confidence, and visibility degrade under
     low light, glare saturation, and low-MTF blur before those signals are
     treated as useful detector inputs.
+12. Aux contribution ablations should separate score-only, score+label, and
+    score+label+aux calibration so aux-map value is not confused with class
+    priors or threshold tuning.
 
 The current project now covers rows 1-4 at the software-reference level on
 KITTI-derived evidence, exercises row 8 through auxiliary-map tensor export,
 training, and direct dense evaluation, covers row 9 with a synthetic front-end
 mechanism report, covers row 10 with a synthetic CFA stress sweep, and covers
-row 11 with a synthetic edge-confidence suite. It does not yet cover
-claim-quality RAW-domain pretraining or large adverse-condition RAW datasets.
+row 11 with a synthetic edge-confidence suite. It covers row 12 with a
+proposal-calibration aux contribution audit. It does not yet cover claim-quality
+RAW-domain pretraining or large adverse-condition RAW datasets.
 
 ## Dataset Direction
 

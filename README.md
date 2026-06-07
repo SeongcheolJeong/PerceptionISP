@@ -809,6 +809,7 @@ PYTHONPATH=src \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
+  --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
@@ -823,7 +824,8 @@ versus HumanISP is not supported even though FP/sample is reduced. Mechanism
 validation is shown as front-end feasibility evidence only, not as detector
 performance evidence, and the CFA stress sweep is shown as diagnostic
 condition/CFA evidence only. The edge-confidence suite is also shown as
-diagnostic difficult-edge evidence, not as detector-performance evidence.
+diagnostic difficult-edge evidence, and the aux contribution audit is shown as
+detector-side calibration evidence, not as DNN detector-performance evidence.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -924,6 +926,31 @@ synthetic deltas are directional: low light lowers mean edge confidence by
 strong-edge confidence by `-0.4119`. This is front-end confidence evidence for
 hard edge cases, not detector-performance evidence.
 
+To verify that aux features are actually used in a downstream scoring path,
+audit the proposal-calibration feature ablation:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.aux_contribution_audit \
+  reports/perception_train512_calibration_feature_ablation_rollup \
+  --calibration-summary reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001 \
+  --recall-floor -0.005 \
+  --min-fp-reduction 0.02 \
+  --output-dir reports/perception_aux_contribution_audit_kitti_train512_to_val1496
+```
+
+The current aux contribution report is:
+
+```text
+reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
+```
+
+It passes the downstream calibration checks. On the KITTI train512-to-val1496
+feature ablation, `score_aux` versus uncalibrated RGB+Aux fusion gives
+`dP=+0.0035`, `dR50=-0.0027`, and `dFP=-0.0608`. Adding aux to
+`score_label` gives `dP=+0.0054`, `dR50=-0.0022`, and `dFP=-0.0622` versus
+`score_label` alone. This proves aux is being used by the proposal scoring
+branch; it still does not prove a trained RGB+aux DNN detector claim.
+
 Make that task-level decision reproducible with the task gate:
 
 ```bash
@@ -971,6 +998,7 @@ PYTHONPATH=src \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
+  --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
@@ -986,8 +1014,8 @@ condition robustness gate, front-end mechanism validation, naive RAW/minimal
 adaptation, classical lightweight RAW transform, and a task-aware or
 aux-assisted path. Missing rows are blockers for broad HumanISP or
 RAW/sensor-native superiority claims. Recommended diagnostic rows, such as the
-CFA stress sweep and edge-confidence suite, help interpret sensor-native
-signals but do not create a detector-performance claim.
+CFA stress sweep, edge-confidence suite, and aux contribution audit, help
+interpret sensor-native signals but do not create a detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -1006,6 +1034,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
+  --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -1021,11 +1050,12 @@ reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer
 reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
+reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
 ```
 
 It marks `coverage_status=coverage_complete`, including front-end mechanism
 validation, the recommended extended sensor-native tensor row, CFA stress
-sweep, and edge-confidence suite, while
+sweep, edge-confidence suite, and aux contribution audit, while
 `metric_claim_status=fp_reducer_only`.
 That is an evidence-coverage result, not a broad-superiority result; the
 dashboard still says broad HumanISP superiority is not supported, while

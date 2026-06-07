@@ -21,6 +21,7 @@ PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
+AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -33,6 +34,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir.")
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
+    parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -46,6 +48,7 @@ def main(argv: Any = None) -> int:
         mechanism_validation=args.mechanism_validation,
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
+        aux_contribution_audit=args.aux_contribution_audit,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -75,6 +78,7 @@ def build_claim_dashboard(
     mechanism_validation: str | Path | None = None,
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
+    aux_contribution_audit: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
@@ -85,8 +89,9 @@ def build_claim_dashboard(
     mechanism = _load_mechanism_validation(mechanism_validation) if mechanism_validation is not None else None
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
+    aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism, cfa_stress, edge_confidence)
+    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism, cfa_stress, edge_confidence, aux_contribution)
     return {
         "claims": claims,
         "training": training,
@@ -96,6 +101,7 @@ def build_claim_dashboard(
         "mechanism_validation": mechanism,
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
+        "aux_contribution_audit": aux_contribution,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
@@ -344,6 +350,44 @@ def _load_edge_confidence_suite(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_aux_contribution_audit(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, AUX_CONTRIBUTION_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    comparisons = []
+    for row in data.get("comparisons", ()):
+        if not isinstance(row, Mapping):
+            continue
+        deltas = row.get("deltas", {}) if isinstance(row.get("deltas"), Mapping) else {}
+        comparisons.append(
+            {
+                "id": str(row.get("id", "")),
+                "target_input": str(row.get("target_input", "")),
+                "baseline_input": str(row.get("baseline_input", "")),
+                "delta_precision@0.50": _maybe_float(deltas.get("precision@0.50_mean")),
+                "delta_recall@0.50": _maybe_float(deltas.get("recall@0.50_mean")),
+                "delta_fp@0.50": _maybe_float(deltas.get("fp@0.50_mean")),
+            }
+        )
+    status = str(data.get("status", ""))
+    feature_audit = data.get("feature_audit", {}) if isinstance(data.get("feature_audit"), Mapping) else {}
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "comparisons": comparisons,
+        "aux_feature_count": int(feature_audit.get("aux_feature_count", 0)),
+        "aux_features": [str(value) for value in feature_audit.get("aux_features", ())],
+        "interpretation": str(data.get("interpretation", "")),
+    }
+
+
 def _select_task_target(data: Mapping[str, Any], *, claims: Sequence[Mapping[str, Any]], baseline_input: str) -> str:
     available = {str(value) for value in data.get("inputs", ())}
     for profile in ("fp_reducer", "broad_superiority"):
@@ -429,6 +473,7 @@ def _claim_decisions(
     mechanism_validation: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
     edge_confidence_suite: Mapping[str, Any] | None,
+    aux_contribution_audit: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -469,6 +514,12 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in edge_confidence_suite.get("failed_checks", ())) or "configured edge-confidence checks"
             decisions.append({"status": "not_supported", "claim": f"Edge-confidence suite failed for {failed}; do not use edge confidence as feasibility evidence yet."})
+    if aux_contribution_audit is not None:
+        if bool(aux_contribution_audit.get("pass")):
+            decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
+        else:
+            failed = ", ".join(str(value) for value in aux_contribution_audit.get("failed_checks", ())) or "configured aux contribution checks"
+            decisions.append({"status": "not_supported", "claim": f"Aux contribution audit failed for {failed}; do not claim aux helps proposal scoring yet."})
     if task_gate is not None:
         profile = str(task_gate.get("profile", "task"))
         if bool(task_gate.get("pass")):
@@ -632,6 +683,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     claim_rows = "".join(_claim_row(item, destination) for item in dashboard.get("claims", ()))
     training = dashboard.get("training")
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
+    aux_contribution = dashboard.get("aux_contribution_audit")
+    aux_contribution_html = _aux_contribution_html(aux_contribution, destination) if isinstance(aux_contribution, Mapping) else "<p>No aux contribution audit was provided.</p>"
     task_metrics = dashboard.get("task_metrics")
     task_metrics_html = _task_metrics_html(task_metrics, destination) if isinstance(task_metrics, Mapping) else "<p>No task metrics summary was provided.</p>"
     task_gate = dashboard.get("task_gate")
@@ -682,6 +735,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   </table>
   <h2>RGB+Aux DNN Training</h2>
   {training_html}
+  <h2>Aux Contribution Audit</h2>
+  {aux_contribution_html}
   <h2>Task Metrics</h2>
   {task_metrics_html}
   <h2>Task Gate</h2>
@@ -753,6 +808,43 @@ def _training_html(training: Mapping[str, Any], destination: Path) -> str:
         f"<td>{html_lib.escape(str(best_recall.get('name', '')))}<br>R50 {_fmt(best_recall.get('recall@0.50_mean'))}, P50 {_fmt(best_recall.get('precision@0.50_mean'))}, FP {_fmt(best_recall.get('fp@0.50_mean'))}</td>"
         f"<td>{html_lib.escape(str(lowest_fp.get('name', '')))}<br>FP {_fmt(lowest_fp.get('fp@0.50_mean'))}, R50 {_fmt(lowest_fp.get('recall@0.50_mean'))}</td>"
         "</tr></tbody></table>"
+    )
+
+
+def _aux_contribution_html(aux_contribution: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(aux_contribution.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in aux_contribution.get("failed_checks", ())) or "none"
+    rows = "".join(_aux_contribution_row(row) for row in aux_contribution.get("comparisons", ()))
+    if not rows:
+        rows = '<tr><td colspan="6">No aux contribution comparisons were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(aux_contribution.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(aux_contribution.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Checks</th><th>Failed</th><th>Aux Feature Count</th><th>Aux Features</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(aux_contribution, destination)}</td>"
+        f"<td>{int(aux_contribution.get('check_count', 0))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        f"<td>{int(aux_contribution.get('aux_feature_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in aux_contribution.get('aux_features', ())) or 'none')}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Comparison</th><th>Target</th><th>Baseline</th><th>dP@0.50</th><th>dR@0.50</th><th>dFP@0.50</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _aux_contribution_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('target_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('baseline_input', '')))}</code></td>"
+        f"<td>{_fmt(row.get('delta_precision@0.50'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('delta_recall@0.50'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('delta_fp@0.50'), signed=True)}</td>"
+        "</tr>"
     )
 
 
