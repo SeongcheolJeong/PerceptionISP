@@ -38,7 +38,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir.")
-    parser.add_argument("--scene-edge-confidence", default=None, help="Scene-edge confidence summary path/dir.")
+    parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
@@ -88,7 +88,7 @@ def build_claim_dashboard(
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
-    scene_edge_confidence: str | Path | None = None,
+    scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
@@ -102,7 +102,7 @@ def build_claim_dashboard(
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
     edge_fidelity = _load_edge_fidelity_suite(edge_fidelity_suite) if edge_fidelity_suite is not None else None
-    scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if scene_edge_confidence is not None else None
+    scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
@@ -439,7 +439,42 @@ def _load_edge_fidelity_suite(spec: str | Path) -> Dict[str, Any]:
     }
 
 
-def _load_scene_edge_confidence(spec: str | Path) -> Dict[str, Any]:
+def _load_scene_edge_confidence(spec: str | Path | Sequence[str | Path]) -> Dict[str, Any]:
+    specs = _as_path_specs(spec)
+    reports = [_load_scene_edge_confidence_one(item) for item in specs]
+    if len(reports) == 1:
+        return reports[0]
+    case_count = sum(int(report.get("case_count", 0)) for report in reports)
+    check_count = sum(int(report.get("check_count", 0)) for report in reports)
+    failed = [str(value) for report in reports for value in report.get("failed_checks", ())]
+    cfa_patterns = sorted({str(value) for report in reports for value in report.get("cfa_patterns", ())})
+    psf_sigmas = sorted({float(value) for report in reports for value in report.get("psf_sigmas", ()) if value is not None})
+    cases = [case for report in reports for case in report.get("cases", ())]
+    first = reports[0]
+    return {
+        "name": "Scene edge confidence evidence",
+        "summary_path": first.get("summary_path"),
+        "html_path": first.get("html_path"),
+        "status": "pass" if all(bool(report.get("pass")) for report in reports) else "fail",
+        "pass": all(bool(report.get("pass")) for report in reports),
+        "report_count": len(reports),
+        "check_count": check_count,
+        "case_count": case_count,
+        "failed_checks": failed,
+        "cfa_patterns": cfa_patterns,
+        "psf_sigmas": psf_sigmas,
+        "human_rgb_proxy_source_edge_f1_mean": _weighted_report_mean(reports, "human_rgb_proxy_source_edge_f1_mean"),
+        "perception_rgb_proxy_source_edge_f1_mean": _weighted_report_mean(reports, "perception_rgb_proxy_source_edge_f1_mean"),
+        "perception_aux_strength_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_mean"),
+        "perception_aux_confidence_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_mean"),
+        "cases": cases[:12],
+        "reports": reports,
+        "interpretation": "Multiple scene edge-confidence summaries are aggregated here.",
+        "claim_boundary": "This is front-end scene-edge confidence evidence. It is not object-boundary ground truth and it is not detector-performance evidence.",
+    }
+
+
+def _load_scene_edge_confidence_one(spec: str | Path) -> Dict[str, Any]:
     label, path = _split_named_path(spec)
     summary_path = _summary_path(path, SCENE_EDGE_CONFIDENCE_SUMMARY)
     data = json.loads(summary_path.read_text())
@@ -1290,6 +1325,10 @@ def _edge_fidelity_case_row(row: Mapping[str, Any]) -> str:
 def _scene_edge_html(scene_edge: Mapping[str, Any], destination: Path) -> str:
     status_class = "supported" if bool(scene_edge.get("pass")) else "not_supported"
     failed = ", ".join(str(value) for value in scene_edge.get("failed_checks", ())) or "none"
+    reports = scene_edge.get("reports", ())
+    report_rows = "".join(_scene_edge_report_row(row, destination) for row in reports if isinstance(row, Mapping))
+    if not report_rows:
+        report_rows = _scene_edge_report_row(scene_edge, destination)
     case_rows = "".join(_scene_edge_case_row(row) for row in scene_edge.get("cases", ()))
     if not case_rows:
         case_rows = '<tr><td colspan="7">No scene edge-confidence case rows were available.</td></tr>'
@@ -1312,8 +1351,26 @@ def _scene_edge_html(scene_edge: Mapping[str, Any], destination: Path) -> str:
         f"<td>{_fmt(scene_edge.get('perception_aux_confidence_source_edge_f1_mean'))}</td>"
         "</tr></tbody></table>"
         "<table>"
+        "<thead><tr><th>Evidence Report</th><th>Report</th><th>Cases</th><th>Checks</th><th>CFA</th><th>LensPSF</th><th>Status</th></tr></thead>"
+        f"<tbody>{report_rows}</tbody></table>"
+        "<table>"
         "<thead><tr><th>Case</th><th>Source</th><th>CFA</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th></tr></thead>"
         f"<tbody>{case_rows}</tbody></table>"
+    )
+
+
+def _scene_edge_report_row(row: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(row.get("pass")) else "not_supported"
+    return (
+        "<tr>"
+        f"<td>{html_lib.escape(str(row.get('name', 'scene edge')))}</td>"
+        f"<td>{_report_link(row, destination)}</td>"
+        f"<td>{int(row.get('case_count', 0))}</td>"
+        f"<td>{int(row.get('check_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in row.get('cfa_patterns', ())) or 'none')}</td>"
+        f"<td>{html_lib.escape(', '.join(_fmt(value) for value in row.get('psf_sigmas', ()) if value is not None) or 'none')}</td>"
+        f"<td class=\"{status_class}\">{html_lib.escape(str(row.get('status', '')))}</td>"
+        "</tr>"
     )
 
 
@@ -1462,6 +1519,29 @@ def _maybe_float_or_none(value: Any) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _as_path_specs(path: str | Path | Sequence[str | Path] | None) -> Tuple[str | Path, ...]:
+    if path is None:
+        return ()
+    if isinstance(path, (str, Path)):
+        return (path,)
+    return tuple(path)
+
+
+def _weighted_report_mean(reports: Sequence[Mapping[str, Any]], key: str) -> float | None:
+    weighted_sum = 0.0
+    weight_sum = 0.0
+    for report in reports:
+        value = report.get(key)
+        if value is None:
+            continue
+        weight = max(float(report.get("case_count", 0)), 1.0)
+        weighted_sum += float(value) * weight
+        weight_sum += weight
+    if weight_sum <= 0.0:
+        return None
+    return float(weighted_sum / weight_sum)
 
 
 def _signed_metric(row: Mapping[str, Any], metric: str) -> float | None:

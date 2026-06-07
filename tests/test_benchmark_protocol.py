@@ -26,6 +26,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
+            scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -41,7 +42,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
-                scene_edge_confidence=scene_edge,
+                scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
@@ -84,6 +85,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
+            scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -100,7 +102,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
-                scene_edge_confidence=scene_edge,
+                scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
@@ -109,6 +111,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(summary["status"], "claim_ready")
             self.assertEqual(summary["coverage_status"], "coverage_complete")
             self.assertEqual(summary["metric_claim_status"], "broad_superiority_not_supported")
+            self.assertEqual(summary["evidence"]["scene_edge_confidence"]["report_count"], 2)
+            self.assertEqual(summary["evidence"]["scene_edge_confidence"]["case_count"], 2)
+            self.assertEqual(summary["evidence"]["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertFalse(summary["claim_gate_outcomes"]["broad_superiority_pass"])
             self.assertEqual(summary["missing_required"], [])
             self.assertEqual(summary["missing_raw_claim"], [])
@@ -387,7 +392,7 @@ def _write_edge_fidelity_suite(path: Path) -> Path:
     return path
 
 
-def _write_scene_edge_confidence(path: Path) -> Path:
+def _write_scene_edge_confidence(path: Path, *, cfa_pattern: str = "GRBG", psf_sigmas: tuple[float, ...] = (0.0,)) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
     payload = {
@@ -396,7 +401,7 @@ def _write_scene_edge_confidence(path: Path) -> Path:
             {
                 "id": "bus",
                 "source": "sample_image_camerae2e",
-                "cfa_pattern": "GRBG",
+                "cfa_pattern": cfa_pattern,
                 "metrics": {
                     "human_rgb_proxy_source_edge_f1": 0.66,
                     "perception_rgb_proxy_source_edge_f1": 0.67,
@@ -418,6 +423,8 @@ def _write_scene_edge_confidence(path: Path) -> Path:
             "perception_aux_strength_source_edge_f1_mean": 0.75,
             "perception_aux_confidence_source_edge_f1_mean": 0.37,
         },
+        "cfa_patterns": [cfa_pattern],
+        "psf_sigmas": list(psf_sigmas),
     }
     (path / "scene_edge_confidence_summary.json").write_text(json.dumps(payload) + "\n")
     return path

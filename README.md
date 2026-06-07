@@ -828,6 +828,7 @@ PYTHONPATH=src \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
+  --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
@@ -1140,6 +1141,7 @@ PYTHONPATH=src \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
+  --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
@@ -1180,6 +1182,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
+  --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --min-samples 1000 \

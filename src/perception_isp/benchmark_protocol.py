@@ -7,7 +7,7 @@ import html as html_lib
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Mapping, Sequence
+from typing import Any, Dict, Mapping, Sequence, Tuple
 
 from .types import json_ready
 
@@ -60,7 +60,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-stress-sweep", default=None, help="cfa_stress_sweep_summary.json path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="edge_confidence_suite_summary.json path/dir.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="edge_fidelity_suite_summary.json path/dir.")
-    parser.add_argument("--scene-edge-confidence", default=None, help="scene_edge_confidence_summary.json path/dir.")
+    parser.add_argument("--scene-edge-confidence", action="append", default=[], help="scene_edge_confidence_summary.json path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="scene_information_stress_summary.json path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="aux_contribution_audit_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
@@ -118,7 +118,7 @@ def build_protocol_coverage(
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
-    scene_edge_confidence: str | Path | None = None,
+    scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     min_samples: int = 1000,
@@ -191,7 +191,7 @@ def _collect_evidence(
     cfa_stress_sweep: str | Path | None,
     edge_confidence_suite: str | Path | None,
     edge_fidelity_suite: str | Path | None,
-    scene_edge_confidence: str | Path | None,
+    scene_edge_confidence: str | Path | Sequence[str | Path] | None,
     scene_information_stress: str | Path | None,
     aux_contribution_audit: str | Path | None,
 ) -> Dict[str, Any]:
@@ -687,9 +687,52 @@ def _load_edge_fidelity_suite(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
-def _load_scene_edge_confidence(path: str | Path | None) -> Dict[str, Any]:
-    if path is None:
+def _load_scene_edge_confidence(path: str | Path | Sequence[str | Path] | None) -> Dict[str, Any]:
+    specs = _as_path_specs(path)
+    if not specs:
         return {"available": False, "pass": False, "summary": "missing"}
+    reports = [_load_scene_edge_confidence_one(spec) for spec in specs]
+    case_count = sum(int(report.get("case_count", 0)) for report in reports)
+    check_count = sum(int(report.get("check_count", 0)) for report in reports)
+    failed = [str(value) for report in reports for value in report.get("failed_checks", ())]
+    cfa_patterns = sorted({str(value) for report in reports for value in report.get("cfa_patterns", ())})
+    psf_sigmas = sorted({float(value) for report in reports for value in report.get("psf_sigmas", ()) if value is not None})
+    pass_all = all(bool(report.get("pass")) for report in reports)
+    status = "pass" if pass_all else "fail"
+    human_f1 = _weighted_report_mean(reports, "human_rgb_proxy_source_edge_f1_mean")
+    perception_f1 = _weighted_report_mean(reports, "perception_rgb_proxy_source_edge_f1_mean")
+    aux_strength_f1 = _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_mean")
+    aux_confidence_f1 = _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_mean")
+    first = reports[0]
+    return {
+        "available": True,
+        "summary_path": first.get("summary_path"),
+        "html_path": first.get("html_path"),
+        "pass": pass_all,
+        "status": status,
+        "report_count": len(reports),
+        "case_count": case_count,
+        "check_count": check_count,
+        "failed_checks": failed,
+        "cfa_patterns": cfa_patterns,
+        "psf_sigmas": psf_sigmas,
+        "human_rgb_proxy_source_edge_f1_mean": human_f1,
+        "perception_rgb_proxy_source_edge_f1_mean": perception_f1,
+        "perception_aux_strength_source_edge_f1_mean": aux_strength_f1,
+        "perception_aux_confidence_source_edge_f1_mean": aux_confidence_f1,
+        "reports": reports,
+        "summary": (
+            f"{status}, reports={len(reports)}, cases={case_count}, checks={check_count}, failed={len(failed)}, "
+            f"cfa={', '.join(cfa_patterns) or 'none'}, "
+            f"psf={', '.join(str(value) for value in psf_sigmas) or 'none'}, "
+            f"humanF1={_fmt_optional(human_f1)}, "
+            f"perRgbF1={_fmt_optional(perception_f1)}, "
+            f"auxStrengthF1={_fmt_optional(aux_strength_f1)}"
+        ),
+    }
+
+
+def _load_scene_edge_confidence_one(path: str | Path) -> Dict[str, Any]:
     summary_path = _summary_path(path, SCENE_EDGE_CONFIDENCE_SUMMARY)
     data = json.loads(summary_path.read_text())
     checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
@@ -1037,6 +1080,29 @@ def _maybe_float(value: Any) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _as_path_specs(path: str | Path | Sequence[str | Path] | None) -> Tuple[str | Path, ...]:
+    if path is None:
+        return ()
+    if isinstance(path, (str, Path)):
+        return (path,)
+    return tuple(path)
+
+
+def _weighted_report_mean(reports: Sequence[Mapping[str, Any]], key: str) -> float | None:
+    weighted_sum = 0.0
+    weight_sum = 0.0
+    for report in reports:
+        value = report.get(key)
+        if value is None:
+            continue
+        weight = max(float(report.get("case_count", 0)), 1.0)
+        weighted_sum += float(value) * weight
+        weight_sum += weight
+    if weight_sum <= 0.0:
+        return None
+    return float(weighted_sum / weight_sum)
 
 
 if __name__ == "__main__":

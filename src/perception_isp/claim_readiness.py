@@ -42,7 +42,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir used as diagnostic CFA evidence.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir used as diagnostic difficult-edge evidence.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir used as diagnostic CFA/LensPSF edge evidence.")
-    parser.add_argument("--scene-edge-confidence", default=None, help="Scene-edge confidence summary path/dir used as high-information scene edge evidence.")
+    parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir used as high-information scene edge evidence. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
@@ -94,7 +94,7 @@ def run_claim_readiness(
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
-    scene_edge_confidence: str | Path | None = None,
+    scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
@@ -439,9 +439,38 @@ def _edge_fidelity_suite_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
-def _scene_edge_confidence_summary(path: str | Path | None) -> Dict[str, Any]:
-    if path is None:
+def _scene_edge_confidence_summary(path: str | Path | Sequence[str | Path] | None) -> Dict[str, Any]:
+    specs = _as_path_specs(path)
+    if not specs:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    reports = [_scene_edge_confidence_summary_one(spec) for spec in specs]
+    case_count = sum(int(report.get("case_count", 0)) for report in reports)
+    check_count = sum(int(report.get("check_count", 0)) for report in reports)
+    failed = [str(value) for report in reports for value in report.get("failed_checks", ())]
+    cfa_patterns = sorted({str(value) for report in reports for value in report.get("cfa_patterns", ())})
+    psf_sigmas = sorted({float(value) for report in reports for value in report.get("psf_sigmas", ()) if value is not None})
+    pass_all = all(bool(report.get("pass")) for report in reports)
+    first = reports[0]
+    return {
+        "report": first.get("report", ""),
+        "summary_json": first.get("summary_json", ""),
+        "pass": pass_all,
+        "status": "pass" if pass_all else "fail",
+        "report_count": len(reports),
+        "failed_checks": failed,
+        "check_count": check_count,
+        "case_count": case_count,
+        "cfa_patterns": cfa_patterns,
+        "psf_sigmas": psf_sigmas,
+        "human_rgb_proxy_source_edge_f1_mean": _weighted_report_mean(reports, "human_rgb_proxy_source_edge_f1_mean"),
+        "perception_rgb_proxy_source_edge_f1_mean": _weighted_report_mean(reports, "perception_rgb_proxy_source_edge_f1_mean"),
+        "perception_aux_strength_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_mean"),
+        "perception_aux_confidence_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_mean"),
+        "reports": reports,
+    }
+
+
+def _scene_edge_confidence_summary_one(path: str | Path) -> Dict[str, Any]:
     candidate = Path(path).expanduser()
     if candidate.is_dir():
         candidate = candidate / "scene_edge_confidence_summary.json"
@@ -548,6 +577,29 @@ def _optional_float(value: Any) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _as_path_specs(path: str | Path | Sequence[str | Path] | None) -> tuple[str | Path, ...]:
+    if path is None:
+        return ()
+    if isinstance(path, (str, Path)):
+        return (path,)
+    return tuple(path)
+
+
+def _weighted_report_mean(reports: Sequence[Mapping[str, Any]], key: str) -> float | None:
+    weighted_sum = 0.0
+    weight_sum = 0.0
+    for report in reports:
+        value = report.get(key)
+        if value is None:
+            continue
+        weight = max(float(report.get("case_count", 0)), 1.0)
+        weighted_sum += float(value) * weight
+        weight_sum += weight
+    if weight_sum <= 0.0:
+        return None
+    return float(weighted_sum / weight_sum)
 
 
 if __name__ == "__main__":
