@@ -18,6 +18,7 @@ class ClaimDashboardTest(unittest.TestCase):
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             training = _write_training_rollup(root / "training")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
+            rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
@@ -42,6 +43,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 claim_gate_specs=[f"Human superiority={broad}", f"FP reducer={fp}"],
                 training_rollup=training,
                 rgb_aux_dnn_gate=rgb_aux_dnn_gate,
+                rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
                 task_metrics=task_metrics,
                 protocol_coverage=protocol,
                 mechanism_validation=mechanism,
@@ -69,6 +71,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["training"]["status"], "diagnostic_only")
             self.assertFalse(dashboard["rgb_aux_dnn_gate"]["pass"])
             self.assertEqual(dashboard["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
+            self.assertFalse(dashboard["rgb_aux_dnn_sweep"]["pass"])
+            self.assertEqual(dashboard["rgb_aux_dnn_sweep"]["claim_status"], "rgb_aux_dnn_sweep_no_claim_operating_point")
             self.assertEqual(dashboard["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(dashboard["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
@@ -124,6 +128,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA/LensPSF visual casebook", evidence_areas)
             self.assertIn("CFA/LensPSF score-label aux ablation", evidence_areas)
             self.assertIn("RGB+Aux DNN fine-tune gate", evidence_areas)
+            self.assertIn("RGB+Aux DNN operating-point sweep", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -206,6 +211,10 @@ class ClaimDashboardTest(unittest.TestCase):
                 "RGB+Aux DNN gate failed for sample_count, absolute_recall, absolute_fp_per_sample, small_recall_vs_rgb_only, fp_vs_rgb_only; do not claim the aux tensor improves a learned detector yet.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
+            self.assertIn(
+                "RGB+Aux DNN confidence sweep found no claim-ready operating point; threshold tuning alone does not support learned RGB+Aux detector improvement.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
             self.assertTrue(
                 any(
                     item["claim"].startswith("Front-end/downstream bridge is directionally positive")
@@ -244,6 +253,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Task Metrics", html)
             self.assertIn("RGB+Aux DNN Gate", html)
             self.assertIn("rgb_aux_dnn_not_claim_ready", html)
+            self.assertIn("RGB+Aux DNN Confidence Sweep", html)
+            self.assertIn("rgb_aux_dnn_sweep_no_claim_operating_point", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
             self.assertIn("Adverse Native RAW Slice", html)
@@ -313,6 +324,7 @@ class ClaimDashboardTest(unittest.TestCase):
             root = Path(tmp)
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
+            rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
@@ -339,6 +351,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(fp),
                         "--rgb-aux-dnn-gate",
                         str(rgb_aux_dnn_gate),
+                        "--rgb-aux-dnn-sweep",
+                        str(rgb_aux_dnn_sweep),
                         "--task-metrics",
                         str(task_metrics),
                         "--protocol-coverage",
@@ -385,6 +399,8 @@ class ClaimDashboardTest(unittest.TestCase):
             summary = json.loads((root / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertFalse(summary["rgb_aux_dnn_gate"]["pass"])
             self.assertEqual(summary["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
+            self.assertFalse(summary["rgb_aux_dnn_sweep"]["pass"])
+            self.assertEqual(summary["rgb_aux_dnn_sweep"]["claim_status"], "rgb_aux_dnn_sweep_no_claim_operating_point")
             self.assertEqual(summary["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(summary["mechanism_validation"]["pass"])
@@ -607,6 +623,89 @@ def _dnn_gate_criterion(
     if delta is not None:
         row["delta"] = delta
     return row
+
+
+def _write_rgb_aux_dnn_sweep(path: Path, *, passed: bool) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    rows = [
+        _dnn_sweep_row(
+            confidence=0.50,
+            metric_pass=False,
+            aux=(0.02, 0.16, 0.05, 40.0),
+            rgb=(0.01, 0.10, 0.02, 80.0),
+            failed=("absolute_precision", "absolute_fp_per_sample"),
+        ),
+        _dnn_sweep_row(
+            confidence=0.93,
+            metric_pass=passed,
+            aux=(0.06, 0.04 if not passed else 0.12, 0.02, 4.0),
+            rgb=(0.01, 0.02, 0.01, 20.0),
+            failed=() if passed else ("absolute_recall", "small_recall_vs_rgb_only"),
+        ),
+    ]
+    (path / "rgb_aux_dnn_sweep_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass" if passed else "fail",
+                "pass": passed,
+                "metric_pass": passed,
+                "claim_status": "rgb_aux_dnn_sweep_claim_ready" if passed else "rgb_aux_dnn_sweep_no_claim_operating_point",
+                "profile": "claim_quality",
+                "row_count": len(rows),
+                "rows": rows,
+                "best_passing_row": rows[1] if passed else None,
+                "best_metric_row": rows[1] if passed else None,
+                "best_recall_positive_delta_row": rows[0],
+                "lowest_fp_positive_recall_delta_row": rows[1],
+                "interpretation": "unit RGB+Aux DNN sweep",
+                "claim_boundary": "unit confidence-sweep boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _dnn_sweep_row(
+    *,
+    confidence: float,
+    metric_pass: bool,
+    aux: tuple[float, float, float, float],
+    rgb: tuple[float, float, float, float],
+    failed: tuple[str, ...],
+) -> dict:
+    deltas = {
+        "precision@0.50_mean": aux[0] - rgb[0],
+        "recall@0.50_mean": aux[1] - rgb[1],
+        "small_recall@0.50_mean": aux[2] - rgb[2],
+        "fp@0.50_mean": aux[3] - rgb[3],
+    }
+    return {
+        "confidence": confidence,
+        "rgb_aux": {
+            "sample_count": 32,
+            "channel_mode": "rgb_aux",
+            "precision@0.50_mean": aux[0],
+            "recall@0.50_mean": aux[1],
+            "small_recall@0.50_mean": aux[2],
+            "fp@0.50_mean": aux[3],
+        },
+        "rgb_only": {
+            "sample_count": 32,
+            "channel_mode": "rgb_only",
+            "precision@0.50_mean": rgb[0],
+            "recall@0.50_mean": rgb[1],
+            "small_recall@0.50_mean": rgb[2],
+            "fp@0.50_mean": rgb[3],
+        },
+        "deltas": deltas,
+        "criteria": [],
+        "pass": False,
+        "metric_pass": metric_pass,
+        "failed_criteria": ("sample_count", *failed) if failed else ("sample_count",),
+        "failed_metric_criteria": list(failed),
+    }
 
 
 def _write_task_metrics(path: Path) -> Path:

@@ -241,13 +241,28 @@ It still fails the `claim_quality` gate because the sample count is only 32 and
 absolute precision/FP remain weak (`P50=0.0193`, `FP/sample=51.5625`). It should
 not be advertised as learned RGB+Aux detector superiority.
 
-Confidence sweeps from `0.30` to `0.98` did not produce a usable operating
-point. Raising confidence lowers FP but collapses recall. This is a concrete
-negative result: the compact dense detector is useful to measure the RGB+aux
-training path and resource needs, but it is not enough for a HumanISP-vs-
-PerceptionISP superiority claim. A practical aux path should either fine-tune a
-real detector stem/head or train a detector-side calibration branch over the
-pretrained RGB detector proposals.
+The current e12 operating-point sweep is:
+
+```text
+reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1/index.html
+```
+
+It reports `rgb_aux_dnn_sweep_no_claim_operating_point`. Raising confidence
+lowers FP but collapses recall, so threshold tuning alone does not rescue this
+compact detector into a claim-quality learned RGB+Aux result.
+
+| Confidence | RGB+Aux R50 | RGB+Aux P50 | RGB+Aux FP/sample | dR50 vs RGB-only | dFP/sample vs RGB-only | Interpretation |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 0.50 | 0.1649 | 0.0193 | 51.5625 | +0.0701 | -36.4375 | Best recall gain, FP too high |
+| 0.80 | 0.1061 | 0.0382 | 17.7188 | +0.0740 | -34.5938 | Better FP, still not claim-quality |
+| 0.93 | 0.0413 | 0.0553 | 4.9062 | +0.0269 | -16.6250 | FP near usable, recall collapsed |
+| 0.95 | 0.0219 | 0.0127 | 3.2812 | +0.0180 | -11.1250 | Lowest FP with positive recall delta, recall too low |
+
+This is a concrete negative result: the compact dense detector is useful to
+measure the RGB+aux training path and resource needs, but it is not enough for a
+HumanISP-vs-PerceptionISP superiority claim. A practical aux path should either
+fine-tune a real detector stem/head or train a detector-side calibration branch
+over the pretrained RGB detector proposals.
 
 The channel ablation sharpens the conclusion. The `rgb_aux` model gets the best
 eval loss and slightly higher R50 than `rgb_only`, but it does not improve the
@@ -642,7 +657,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | --- | --- |
 | Broad HumanISP superiority | Not supported |
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
-| Learned RGB+Aux DNN direct detector claim | Not supported; the matched KITTI val128 e12 gate improves over RGB-only (`dR50=+0.0701`, `dFP50=-36.4375`) but fails `claim_quality` on sample count, absolute precision, and absolute FP |
+| Learned RGB+Aux DNN direct detector claim | Not supported; the matched KITTI val128 e12 gate improves over RGB-only (`dR50=+0.0701`, `dFP50=-36.4375`) but fails `claim_quality` on sample count, absolute precision, and absolute FP. The e12 confidence sweep also reports `rgb_aux_dnn_sweep_no_claim_operating_point`, so threshold tuning alone is not enough |
 | Task-level recall improvement | `task_gate_fail` for `vru`, `person`, `cyclist`, `vehicle`, and `small_all`; current evidence supports only the narrower FP-reduction claim |
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |

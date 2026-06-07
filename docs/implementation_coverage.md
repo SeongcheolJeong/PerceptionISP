@@ -21,7 +21,7 @@ boundary used by the benchmark protocol and claim gates.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, adverse native RAW slice, adverse task slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, RGB+Aux-vs-RGB-only DNN gate, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, adverse native RAW slice, adverse task slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, RGB+Aux-vs-RGB-only DNN gate, RGB+Aux DNN confidence sweep, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -35,6 +35,12 @@ Known limits:
   sample count, absolute precision, and absolute FP are too weak. Treat
   `reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1/index.html`
   as learned-aux feasibility evidence, not a detector superiority claim.
+- The corresponding e12 confidence sweep reports
+  `rgb_aux_dnn_sweep_no_claim_operating_point` in
+  `reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1/index.html`.
+  Threshold tuning lowers FP only by collapsing recall, so this remains a
+  training-path feasibility result rather than a learned RGB+Aux performance
+  claim.
 - The RGB+aux smoke checkpoint predicts one generic box and is not a useful trained detector.
 - The current extended RGB+aux tensor is 15 channels after adding PSF blur and
   PSF edge-likelihood aux channels. Older 13-channel export/train/eval artifacts

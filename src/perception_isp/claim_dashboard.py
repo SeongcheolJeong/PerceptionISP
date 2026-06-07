@@ -15,6 +15,7 @@ from .types import json_ready
 CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 RGB_AUX_DNN_GATE_SUMMARY = "rgb_aux_dnn_gate_summary.json"
+RGB_AUX_DNN_SWEEP_SUMMARY = "rgb_aux_dnn_sweep_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 TASK_GATE_SUMMARY = "task_gate_summary.json"
@@ -42,6 +43,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--claim-gate", action="append", default=[], help="Claim gate summary path/dir, optionally name=path.")
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
     parser.add_argument("--rgb-aux-dnn-gate", default=None, help="RGB+Aux versus RGB-only DNN gate summary path/dir.")
+    parser.add_argument("--rgb-aux-dnn-sweep", default=None, help="RGB+Aux versus RGB-only DNN confidence sweep summary path/dir.")
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
     parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
@@ -68,6 +70,7 @@ def main(argv: Any = None) -> int:
         claim_gate_specs=args.claim_gate,
         training_rollup=args.training_rollup,
         rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
+        rgb_aux_dnn_sweep=args.rgb_aux_dnn_sweep,
         task_metrics=args.task_metrics,
         task_gate=args.task_gate,
         protocol_coverage=args.protocol_coverage,
@@ -110,6 +113,7 @@ def build_claim_dashboard(
     claim_gate_specs: Sequence[str | Path],
     training_rollup: str | Path | None = None,
     rgb_aux_dnn_gate: str | Path | None = None,
+    rgb_aux_dnn_sweep: str | Path | None = None,
     task_metrics: str | Path | None = None,
     task_gate: str | Path | None = None,
     protocol_coverage: str | Path | None = None,
@@ -133,6 +137,7 @@ def build_claim_dashboard(
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
     rgb_aux_dnn = _load_rgb_aux_dnn_gate(rgb_aux_dnn_gate) if rgb_aux_dnn_gate is not None else None
+    rgb_aux_dnn_sweep_data = _load_rgb_aux_dnn_sweep(rgb_aux_dnn_sweep) if rgb_aux_dnn_sweep is not None else None
     task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
     task_gate_data = _load_task_gate(task_gate) if task_gate is not None else None
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
@@ -176,6 +181,7 @@ def build_claim_dashboard(
         claims,
         training,
         rgb_aux_dnn,
+        rgb_aux_dnn_sweep_data,
         task,
         task_gate_data,
         protocol,
@@ -199,6 +205,7 @@ def build_claim_dashboard(
         claims,
         training,
         rgb_aux_dnn,
+        rgb_aux_dnn_sweep_data,
         task,
         task_gate_data,
         protocol,
@@ -222,6 +229,7 @@ def build_claim_dashboard(
         "claims": claims,
         "training": training,
         "rgb_aux_dnn_gate": rgb_aux_dnn,
+        "rgb_aux_dnn_sweep": rgb_aux_dnn_sweep_data,
         "task_metrics": task,
         "task_gate": task_gate_data,
         "protocol_coverage": protocol,
@@ -350,6 +358,38 @@ def _load_rgb_aux_dnn_gate(path: str | Path) -> Dict[str, Any]:
             "small_recall@0.50_mean": _maybe_float_or_none(deltas.get("small_recall@0.50_mean")),
             "fp@0.50_mean": _maybe_float_or_none(deltas.get("fp@0.50_mean")),
         },
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_rgb_aux_dnn_sweep(path: str | Path) -> Dict[str, Any]:
+    summary_path = _summary_path(path, RGB_AUX_DNN_SWEEP_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    rows = [row for row in data.get("rows", ()) if isinstance(row, Mapping)]
+    return {
+        "name": _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": bool(data.get("pass")),
+        "metric_pass": bool(data.get("metric_pass")),
+        "claim_status": str(data.get("claim_status", "")),
+        "profile": str(data.get("profile", "")),
+        "row_count": int(data.get("row_count", len(rows))),
+        "rows": rows,
+        "best_passing_row": dict(data.get("best_passing_row")) if isinstance(data.get("best_passing_row"), Mapping) else None,
+        "best_metric_row": dict(data.get("best_metric_row")) if isinstance(data.get("best_metric_row"), Mapping) else None,
+        "best_recall_positive_delta_row": (
+            dict(data.get("best_recall_positive_delta_row"))
+            if isinstance(data.get("best_recall_positive_delta_row"), Mapping)
+            else None
+        ),
+        "lowest_fp_positive_recall_delta_row": (
+            dict(data.get("lowest_fp_positive_recall_delta_row"))
+            if isinstance(data.get("lowest_fp_positive_recall_delta_row"), Mapping)
+            else None
+        ),
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1460,6 +1500,7 @@ def _build_evidence_map(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
+    rgb_aux_dnn_sweep: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
@@ -1785,6 +1826,23 @@ def _build_evidence_map(
             }
         )
 
+    if rgb_aux_dnn_sweep is not None:
+        passed = bool(rgb_aux_dnn_sweep.get("pass"))
+        current.append(
+            {
+                "area": "RGB+Aux DNN operating-point sweep",
+                "status": "supported" if passed else "not_supported",
+                "claim_strength": str(rgb_aux_dnn_sweep.get("claim_status", "")),
+                "evidence": _rgb_aux_dnn_sweep_evidence(rgb_aux_dnn_sweep),
+                "claim_boundary": (
+                    "Confidence-sweep evidence only; it does not retrain the model or add held-out scale."
+                    if passed
+                    else "Do not claim a learned RGB+Aux detector operating point until the confidence sweep finds a passing point."
+                ),
+                "next_evidence": "Improve detector calibration/training so one threshold preserves recall while meeting precision and FP budgets.",
+            }
+        )
+
     return {
         "claim_posture": _claim_posture(claims, protocol_coverage),
         "current_evidence": current,
@@ -1803,6 +1861,7 @@ def _build_evidence_map(
             casebook=casebook,
             training=training,
             rgb_aux_dnn_gate=rgb_aux_dnn_gate,
+            rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
         ),
     }
 
@@ -2182,6 +2241,33 @@ def _rgb_aux_dnn_gate_evidence(gate: Mapping[str, Any]) -> str:
     )
 
 
+def _rgb_aux_dnn_sweep_evidence(sweep: Mapping[str, Any]) -> str:
+    best_recall = (
+        sweep.get("best_recall_positive_delta_row")
+        if isinstance(sweep.get("best_recall_positive_delta_row"), Mapping)
+        else {}
+    )
+    lowest_fp = (
+        sweep.get("lowest_fp_positive_recall_delta_row")
+        if isinstance(sweep.get("lowest_fp_positive_recall_delta_row"), Mapping)
+        else {}
+    )
+    best_aux = best_recall.get("rgb_aux", {}) if isinstance(best_recall.get("rgb_aux"), Mapping) else {}
+    best_deltas = best_recall.get("deltas", {}) if isinstance(best_recall.get("deltas"), Mapping) else {}
+    low_aux = lowest_fp.get("rgb_aux", {}) if isinstance(lowest_fp.get("rgb_aux"), Mapping) else {}
+    low_deltas = lowest_fp.get("deltas", {}) if isinstance(lowest_fp.get("deltas"), Mapping) else {}
+    return (
+        f"profile={sweep.get('profile', '')}; rows={int(sweep.get('row_count', 0))}; "
+        f"metric_pass={bool(sweep.get('metric_pass'))}; "
+        f"bestRecall conf={_fmt(best_recall.get('confidence'))}, "
+        f"R50={_fmt(best_aux.get('recall@0.50_mean'))}, FP={_fmt(best_aux.get('fp@0.50_mean'))}, "
+        f"dR={_fmt(best_deltas.get('recall@0.50_mean'), signed=True)}, dFP={_fmt(best_deltas.get('fp@0.50_mean'), signed=True)}; "
+        f"lowestFPPositive conf={_fmt(lowest_fp.get('confidence'))}, "
+        f"R50={_fmt(low_aux.get('recall@0.50_mean'))}, FP={_fmt(low_aux.get('fp@0.50_mean'))}, "
+        f"dR={_fmt(low_deltas.get('recall@0.50_mean'), signed=True)}, dFP={_fmt(low_deltas.get('fp@0.50_mean'), signed=True)}"
+    )
+
+
 def _future_evidence_rows(
     *,
     scene_edge_confidence: Mapping[str, Any] | None,
@@ -2198,6 +2284,7 @@ def _future_evidence_rows(
     casebook: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
+    rgb_aux_dnn_sweep: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
     scene_edge_correlation = _sample_bridge_scene_edge_correlation(aux_contribution_audit)
@@ -2285,6 +2372,12 @@ def _future_evidence_rows(
             )
     else:
         dnn_gate_gap = f"Current DNN training status is {training_status}. {aux_gate_gap}"
+    if rgb_aux_dnn_sweep is not None and not bool(rgb_aux_dnn_sweep.get("pass")):
+        dnn_gate_gap = (
+            dnn_gate_gap
+            + f" Confidence sweep status is {rgb_aux_dnn_sweep.get('claim_status', '')}; "
+            "threshold tuning alone did not find a claim-ready operating point."
+        )
     if cfa_lenspsf_casebook is not None:
         casebook_gap = "CFA/LensPSF visual casebook exists; next step is larger scale and richer TP-loss/adverse-condition review."
     elif casebook is not None:
@@ -2385,6 +2478,7 @@ def _claim_decisions(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
+    rgb_aux_dnn_sweep: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
@@ -2443,6 +2537,28 @@ def _claim_decisions(
                 {
                     "status": "not_supported",
                     "claim": f"RGB+Aux DNN gate failed for {failed}; do not claim the aux tensor improves a learned detector yet.",
+                }
+            )
+    if rgb_aux_dnn_sweep is not None:
+        if bool(rgb_aux_dnn_sweep.get("pass")):
+            decisions.append(
+                {
+                    "status": "supported",
+                    "claim": "RGB+Aux DNN confidence sweep found a passing compact-DNN operating point; still validate on larger held-out data.",
+                }
+            )
+        elif bool(rgb_aux_dnn_sweep.get("metric_pass")):
+            decisions.append(
+                {
+                    "status": "needs_eval",
+                    "claim": "RGB+Aux DNN confidence sweep found a metric-passing operating point, but sample scale is still insufficient.",
+                }
+            )
+        else:
+            decisions.append(
+                {
+                    "status": "not_supported",
+                    "claim": "RGB+Aux DNN confidence sweep found no claim-ready operating point; threshold tuning alone does not support learned RGB+Aux detector improvement.",
                 }
             )
     if mechanism_validation is not None:
@@ -2940,6 +3056,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(rgb_aux_dnn_gate, Mapping)
         else "<p>No RGB+Aux DNN gate summary was provided.</p>"
     )
+    rgb_aux_dnn_sweep = dashboard.get("rgb_aux_dnn_sweep")
+    rgb_aux_dnn_sweep_html = (
+        _rgb_aux_dnn_sweep_html(rgb_aux_dnn_sweep, destination)
+        if isinstance(rgb_aux_dnn_sweep, Mapping)
+        else "<p>No RGB+Aux DNN confidence sweep summary was provided.</p>"
+    )
     aux_contribution = dashboard.get("aux_contribution_audit")
     aux_contribution_html = _aux_contribution_html(aux_contribution, destination) if isinstance(aux_contribution, Mapping) else "<p>No aux contribution audit was provided.</p>"
     adverse_native = dashboard.get("adverse_native_slice")
@@ -3049,6 +3171,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {training_html}
   <h2>RGB+Aux DNN Gate</h2>
   {rgb_aux_dnn_gate_html}
+  <h2>RGB+Aux DNN Confidence Sweep</h2>
+  {rgb_aux_dnn_sweep_html}
   <h2>Aux Contribution Audit</h2>
   {aux_contribution_html}
   <h2>Adverse Native RAW Slice</h2>
@@ -3260,6 +3384,78 @@ def _rgb_aux_dnn_gate_criterion_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('delta'), signed=True)}</td>"
         f"<td>{_fmt(row.get('threshold'))}</td>"
         "</tr>"
+    )
+
+
+def _rgb_aux_dnn_sweep_html(sweep: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(sweep.get("pass")) else "not_supported"
+    best = sweep.get("best_recall_positive_delta_row") if isinstance(sweep.get("best_recall_positive_delta_row"), Mapping) else {}
+    lowest = (
+        sweep.get("lowest_fp_positive_recall_delta_row")
+        if isinstance(sweep.get("lowest_fp_positive_recall_delta_row"), Mapping)
+        else {}
+    )
+    rows = "".join(_rgb_aux_dnn_sweep_row(row) for row in sweep.get("rows", ()) if isinstance(row, Mapping))
+    if not rows:
+        rows = '<tr><td colspan="9">No DNN confidence sweep rows were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(sweep.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(sweep.get('claim_status', '')))}</code>; "
+        f"metric pass: <code>{html_lib.escape(str(bool(sweep.get('metric_pass'))))}</code>. "
+        f"{html_lib.escape(str(sweep.get('interpretation', '')))} "
+        f"{html_lib.escape(str(sweep.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Profile</th><th>Rows</th><th>Best Recall Positive Delta</th><th>Lowest FP Positive Recall Delta</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(sweep, destination)}</td>"
+        f"<td><code>{html_lib.escape(str(sweep.get('profile', '')))}</code></td>"
+        f"<td>{int(sweep.get('row_count', 0))}</td>"
+        f"<td>{_rgb_aux_dnn_sweep_best_cell(best)}</td>"
+        f"<td>{_rgb_aux_dnn_sweep_best_cell(lowest)}</td>"
+        "</tr></tbody></table>"
+        "<table><thead><tr><th>Conf</th><th>Status</th><th>Metric Pass</th><th>RGB+Aux P/R/Small/FP</th><th>RGB-only P/R/Small/FP</th><th>dP</th><th>dR</th><th>dSmall</th><th>dFP</th><th>Failed Metric Criteria</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _rgb_aux_dnn_sweep_best_cell(row: Mapping[str, Any]) -> str:
+    if not row:
+        return "none"
+    rgb_aux = row.get("rgb_aux", {}) if isinstance(row.get("rgb_aux"), Mapping) else {}
+    deltas = row.get("deltas", {}) if isinstance(row.get("deltas"), Mapping) else {}
+    return (
+        f"conf {_fmt(row.get('confidence'))}<br>"
+        f"R50 {_fmt(rgb_aux.get('recall@0.50_mean'))}, FP {_fmt(rgb_aux.get('fp@0.50_mean'))}<br>"
+        f"dR {_fmt(deltas.get('recall@0.50_mean'), signed=True)}, dFP {_fmt(deltas.get('fp@0.50_mean'), signed=True)}"
+    )
+
+
+def _rgb_aux_dnn_sweep_row(row: Mapping[str, Any]) -> str:
+    rgb_aux = row.get("rgb_aux", {}) if isinstance(row.get("rgb_aux"), Mapping) else {}
+    rgb_only = row.get("rgb_only", {}) if isinstance(row.get("rgb_only"), Mapping) else {}
+    deltas = row.get("deltas", {}) if isinstance(row.get("deltas"), Mapping) else {}
+    failed = ", ".join(str(value) for value in row.get("failed_metric_criteria", ())) or "none"
+    status = "pass" if bool(row.get("pass")) else "fail"
+    return (
+        "<tr>"
+        f"<td>{_fmt(row.get('confidence'))}</td>"
+        f"<td class=\"{'supported' if status == 'pass' else 'not_supported'}\">{status}</td>"
+        f"<td>{html_lib.escape(str(bool(row.get('metric_pass'))))}</td>"
+        f"<td>{_rgb_aux_dnn_sweep_metric_group(rgb_aux)}</td>"
+        f"<td>{_rgb_aux_dnn_sweep_metric_group(rgb_only)}</td>"
+        f"<td>{_fmt(deltas.get('precision@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('recall@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('small_recall@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('fp@0.50_mean'), signed=True)}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr>"
+    )
+
+
+def _rgb_aux_dnn_sweep_metric_group(row: Mapping[str, Any]) -> str:
+    return (
+        f"{_fmt(row.get('precision@0.50_mean'))} / "
+        f"{_fmt(row.get('recall@0.50_mean'))} / "
+        f"{_fmt(row.get('small_recall@0.50_mean'))} / "
+        f"{_fmt(row.get('fp@0.50_mean'))}"
     )
 
 

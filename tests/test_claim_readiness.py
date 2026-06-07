@@ -18,6 +18,7 @@ class ClaimReadinessTest(unittest.TestCase):
             train_dir = _write_train_summary(root / "train")
             eval_dir = _write_eval_summary(root / "eval")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
+            rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
             rollup_dir = _write_comparison_rollup(root / "rollup")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
@@ -42,6 +43,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 bootstrap_seed="unit",
                 training_summaries=[train_dir, eval_dir],
                 rgb_aux_dnn_gate=rgb_aux_dnn_gate,
+                rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
                 comparison_rollups=[f"Calibration={rollup_dir}"],
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
@@ -83,6 +85,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("rgb_aux_dnn_gate", summary)
+            self.assertIn("rgb_aux_dnn_sweep", summary)
             self.assertIn("adverse_native_slice", summary)
             self.assertIn("adverse_task_slice", summary)
             self.assertIn("cfa_lenspsf_proposal_audit", summary)
@@ -99,6 +102,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertFalse(summary["rgb_aux_dnn_gate"]["pass"])
             self.assertEqual(summary["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
+            self.assertFalse(summary["rgb_aux_dnn_sweep"]["pass"])
+            self.assertEqual(summary["rgb_aux_dnn_sweep"]["claim_status"], "rgb_aux_dnn_sweep_no_claim_operating_point")
             self.assertTrue(summary["adverse_native_slice"]["pass"])
             self.assertEqual(summary["adverse_native_slice"]["claim_status"], "adverse_fp_reducer_supported")
             self.assertTrue(summary["adverse_task_slice"]["pass"])
@@ -145,6 +150,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertFalse(dashboard_summary["rgb_aux_dnn_gate"]["pass"])
             self.assertEqual(dashboard_summary["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
+            self.assertFalse(dashboard_summary["rgb_aux_dnn_sweep"]["pass"])
+            self.assertEqual(dashboard_summary["rgb_aux_dnn_sweep"]["claim_status"], "rgb_aux_dnn_sweep_no_claim_operating_point")
             self.assertTrue(dashboard_summary["adverse_native_slice"]["pass"])
             self.assertTrue(dashboard_summary["adverse_task_slice"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_proposal_audit"]["pass"])
@@ -164,6 +171,7 @@ class ClaimReadinessTest(unittest.TestCase):
             adverse_task = _write_adverse_task_slice(root / "adverse_task")
             cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
+            rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = readiness_main(
@@ -181,6 +189,8 @@ class ClaimReadinessTest(unittest.TestCase):
                         str(adverse_task),
                         "--rgb-aux-dnn-gate",
                         str(rgb_aux_dnn_gate),
+                        "--rgb-aux-dnn-sweep",
+                        str(rgb_aux_dnn_sweep),
                         "--cfa-lenspsf-aux-ablation",
                         str(cfa_lenspsf_aux_ablation),
                         "--output-dir",
@@ -196,6 +206,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("condition_metrics", printed)
             self.assertIn("condition_gate", printed)
             self.assertFalse(printed["rgb_aux_dnn_gate"]["pass"])
+            self.assertFalse(printed["rgb_aux_dnn_sweep"]["pass"])
             self.assertTrue(printed["adverse_native_slice"]["pass"])
             self.assertTrue(printed["adverse_task_slice"]["pass"])
             self.assertEqual(printed["adverse_task_slice"]["claim_status"], "adverse_task_gate_partially_supported")
@@ -480,6 +491,88 @@ def _dnn_gate_criterion(
     if delta is not None:
         row["delta"] = delta
     return row
+
+
+def _write_rgb_aux_dnn_sweep(path: Path, *, passed: bool) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    rows = [
+        _dnn_sweep_row(
+            confidence=0.50,
+            metric_pass=False,
+            aux=(0.02, 0.16, 0.05, 40.0),
+            rgb=(0.01, 0.10, 0.02, 80.0),
+            failed=("absolute_precision", "absolute_fp_per_sample"),
+        ),
+        _dnn_sweep_row(
+            confidence=0.93,
+            metric_pass=passed,
+            aux=(0.06, 0.04 if not passed else 0.12, 0.02, 4.0),
+            rgb=(0.01, 0.02, 0.01, 20.0),
+            failed=() if passed else ("absolute_recall", "small_recall_vs_rgb_only"),
+        ),
+    ]
+    (path / "rgb_aux_dnn_sweep_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass" if passed else "fail",
+                "pass": passed,
+                "metric_pass": passed,
+                "claim_status": "rgb_aux_dnn_sweep_claim_ready" if passed else "rgb_aux_dnn_sweep_no_claim_operating_point",
+                "profile": "claim_quality",
+                "row_count": len(rows),
+                "rows": rows,
+                "best_passing_row": rows[1] if passed else None,
+                "best_metric_row": rows[1] if passed else None,
+                "best_recall_positive_delta_row": rows[0],
+                "lowest_fp_positive_recall_delta_row": rows[1],
+                "interpretation": "unit RGB+Aux DNN sweep",
+                "claim_boundary": "unit confidence-sweep boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _dnn_sweep_row(
+    *,
+    confidence: float,
+    metric_pass: bool,
+    aux: tuple[float, float, float, float],
+    rgb: tuple[float, float, float, float],
+    failed: tuple[str, ...],
+) -> dict:
+    return {
+        "confidence": confidence,
+        "rgb_aux": {
+            "sample_count": 32,
+            "channel_mode": "rgb_aux",
+            "precision@0.50_mean": aux[0],
+            "recall@0.50_mean": aux[1],
+            "small_recall@0.50_mean": aux[2],
+            "fp@0.50_mean": aux[3],
+        },
+        "rgb_only": {
+            "sample_count": 32,
+            "channel_mode": "rgb_only",
+            "precision@0.50_mean": rgb[0],
+            "recall@0.50_mean": rgb[1],
+            "small_recall@0.50_mean": rgb[2],
+            "fp@0.50_mean": rgb[3],
+        },
+        "deltas": {
+            "precision@0.50_mean": aux[0] - rgb[0],
+            "recall@0.50_mean": aux[1] - rgb[1],
+            "small_recall@0.50_mean": aux[2] - rgb[2],
+            "fp@0.50_mean": aux[3] - rgb[3],
+        },
+        "criteria": [],
+        "pass": False,
+        "metric_pass": metric_pass,
+        "failed_criteria": ("sample_count", *failed) if failed else ("sample_count",),
+        "failed_metric_criteria": list(failed),
+    }
 
 
 def _write_comparison_rollup(path: Path) -> Path:

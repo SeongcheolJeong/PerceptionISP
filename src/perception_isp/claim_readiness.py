@@ -37,6 +37,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-summary", action="append", default=[], help="RGB+aux export/train/eval summary path/dir. Repeat to build a training rollup.")
     parser.add_argument("--training-rollup", default=None, help="Existing training rollup summary path/dir. Ignored when --training-summary is used.")
     parser.add_argument("--rgb-aux-dnn-gate", default=None, help="Existing RGB+Aux versus RGB-only DNN gate summary path/dir.")
+    parser.add_argument("--rgb-aux-dnn-sweep", default=None, help="Existing RGB+Aux versus RGB-only DNN confidence sweep summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Existing comparison rollup path/dir, optionally name=path.")
     parser.add_argument("--protocol-comparison-report", action="append", default=[], help="Additional comparison report used only for benchmark-protocol coverage, for example a naive RAW baseline.")
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir used for RAW/sensor-native claim coverage.")
@@ -70,6 +71,7 @@ def main(argv: Any = None) -> int:
         training_summaries=args.training_summary,
         training_rollup=args.training_rollup,
         rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
+        rgb_aux_dnn_sweep=args.rgb_aux_dnn_sweep,
         comparison_rollups=args.comparison_rollup,
         protocol_comparison_reports=args.protocol_comparison_report,
         mechanism_validation=args.mechanism_validation,
@@ -107,6 +109,7 @@ def run_claim_readiness(
     training_summaries: Sequence[str | Path] = (),
     training_rollup: str | Path | None = None,
     rgb_aux_dnn_gate: str | Path | None = None,
+    rgb_aux_dnn_sweep: str | Path | None = None,
     comparison_rollups: Sequence[str | Path] = (),
     protocol_comparison_reports: Sequence[str | Path] = (),
     mechanism_validation: str | Path | None = None,
@@ -249,6 +252,7 @@ def run_claim_readiness(
         ],
         training_rollup=training_rollup_path,
         rgb_aux_dnn_gate=rgb_aux_dnn_gate,
+        rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
         task_metrics=task_metrics_dir,
         task_gate=task_gate_dir,
         protocol_coverage=protocol_dir,
@@ -299,6 +303,7 @@ def run_claim_readiness(
         },
         "training_rollup": "" if training_rollup_path is None else str(training_rollup_path),
         "rgb_aux_dnn_gate": _rgb_aux_dnn_gate_summary(rgb_aux_dnn_gate),
+        "rgb_aux_dnn_sweep": _rgb_aux_dnn_sweep_summary(rgb_aux_dnn_sweep),
         "task_metrics": {
             "report": str(task_html),
             "summary_json": str(task_html.parent / "task_metrics_summary.json"),
@@ -643,6 +648,36 @@ def _rgb_aux_dnn_gate_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _rgb_aux_dnn_sweep_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "rgb_aux_dnn_sweep_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"RGB+Aux DNN sweep summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    best = data.get("best_recall_positive_delta_row", {}) if isinstance(data.get("best_recall_positive_delta_row"), Mapping) else {}
+    lowest = (
+        data.get("lowest_fp_positive_recall_delta_row", {})
+        if isinstance(data.get("lowest_fp_positive_recall_delta_row"), Mapping)
+        else {}
+    )
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": bool(data.get("pass")),
+        "metric_pass": bool(data.get("metric_pass")),
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "profile": data.get("profile"),
+        "row_count": int(data.get("row_count", 0)),
+        "best_recall_confidence": _optional_float(best.get("confidence")),
+        "lowest_fp_positive_confidence": _optional_float(lowest.get("confidence")),
+    }
+
+
 def _adverse_native_slice_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -926,6 +961,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
         "rgb_aux_dnn_gate": summary.get("rgb_aux_dnn_gate"),
+        "rgb_aux_dnn_sweep": summary.get("rgb_aux_dnn_sweep"),
         "adverse_native_slice": summary.get("adverse_native_slice"),
         "adverse_task_slice": summary.get("adverse_task_slice"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),

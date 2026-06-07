@@ -282,7 +282,28 @@ PYTHONPATH=src \
   --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf050_v1 \
   --profile claim_quality \
   --output-dir reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1
+
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.rgb_aux_dnn_sweep \
+  --confidence 0.50 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf050_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf050_v1 \
+  --confidence 0.60 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf060_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf060_v1 \
+  --confidence 0.70 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf070_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf070_v1 \
+  --confidence 0.80 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf080_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf080_v1 \
+  --confidence 0.90 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf090_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf090_v1 \
+  --confidence 0.91 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf091_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf091_v1 \
+  --confidence 0.92 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf092_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf092_v1 \
+  --confidence 0.93 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf093_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf093_v1 \
+  --confidence 0.94 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf094_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf094_v1 \
+  --confidence 0.95 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf095_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf095_v1 \
+  --confidence 0.98 --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf098_v1 --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf098_v1 \
+  --profile claim_quality \
+  --output-dir reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1
 ```
+
+This run uses a compact KITTI-based feasibility split: 128 exported KITTI
+samples are split by coverage into 96 train samples and 32 eval samples. It is
+not a full KITTI train/held-out benchmark.
 
 Current result on the 32-sample eval split: RGB+Aux improves over RGB-only
 inside this compact model (`dP50=+0.0143`, `dR50=+0.0701`,
@@ -291,6 +312,14 @@ inside this compact model (`dP50=+0.0143`, `dR50=+0.0701`,
 (`P50=0.0193`, `FP/sample=51.5625`). This is evidence that aux can be consumed
 by a trained DNN and can change detector behavior in the right direction; it is
 not yet a learned RGB+Aux performance claim.
+
+The confidence sweep strengthens that conclusion:
+`reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1/index.html` reports
+`rgb_aux_dnn_sweep_no_claim_operating_point`. The high-recall point is
+confidence `0.50` (`R50=0.1649`, `FP/sample=51.5625`), while the lowest-FP
+point that still has positive recall delta is confidence `0.95`
+(`R50=0.0219`, `FP/sample=3.2812`). Threshold tuning alone therefore does not
+produce a claim-ready learned RGB+Aux detector.
 
 The rollup is a resource and diagnostic view. It now includes a Training-Time
 Plan derived from observed sample-epochs/sec and export samples/sec, making
@@ -1157,6 +1186,7 @@ PYTHONPATH=src \
   --claim-gate 'Aux FP reducer vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human' \
   --training-rollup reports/perception_rgb_aux_dnn_gate_kitti_val128_training_rollup_e12_v1 \
   --rgb-aux-dnn-gate reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1 \
+  --rgb-aux-dnn-sweep reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1 \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --task-gate reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
@@ -1185,10 +1215,12 @@ bounded FP reduction versus HumanISP is supported, and the learned RGB+aux DNN
 path is trainable but not yet claim-quality. The latest compact RGB+Aux DNN
 gate improves over RGB-only inside the 12-epoch KITTI val128 quick run, but the
 gate still fails because sample scale, absolute precision, and absolute FP are
-not claim-quality. When task metrics are provided, it also
-keeps the task-level claim narrow: the `recall_improvement` task gate fails for
-VRU/person/cyclist/vehicle/small-object groups, so task recall improvement
-versus HumanISP is not supported even though FP/sample is reduced. Mechanism
+not claim-quality. The confidence sweep also fails to find a claim-ready
+operating point, so threshold tuning alone is not enough. When task metrics are
+provided, it also keeps the task-level claim narrow: the `recall_improvement`
+task gate fails for VRU/person/cyclist/vehicle/small-object groups, so task
+recall improvement versus HumanISP is not supported even though FP/sample is
+reduced. Mechanism
 validation is shown as front-end feasibility evidence only, not as detector
 performance evidence, and the CFA stress sweep is shown as diagnostic
 condition/CFA evidence only. The edge-confidence suite is also shown as
