@@ -359,6 +359,8 @@ def rgb_aux_detector_from_checkpoint(
     checkpoint_path: str,
     *,
     confidence: Optional[float] = None,
+    nms_iou: Optional[float] = None,
+    max_detections: Optional[int] = None,
     device: str = "auto",
 ) -> DetectorAdapter:
     """Load the right RGB+aux detector adapter from checkpoint metadata."""
@@ -370,7 +372,15 @@ def rgb_aux_detector_from_checkpoint(
     checkpoint = torch.load(str(checkpoint_path), map_location="cpu")
     model_type = str(checkpoint.get("model_type", "")) if isinstance(checkpoint, Mapping) else ""
     if model_type == "rgb_aux_dense_detector_v1":
-        return RGBAuxTorchDenseDetector(str(checkpoint_path), confidence=0.30 if confidence is None else float(confidence), device=device)
+        kwargs: Dict[str, Any] = {
+            "confidence": 0.30 if confidence is None else float(confidence),
+            "device": device,
+        }
+        if nms_iou is not None:
+            kwargs["nms_iou"] = float(nms_iou)
+        if max_detections is not None:
+            kwargs["max_detections"] = int(max_detections)
+        return RGBAuxTorchDenseDetector(str(checkpoint_path), **kwargs)
     return RGBAuxTorchSmokeDetector(str(checkpoint_path), confidence=0.10 if confidence is None else float(confidence), device=device)
 
 

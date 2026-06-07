@@ -24,6 +24,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--split", default="all", choices=["all", "train", "eval"])
     parser.add_argument("--confidence", type=float, default=None)
+    parser.add_argument("--nms-iou", type=float, default=None, help="Optional dense-detector NMS IoU override.")
+    parser.add_argument("--max-detections", type=int, default=None, help="Optional dense-detector top-k cap after NMS.")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--label-aware", action="store_true")
     parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to evaluate; default uses checkpoint labels.")
@@ -35,6 +37,8 @@ def main(argv: Any = None) -> int:
         checkpoint_path=args.checkpoint,
         split=str(args.split),
         confidence=args.confidence,
+        nms_iou=args.nms_iou,
+        max_detections=args.max_detections,
         device=str(args.device),
         label_agnostic=not bool(args.label_aware),
         include_labels=parse_label_list(args.include_labels),
@@ -50,6 +54,8 @@ def evaluate_dense_manifest(
     checkpoint_path: str | Path,
     split: str = "all",
     confidence: float | None = None,
+    nms_iou: float | None = None,
+    max_detections: int | None = None,
     device: str = "auto",
     label_agnostic: bool = False,
     include_labels: Sequence[str] | None = None,
@@ -72,6 +78,8 @@ def evaluate_dense_manifest(
     detector = rgb_aux_detector_from_checkpoint(
         str(checkpoint_path),
         confidence=confidence,
+        nms_iou=nms_iou,
+        max_detections=max_detections,
         device=device,
     )
     sample_rows = []
@@ -115,6 +123,11 @@ def evaluate_dense_manifest(
         "sample_count": int(len(sample_rows)),
         "selected_indices": [int(index) for index in indices],
         "detector_name": detector.name,
+        "detector_config": {
+            "confidence": None if confidence is None else float(confidence),
+            "nms_iou": None if nms_iou is None else float(nms_iou),
+            "max_detections": None if max_detections is None else int(max_detections),
+        },
         "elapsed_seconds": float(elapsed),
         "samples_per_second": float(len(sample_rows) / elapsed) if sample_rows else 0.0,
         "aggregate": aggregate,
@@ -161,6 +174,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "eval_labels": summary.get("eval_labels"),
         "sample_count": summary.get("sample_count"),
         "detector_name": summary.get("detector_name"),
+        "detector_config": summary.get("detector_config"),
         "elapsed_seconds": summary.get("elapsed_seconds"),
         "samples_per_second": summary.get("samples_per_second"),
         "aggregate": summary.get("aggregate"),

@@ -283,6 +283,20 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
             self.assertTrue((Path(tmp) / "dense_eval" / "index.html").exists())
+            capped = evaluate_dense_manifest(
+                manifest_path=manifest,
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                max_detections=2,
+                nms_iou=0.40,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_eval_capped",
+            )
+            self.assertEqual(capped["detector_config"]["max_detections"], 2)
+            self.assertEqual(capped["detector_config"]["nms_iou"], 0.40)
+            self.assertLessEqual(capped["aggregate"]["det_count_mean"], 2.0)
+            self.assertGreaterEqual(direct["aggregate"]["det_count_mean"], capped["aggregate"]["det_count_mean"])
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_extended_dense_detector_trains_and_evaluates(self) -> None:
