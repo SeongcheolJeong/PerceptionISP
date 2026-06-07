@@ -21,7 +21,7 @@ boundary used by the benchmark protocol and claim gates.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, adverse native RAW slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, adverse native RAW slice, adverse task slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -115,6 +115,13 @@ Known limits:
   remap. PerceptionISP reduces FP in 5/5 adverse conditions and preserves recall
   in 4/5, but HDR remains a tradeoff. This is simulated adverse feasibility
   evidence, not a real adverse RAW dataset or broad-superiority result.
+- `adverse_task_slice` reuses the saved adverse native RAW condition reports and
+  evaluates task groups under a configured task gate. The current KITTI val32
+  GRBG slice passes the simulated `fp_reducer` task gate in 4/5 adverse
+  conditions: night, fog, glare, and low-MTF pass, while HDR fails vehicle and
+  small-object groups. VRU/person/cyclist pass in 6/6 evaluated conditions.
+  This is a fast task-slice feasibility check, not a real adverse task benchmark
+  and not a trained RGB+aux DNN result.
 - The success/failure casebook renders representative sample-level wins and
   counterexamples from the same comparison report used by claim gates. The
   current KITTI val1496 casebook selects 32 visual cases and shows

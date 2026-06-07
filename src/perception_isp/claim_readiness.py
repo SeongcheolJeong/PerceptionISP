@@ -46,6 +46,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
     parser.add_argument("--adverse-native-slice", default=None, help="Adverse-condition native RAW slice summary path/dir used as simulated adverse evidence.")
+    parser.add_argument("--adverse-task-slice", default=None, help="Adverse-condition task-specific slice summary path/dir used as simulated task-slice evidence.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir used as condition detector evidence.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir used as condition proposal bridge evidence.")
     parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir used as native/remap boundary evidence.")
@@ -77,6 +78,7 @@ def main(argv: Any = None) -> int:
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         adverse_native_slice=args.adverse_native_slice,
+        adverse_task_slice=args.adverse_task_slice,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
@@ -112,6 +114,7 @@ def run_claim_readiness(
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     adverse_native_slice: str | Path | None = None,
+    adverse_task_slice: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
     cfa_lenspsf_native_audit: str | Path | None = None,
@@ -253,6 +256,7 @@ def run_claim_readiness(
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
         adverse_native_slice=adverse_native_slice,
+        adverse_task_slice=adverse_task_slice,
         cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
@@ -332,6 +336,7 @@ def run_claim_readiness(
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
         "adverse_native_slice": _adverse_native_slice_summary(adverse_native_slice),
+        "adverse_task_slice": _adverse_task_slice_summary(adverse_task_slice),
         "cfa_lenspsf_detector_sweep": _cfa_lenspsf_detector_sweep_summary(cfa_lenspsf_detector_sweep),
         "cfa_lenspsf_proposal_audit": _cfa_lenspsf_proposal_audit_summary(cfa_lenspsf_proposal_audit),
         "cfa_lenspsf_native_audit": _cfa_lenspsf_native_audit_summary(cfa_lenspsf_native_audit),
@@ -639,6 +644,38 @@ def _adverse_native_slice_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _adverse_task_slice_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "adverse_task_slice_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"adverse task slice summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "failed_checks": failed,
+        "profile": data.get("profile"),
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "adverse_condition_count": int(aggregate.get("adverse_condition_count", 0)),
+        "adverse_passed_condition_count": int(aggregate.get("adverse_passed_condition_count", 0)),
+        "adverse_failed_condition_count": int(aggregate.get("adverse_failed_condition_count", 0)),
+        "failed_group_count": int(aggregate.get("failed_group_count", 0)),
+        "skipped_group_count": int(aggregate.get("skipped_group_count", 0)),
+        "cfa_pattern": data.get("cfa_pattern"),
+    }
+
+
 def _cfa_lenspsf_detector_sweep_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -848,6 +885,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
         "adverse_native_slice": summary.get("adverse_native_slice"),
+        "adverse_task_slice": summary.get("adverse_task_slice"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
         "cfa_lenspsf_proposal_audit": summary.get("cfa_lenspsf_proposal_audit"),
         "cfa_lenspsf_native_audit": summary.get("cfa_lenspsf_native_audit"),

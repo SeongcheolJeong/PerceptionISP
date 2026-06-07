@@ -28,6 +28,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             adverse_native = _write_adverse_native_slice(root / "adverse_native")
+            adverse_task = _write_adverse_task_slice(root / "adverse_task")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
@@ -49,6 +50,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 adverse_native_slice=adverse_native,
+                adverse_task_slice=adverse_task,
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
@@ -81,6 +83,9 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["adverse_native_slice"]["adverse_fp_win_count"], 5)
             self.assertEqual(dashboard["adverse_native_slice"]["native_count"], 192)
             self.assertEqual(dashboard["adverse_native_slice"]["remapped_count"], 0)
+            self.assertTrue(dashboard["adverse_task_slice"]["pass"])
+            self.assertEqual(dashboard["adverse_task_slice"]["claim_status"], "adverse_task_gate_partially_supported")
+            self.assertEqual(dashboard["adverse_task_slice"]["adverse_passed_condition_count"], 4)
             self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
             detector_run = dashboard["cfa_lenspsf_detector_sweep"]["runs"][0]
             self.assertEqual(detector_run["true_sensor_cfa_mosaic_fraction"], 1.0)
@@ -108,6 +113,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("High-information scene edge similarity", evidence_areas)
             self.assertIn("Aux evidence used downstream", evidence_areas)
             self.assertIn("Adverse native RAW slice", evidence_areas)
+            self.assertIn("Adverse task-specific slice", evidence_areas)
             self.assertIn("CFA/LensPSF detector condition sweep", evidence_areas)
             self.assertIn("CFA/LensPSF proposal-edge bridge", evidence_areas)
             self.assertIn("CFA/LensPSF native-CFA separation", evidence_areas)
@@ -122,6 +128,7 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             future_evidence = [row["evidence"] for row in dashboard["evidence_map"]["future_evidence"]]
             self.assertIn("Adverse-condition/native RAW slice", future_evidence)
+            self.assertIn("Task-specific adverse gate", future_evidence)
             self.assertIn("Scene-edge proposal correlation across CFA/LensPSF", future_evidence)
             self.assertIn("CFA/LensPSF detector sweep", future_evidence)
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
@@ -160,6 +167,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Adverse native RAW slice supports simulated-condition FP reduction: adverse FP wins 5/5, recall preserved 4/5, mean dR -0.0030, mean dFP -0.3500. Treat this as simulated native RAW evidence, not proof on real adverse datasets.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Adverse task-specific slice supports simulated task FP-reducer behavior in 4/5 adverse conditions under profile fp_reducer. Failed conditions: nominal, hdr. Use as simulated task-slice evidence, not real adverse task proof.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -227,6 +238,9 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Adverse Native RAW Slice", html)
             self.assertIn("Adverse Condition Rows", html)
             self.assertIn("adverse_fp_reducer_supported", html)
+            self.assertIn("Adverse Task Slice", html)
+            self.assertIn("adverse_task_gate_partially_supported", html)
+            self.assertIn("Task Groups", html)
             self.assertIn("Success/Failure Casebook", html)
             self.assertIn("fp_reduction_success", html)
             self.assertIn("Removed FP Edge Delta vs Kept TP", html)
@@ -298,6 +312,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             adverse_native = _write_adverse_native_slice(root / "adverse_native")
+            adverse_task = _write_adverse_task_slice(root / "adverse_task")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
@@ -332,6 +347,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(aux_contribution),
                         "--adverse-native-slice",
                         str(adverse_native),
+                        "--adverse-task-slice",
+                        str(adverse_task),
                         "--cfa-lenspsf-detector-sweep",
                         str(cfa_lenspsf_detector),
                         "--cfa-lenspsf-proposal-audit",
@@ -364,6 +381,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue(summary["adverse_native_slice"]["pass"])
             self.assertEqual(summary["adverse_native_slice"]["claim_status"], "adverse_fp_reducer_supported")
+            self.assertTrue(summary["adverse_task_slice"]["pass"])
+            self.assertEqual(summary["adverse_task_slice"]["claim_status"], "adverse_task_gate_partially_supported")
             self.assertTrue(summary["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_native_audit"]["pass"])
@@ -1051,6 +1070,123 @@ def _write_adverse_native_slice(path: Path) -> Path:
         "claim_boundary": "unit simulated adverse boundary",
     }
     (path / "adverse_native_slice_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_adverse_task_slice(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    condition_dir = path / "006_condition-hdr"
+    condition_dir.mkdir()
+    (condition_dir / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "claim_status": "adverse_task_gate_partially_supported",
+        "profile": "fp_reducer",
+        "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+        "baseline_input": "human_rgb",
+        "condition_count": 6,
+        "expected_condition_count": 6,
+        "cfa_pattern": "GRBG",
+        "psf_sigma": 0.0,
+        "aggregate": {
+            "adverse_condition_count": 5,
+            "adverse_passed_condition_count": 4,
+            "adverse_failed_condition_count": 1,
+            "failed_group_count": 3,
+            "skipped_group_count": 6,
+        },
+        "checks": [
+            {"id": "condition_reports_available", "status": "pass", "evidence": "conditions=6 expected=6"},
+            {"id": "task_groups_evaluated", "status": "pass", "evidence": "evaluated_groups=30"},
+            {"id": "adverse_task_gate_majority", "status": "pass", "evidence": "adverse_passed=4/5"},
+        ],
+        "group_summary": [
+            {
+                "group": "vru",
+                "evaluated_condition_count": 6,
+                "pass_condition_count": 6,
+                "fail_condition_count": 0,
+                "skipped_condition_count": 0,
+                "gt_count_total": 320,
+                "mean_delta_precision@0.50": 0.045,
+                "mean_delta_recall@0.50": 0.0,
+                "mean_delta_fp@0.50_per_sample": -0.0625,
+                "worst_delta_recall@0.50": 0.0,
+                "worst_delta_fp@0.50_per_sample": -0.03125,
+            },
+            {
+                "group": "person",
+                "evaluated_condition_count": 6,
+                "pass_condition_count": 6,
+                "fail_condition_count": 0,
+                "skipped_condition_count": 0,
+                "gt_count_total": 220,
+                "mean_delta_precision@0.50": 0.010,
+                "mean_delta_recall@0.50": 0.0,
+                "mean_delta_fp@0.50_per_sample": -0.0052,
+                "worst_delta_recall@0.50": 0.0,
+                "worst_delta_fp@0.50_per_sample": 0.0,
+            },
+            {
+                "group": "small_all",
+                "evaluated_condition_count": 6,
+                "pass_condition_count": 4,
+                "fail_condition_count": 2,
+                "skipped_condition_count": 0,
+                "gt_count_total": 180,
+                "mean_delta_precision@0.50": 0.015,
+                "mean_delta_recall@0.50": -0.0021,
+                "mean_delta_fp@0.50_per_sample": -0.0260,
+                "worst_delta_recall@0.50": -0.0250,
+                "worst_delta_fp@0.50_per_sample": 0.0625,
+            },
+        ],
+        "conditions": [
+            {
+                "condition": "nominal",
+                "run_id": "condition-nominal",
+                "report": "001_condition-nominal/comparison_summary.json",
+                "sample_count": 32,
+                "verdict": "task_gate_fail",
+                "pass": False,
+                "evaluated_group_count": 5,
+                "failed_group_count": 1,
+                "skipped_group_count": 1,
+                "failed_groups": ["small_all"],
+                "skipped_groups": ["traffic_light"],
+            },
+            {
+                "condition": "night",
+                "run_id": "condition-night",
+                "report": "002_condition-night/comparison_summary.json",
+                "sample_count": 32,
+                "verdict": "task_gate_pass",
+                "pass": True,
+                "evaluated_group_count": 5,
+                "failed_group_count": 0,
+                "skipped_group_count": 1,
+                "failed_groups": [],
+                "skipped_groups": ["traffic_light"],
+            },
+            {
+                "condition": "hdr",
+                "run_id": "condition-hdr",
+                "report": str(condition_dir / "comparison_summary.json"),
+                "sample_count": 32,
+                "verdict": "task_gate_fail",
+                "pass": False,
+                "evaluated_group_count": 5,
+                "failed_group_count": 2,
+                "skipped_group_count": 1,
+                "failed_groups": ["vehicle", "small_all"],
+                "skipped_groups": ["traffic_light"],
+            },
+        ],
+        "interpretation": "unit adverse task slice",
+        "claim_boundary": "unit simulated task boundary",
+    }
+    (path / "adverse_task_slice_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

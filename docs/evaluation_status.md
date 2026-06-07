@@ -267,6 +267,7 @@ reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
 reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1/index.html
+reports/perception_adverse_task_slice_kitti_val32_grbg_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1/index.html
@@ -636,6 +637,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622`. In the same-sample bridge, incremental aux scoring removes 95 FP and 16 TP proposals; removed FP has lower aux edge support than kept TP (`delta=-0.0596`, low-edge AUC `0.6904`) and lower source scene-edge support (`delta=-0.0302`, low-scene-edge AUC `0.6681`) |
 | Adverse native RAW slice | `pass` as simulated adverse-condition native RAW evidence; `reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1` covers nominal/night/fog/glare/low-MTF/HDR at GRBG, 32 KITTI val samples per condition, and all 192 conditioned samples are CameraE2E native CFA rows with 0 remap. Across the five adverse conditions, FP improves in 5/5 and recall is preserved in 4/5 (`mean dFP50=-0.3500`, `mean dR50=-0.0034`). HDR is a visible tradeoff/counterexample. This supports simulated adverse feasibility, not real adverse dataset proof |
+| Adverse task slice | `pass` as simulated task-slice evidence; `reports/perception_adverse_task_slice_kitti_val32_grbg_native_bayer_v1` reuses the adverse native RAW condition reports and evaluates the `fp_reducer` task gate by group. The simulated adverse task gate passes 4/5 adverse conditions: night, fog, glare, and low-MTF pass, while HDR fails vehicle and small-object groups. VRU/person/cyclist pass in 6/6 evaluated conditions with mean `dR50=0.0` and FP/sample reductions. This is not a real adverse task benchmark or trained RGB+Aux DNN result |
 | Visual success/failure casebook | `pass` as qualitative review evidence; `reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human` selects 32 visual cases from the same 1496-image claim report: 8 FP-reduction successes, 8 recall tradeoffs, 8 recall-loss failures, and 8 FP-regression failures. Across all samples, `fp_reduction_success=304`, `recall_tradeoff=24`, `recall_loss_failure=56`, `fp_regression_failure=57`, with net `dFP=-336` and `dTP=-55`. This helps explain where the narrow FP-reduction claim works and fails, but it is not a replacement for held-out gates, native RAW/CFA coverage, or trained RGB+Aux DNN evaluation |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
@@ -1033,9 +1035,9 @@ edge/scene-edge correlations: the calibrated proposal path removes 334 FP and 3
 TP proposals, source scene-edge support is positive in 12/12 conditions, and
 aux-edge support is positive in 12/12. Mean source scene-edge delta/AUC is
 `-0.0188`/`0.5930`, and mean aux-edge delta/AUC is `-0.0138`/`0.5470`. A
-simulated adverse native RAW slice now exists; the next step is larger held-out
-adverse scale, real adverse datasets, and stronger task-specific gates rather
-than relying on bridge-remap sensitivity.
+simulated adverse native RAW slice and matching adverse task slice now exist;
+the next step is larger held-out adverse scale, real adverse datasets, and
+larger task-specific gates rather than relying on bridge-remap sensitivity.
 
 The matching visual condition casebook is:
 

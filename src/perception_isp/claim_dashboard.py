@@ -26,6 +26,7 @@ SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 ADVERSE_NATIVE_SLICE_SUMMARY = "adverse_native_slice_summary.json"
+ADVERSE_TASK_SLICE_SUMMARY = "adverse_task_slice_summary.json"
 CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
 CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
 CFA_LENSPSF_NATIVE_AUDIT_SUMMARY = "cfa_lenspsf_native_audit_summary.json"
@@ -50,6 +51,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--adverse-native-slice", default=None, help="Adverse-condition native RAW slice summary path/dir.")
+    parser.add_argument("--adverse-task-slice", default=None, help="Adverse-condition task-specific slice summary path/dir.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir.")
     parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir.")
@@ -74,6 +76,7 @@ def main(argv: Any = None) -> int:
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         adverse_native_slice=args.adverse_native_slice,
+        adverse_task_slice=args.adverse_task_slice,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
@@ -114,6 +117,7 @@ def build_claim_dashboard(
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     adverse_native_slice: str | Path | None = None,
+    adverse_task_slice: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
     cfa_lenspsf_native_audit: str | Path | None = None,
@@ -135,6 +139,7 @@ def build_claim_dashboard(
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
     adverse_native = _load_adverse_native_slice(adverse_native_slice) if adverse_native_slice is not None else None
+    adverse_task = _load_adverse_task_slice(adverse_task_slice) if adverse_task_slice is not None else None
     cfa_lenspsf_detector = (
         _load_cfa_lenspsf_detector_sweep(cfa_lenspsf_detector_sweep)
         if cfa_lenspsf_detector_sweep is not None
@@ -176,6 +181,7 @@ def build_claim_dashboard(
         scene_information,
         aux_contribution,
         adverse_native,
+        adverse_task,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
         cfa_lenspsf_native,
@@ -197,6 +203,7 @@ def build_claim_dashboard(
         scene_information,
         aux_contribution,
         adverse_native,
+        adverse_task,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
         cfa_lenspsf_native,
@@ -218,6 +225,7 @@ def build_claim_dashboard(
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
         "adverse_native_slice": adverse_native,
+        "adverse_task_slice": adverse_task,
         "cfa_lenspsf_detector_sweep": cfa_lenspsf_detector,
         "cfa_lenspsf_proposal_audit": cfa_lenspsf_proposal,
         "cfa_lenspsf_native_audit": cfa_lenspsf_native,
@@ -764,6 +772,80 @@ def _load_adverse_native_slice(spec: str | Path) -> Dict[str, Any]:
         "primary_rows": primary_rows,
         "checks": checks,
         "failed_checks": failed,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_adverse_task_slice(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, ADVERSE_TASK_SLICE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    group_summary = []
+    for row in data.get("group_summary", ()):
+        if not isinstance(row, Mapping):
+            continue
+        group_summary.append(
+            {
+                "group": str(row.get("group", "")),
+                "evaluated_condition_count": int(row.get("evaluated_condition_count", 0)),
+                "pass_condition_count": int(row.get("pass_condition_count", 0)),
+                "fail_condition_count": int(row.get("fail_condition_count", 0)),
+                "skipped_condition_count": int(row.get("skipped_condition_count", 0)),
+                "gt_count_total": int(row.get("gt_count_total", 0)),
+                "mean_delta_precision@0.50": _maybe_float(row.get("mean_delta_precision@0.50")),
+                "mean_delta_recall@0.50": _maybe_float(row.get("mean_delta_recall@0.50")),
+                "mean_delta_fp@0.50_per_sample": _maybe_float(row.get("mean_delta_fp@0.50_per_sample")),
+                "worst_delta_recall@0.50": _maybe_float(row.get("worst_delta_recall@0.50")),
+                "worst_delta_fp@0.50_per_sample": _maybe_float(row.get("worst_delta_fp@0.50_per_sample")),
+            }
+        )
+    conditions = []
+    for row in data.get("conditions", ()):
+        if not isinstance(row, Mapping):
+            continue
+        conditions.append(
+            {
+                "condition": str(row.get("condition", "")),
+                "run_id": str(row.get("run_id", "")),
+                "report": str(row.get("report", "")),
+                "sample_count": int(row.get("sample_count", 0)),
+                "verdict": str(row.get("verdict", "")),
+                "pass": bool(row.get("pass")),
+                "evaluated_group_count": int(row.get("evaluated_group_count", 0)),
+                "failed_group_count": int(row.get("failed_group_count", 0)),
+                "skipped_group_count": int(row.get("skipped_group_count", 0)),
+                "failed_groups": [str(value) for value in row.get("failed_groups", ())],
+                "skipped_groups": [str(value) for value in row.get("skipped_groups", ())],
+            }
+        )
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "profile": str(data.get("profile", "")),
+        "target_input": str(data.get("target_input", "")),
+        "baseline_input": str(data.get("baseline_input", "")),
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "adverse_condition_count": int(aggregate.get("adverse_condition_count", 0)),
+        "adverse_passed_condition_count": int(aggregate.get("adverse_passed_condition_count", 0)),
+        "adverse_failed_condition_count": int(aggregate.get("adverse_failed_condition_count", 0)),
+        "failed_group_count": int(aggregate.get("failed_group_count", 0)),
+        "skipped_group_count": int(aggregate.get("skipped_group_count", 0)),
+        "cfa_pattern": str(data.get("cfa_pattern", "")),
+        "psf_sigma": _maybe_float(data.get("psf_sigma")),
+        "checks": checks,
+        "failed_checks": failed,
+        "group_summary": group_summary,
+        "conditions": conditions,
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1342,6 +1424,7 @@ def _build_evidence_map(
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
     adverse_native_slice: Mapping[str, Any] | None,
+    adverse_task_slice: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
@@ -1565,6 +1648,18 @@ def _build_evidence_map(
             }
         )
 
+    if adverse_task_slice is not None:
+        current.append(
+            {
+                "area": "Adverse task-specific slice",
+                "status": "diagnostic" if bool(adverse_task_slice.get("pass")) else "not_supported",
+                "claim_strength": str(adverse_task_slice.get("claim_status", "")),
+                "evidence": _adverse_task_slice_evidence(adverse_task_slice),
+                "claim_boundary": "Simulated adverse task-slice evidence only; skipped low-GT groups and HDR counterexamples must stay visible.",
+                "next_evidence": "Scale adverse task gates to larger held-out splits and real adverse datasets, then add task-recall or early-warning gates.",
+            }
+        )
+
     if scene_edge_confidence is not None:
         current.append(
             {
@@ -1633,6 +1728,7 @@ def _build_evidence_map(
             scene_edge_confidence=scene_edge_confidence,
             aux_contribution_audit=aux_contribution_audit,
             adverse_native_slice=adverse_native_slice,
+            adverse_task_slice=adverse_task_slice,
             edge_fidelity_suite=edge_fidelity_suite,
             cfa_stress_sweep=cfa_stress_sweep,
             cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
@@ -1925,6 +2021,34 @@ def _adverse_native_slice_evidence(adverse: Mapping[str, Any]) -> str:
     )
 
 
+def _adverse_task_slice_evidence(task_slice: Mapping[str, Any]) -> str:
+    failed_conditions = [
+        str(row.get("condition", ""))
+        for row in task_slice.get("conditions", ())
+        if isinstance(row, Mapping) and not bool(row.get("pass"))
+    ]
+    group_bits = []
+    for row in task_slice.get("group_summary", ()):
+        if not isinstance(row, Mapping):
+            continue
+        group = str(row.get("group", ""))
+        if group not in {"vru", "person", "cyclist", "vehicle", "small_all"}:
+            continue
+        group_bits.append(
+            f"{group}={int(row.get('pass_condition_count', 0))}/{int(row.get('evaluated_condition_count', 0))} "
+            f"dR={_fmt(row.get('mean_delta_recall@0.50'), signed=True)} "
+            f"dFP={_fmt(row.get('mean_delta_fp@0.50_per_sample'), signed=True)}"
+        )
+    return (
+        f"conditions={int(task_slice.get('condition_count', 0))}/{int(task_slice.get('expected_condition_count', 0))}; "
+        f"profile={task_slice.get('profile', '')}; "
+        f"claim={task_slice.get('claim_status', '')}; "
+        f"adversePass={int(task_slice.get('adverse_passed_condition_count', 0))}/{int(task_slice.get('adverse_condition_count', 0))}; "
+        f"failed={', '.join(failed_conditions) or 'none'}; "
+        f"{'; '.join(group_bits) or 'no group rows'}"
+    )
+
+
 def _aux_contribution_evidence(aux_contribution: Mapping[str, Any]) -> str:
     fp_delta = _preferred_aux_fp_delta(aux_contribution.get("comparisons", ()))
     bridge = aux_contribution.get("sample_bridge")
@@ -1978,6 +2102,7 @@ def _future_evidence_rows(
     scene_edge_confidence: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
     adverse_native_slice: Mapping[str, Any] | None,
+    adverse_task_slice: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
@@ -2022,6 +2147,19 @@ def _future_evidence_rows(
         adverse_gap = f"Adverse native RAW slice exists but is not passing yet: {failed}."
     else:
         adverse_gap = "No adverse-condition native RAW slice exists yet."
+    if adverse_task_slice is not None and bool(adverse_task_slice.get("pass")):
+        adverse_task_gap = (
+            "Simulated adverse task slice exists "
+            f"({adverse_task_slice.get('claim_status', '')}, "
+            f"adverse task gates {int(adverse_task_slice.get('adverse_passed_condition_count', 0))}/"
+            f"{int(adverse_task_slice.get('adverse_condition_count', 0))}); "
+            "next step is larger held-out task slices and real adverse datasets."
+        )
+    elif adverse_task_slice is not None:
+        failed = ", ".join(str(value) for value in adverse_task_slice.get("failed_checks", ())) or "configured adverse task checks"
+        adverse_task_gap = f"Adverse task slice exists but is not passing yet: {failed}."
+    else:
+        adverse_task_gap = "No adverse task-specific gate exists yet."
     if cfa_lenspsf_native_audit is not None and cfa_lenspsf_proposal_audit is not None and large_cfa_lenspsf_samples:
         scene_aux_gap = "Large native CFA/LensPSF proposal bridge exists. " + aux_gate_gap
     elif cfa_lenspsf_native_audit is not None:
@@ -2060,6 +2198,13 @@ def _future_evidence_rows(
             "why": "Night, fog, glare, HDR, and low-MTF slices are where a perception-oriented ISP should show practical value beyond nominal scenes.",
             "current_gap": adverse_gap,
             "implementation_path": "Repeat the native CameraE2E RAW protocol on larger simulated adverse splits, then validate the same gates on real adverse-condition datasets.",
+        },
+        {
+            "priority": "P0",
+            "evidence": "Task-specific adverse gate",
+            "why": "VRU, person, vehicle, and small-object claims need group-level gates under adverse conditions, not only aggregate FP/recall deltas.",
+            "current_gap": adverse_task_gap,
+            "implementation_path": "Scale the adverse task slice to larger held-out splits, keep skipped low-GT groups explicit, and add task-recall or early-warning gates.",
         },
         {
             "priority": "P0",
@@ -2150,6 +2295,7 @@ def _claim_decisions(
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
     adverse_native_slice: Mapping[str, Any] | None,
+    adverse_task_slice: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
@@ -2264,6 +2410,30 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in adverse_native_slice.get("failed_checks", ())) or "configured adverse native RAW checks"
             decisions.append({"status": "not_supported", "claim": f"Adverse native RAW slice failed for {failed}; do not use it as adverse-condition evidence yet."})
+    if adverse_task_slice is not None:
+        if bool(adverse_task_slice.get("pass")):
+            failed_conditions = [
+                str(row.get("condition", ""))
+                for row in adverse_task_slice.get("conditions", ())
+                if isinstance(row, Mapping) and not bool(row.get("pass"))
+            ]
+            failed_text = ", ".join(failed_conditions) or "none"
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "Adverse task-specific slice supports simulated task FP-reducer behavior in "
+                        f"{int(adverse_task_slice.get('adverse_passed_condition_count', 0))}/"
+                        f"{int(adverse_task_slice.get('adverse_condition_count', 0))} adverse conditions "
+                        f"under profile {adverse_task_slice.get('profile', '')}. "
+                        f"Failed conditions: {failed_text}. "
+                        "Use as simulated task-slice evidence, not real adverse task proof."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in adverse_task_slice.get("failed_checks", ())) or "configured adverse task checks"
+            decisions.append({"status": "not_supported", "claim": f"Adverse task-specific slice failed for {failed}; do not use it as adverse task evidence yet."})
     if cfa_lenspsf_detector_sweep is not None:
         if bool(cfa_lenspsf_detector_sweep.get("pass")):
             decisions.append(
@@ -2652,6 +2822,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(adverse_native, Mapping)
         else "<p>No adverse native RAW slice summary was provided.</p>"
     )
+    adverse_task = dashboard.get("adverse_task_slice")
+    adverse_task_html = (
+        _adverse_task_slice_html(adverse_task, destination)
+        if isinstance(adverse_task, Mapping)
+        else "<p>No adverse task slice summary was provided.</p>"
+    )
     casebook = dashboard.get("casebook")
     casebook_html = _casebook_html(casebook, destination) if isinstance(casebook, Mapping) else "<p>No success/failure casebook was provided.</p>"
     task_metrics = dashboard.get("task_metrics")
@@ -2749,6 +2925,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {aux_contribution_html}
   <h2>Adverse Native RAW Slice</h2>
   {adverse_native_html}
+  <h2>Adverse Task Slice</h2>
+  {adverse_task_html}
   <h2>Success/Failure Casebook</h2>
   {casebook_html}
   <h2>Task Metrics</h2>
@@ -2994,6 +3172,99 @@ def _adverse_native_slice_primary_row(row: Mapping[str, Any]) -> str:
         f"<td>{_task_delta_cell(row.get('delta_recall@0.50'), lower_is_better=False)}</td>"
         f"<td>{_task_delta_cell(row.get('delta_small_recall@0.50'), lower_is_better=False)}</td>"
         f"<td>{_task_delta_cell(row.get('delta_fp@0.50'), lower_is_better=True)}</td>"
+        "</tr>"
+    )
+
+
+def _adverse_task_slice_html(task_slice: Mapping[str, Any], destination: Path) -> str:
+    status_class = "diagnostic" if bool(task_slice.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in task_slice.get("failed_checks", ())) or "none"
+    group_rows = "".join(_adverse_task_group_row(row) for row in task_slice.get("group_summary", ()))
+    if not group_rows:
+        group_rows = '<tr><td colspan="11">No adverse task group rows were available.</td></tr>'
+    base = Path(str(task_slice.get("summary_path", ""))).parent if task_slice.get("summary_path") else destination
+    condition_rows = "".join(_adverse_task_condition_row(row, destination, base) for row in task_slice.get("conditions", ()))
+    if not condition_rows:
+        condition_rows = '<tr><td colspan="9">No adverse task condition rows were available.</td></tr>'
+    check_rows = "".join(
+        f"<tr><td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('status', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td></tr>"
+        for row in task_slice.get("checks", ())
+        if isinstance(row, Mapping)
+    )
+    if not check_rows:
+        check_rows = '<tr><td colspan="3">No adverse task checks were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(task_slice.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(task_slice.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(task_slice.get('interpretation', '')))} "
+        f"{html_lib.escape(str(task_slice.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Profile</th><th>Baseline</th><th>Target</th><th>Conditions</th><th>Adverse Pass</th><th>Failed Groups</th><th>Skipped Groups</th><th>CFA</th><th>PSF</th><th>Failed Checks</th></tr></thead><tbody>"
+        f"<tr><td>{_report_link(task_slice, destination)}</td>"
+        f"<td><code>{html_lib.escape(str(task_slice.get('profile', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(task_slice.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(task_slice.get('target_input', '')))}</code></td>"
+        f"<td>{int(task_slice.get('condition_count', 0))}/{int(task_slice.get('expected_condition_count', 0))}</td>"
+        f"<td>{int(task_slice.get('adverse_passed_condition_count', 0))}/{int(task_slice.get('adverse_condition_count', 0))}</td>"
+        f"<td>{int(task_slice.get('failed_group_count', 0))}</td>"
+        f"<td>{int(task_slice.get('skipped_group_count', 0))}</td>"
+        f"<td><code>{html_lib.escape(str(task_slice.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{_fmt(task_slice.get('psf_sigma'))}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<h3>Task Groups</h3>"
+        "<table><thead><tr><th>Group</th><th>Evaluated</th><th>Pass</th><th>Fail</th><th>Skipped</th><th>GT</th><th>Mean dP50</th><th>Mean dR50</th><th>Mean dFP/sample</th><th>Worst dR50</th><th>Worst dFP/sample</th></tr></thead>"
+        f"<tbody>{group_rows}</tbody></table>"
+        "<h3>Adverse Task Conditions</h3>"
+        "<table><thead><tr><th>Condition</th><th>Run</th><th>Samples</th><th>Verdict</th><th>Evaluated</th><th>Failed</th><th>Skipped</th><th>Failed Groups</th><th>Report</th></tr></thead>"
+        f"<tbody>{condition_rows}</tbody></table>"
+        "<h3>Adverse Task Checks</h3>"
+        f"<table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>"
+    )
+
+
+def _adverse_task_group_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('group', '')))}</code></td>"
+        f"<td>{int(row.get('evaluated_condition_count', 0))}</td>"
+        f"<td>{int(row.get('pass_condition_count', 0))}</td>"
+        f"<td>{int(row.get('fail_condition_count', 0))}</td>"
+        f"<td>{int(row.get('skipped_condition_count', 0))}</td>"
+        f"<td>{int(row.get('gt_count_total', 0))}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_delta_precision@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_delta_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_delta_fp@0.50_per_sample'), lower_is_better=True)}</td>"
+        f"<td>{_task_delta_cell(row.get('worst_delta_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('worst_delta_fp@0.50_per_sample'), lower_is_better=True)}</td>"
+        "</tr>"
+    )
+
+
+def _adverse_task_condition_row(row: Mapping[str, Any], destination: Path, base: Path) -> str:
+    verdict_class = "supported" if bool(row.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in row.get("failed_groups", ())) or "none"
+    report_link = ""
+    report = str(row.get("report", ""))
+    if report:
+        report_path = Path(report).expanduser()
+        if not report_path.is_absolute():
+            report_path = base / report_path
+        if report_path.suffix == ".json":
+            report_path = report_path.with_name("index.html")
+        relative = os.path.relpath(str(report_path), start=str(destination))
+        report_link = f"<a href=\"{html_lib.escape(relative)}\">open</a>"
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('condition', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('run_id', '')))}</code></td>"
+        f"<td>{int(row.get('sample_count', 0))}</td>"
+        f"<td class=\"{verdict_class}\">{html_lib.escape(str(row.get('verdict', '')))}</td>"
+        f"<td>{int(row.get('evaluated_group_count', 0))}</td>"
+        f"<td>{int(row.get('failed_group_count', 0))}</td>"
+        f"<td>{int(row.get('skipped_group_count', 0))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        f"<td>{report_link}</td>"
         "</tr>"
     )
 
