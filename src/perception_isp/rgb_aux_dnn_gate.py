@@ -136,7 +136,7 @@ def build_rgb_aux_dnn_gate(
         "name": "RGB+Aux DNN gate",
         "status": "pass" if passed else "fail",
         "pass": bool(passed),
-        "claim_status": "rgb_aux_dnn_claim_ready" if passed else "rgb_aux_dnn_not_claim_ready",
+        "claim_status": _claim_status(profile, passed),
         "profile": profile,
         "thresholds": threshold_values,
         "primary_run": "rgb_aux",
@@ -144,7 +144,7 @@ def build_rgb_aux_dnn_gate(
         "runs": runs,
         "deltas": deltas,
         "criteria": criteria,
-        "interpretation": _interpretation(passed),
+        "interpretation": _interpretation(profile, passed),
         "claim_boundary": (
             "This gate evaluates direct compact dense-detector outputs from exported tensors. "
             "Passing it would still be compact-DNN evidence, not full YOLO-scale RGB+Aux fine-tuning proof."
@@ -361,9 +361,23 @@ def _delta(target: Mapping[str, Any], baseline: Mapping[str, Any], key: str) -> 
     return float(target_value) - float(baseline_value)
 
 
-def _interpretation(passed: bool) -> str:
+def _claim_status(profile: str, passed: bool) -> str:
+    if not passed:
+        return "rgb_aux_dnn_not_claim_ready"
+    if profile == "diagnostic":
+        return "rgb_aux_dnn_diagnostic_pass"
+    if profile == "fp_reducer":
+        return "rgb_aux_dnn_fp_reducer_ready"
+    return "rgb_aux_dnn_claim_ready"
+
+
+def _interpretation(profile: str, passed: bool) -> str:
+    if passed and profile == "diagnostic":
+        return "The compact RGB+Aux DNN evaluation passes the diagnostic smoke gate; this is pipeline evidence, not a learned-detector performance claim."
+    if passed and profile == "fp_reducer":
+        return "The compact RGB+Aux DNN evaluation passes the configured FP-reducer gate versus RGB-only."
     if passed:
-        return "The compact RGB+Aux DNN evaluation passes the configured gate versus RGB-only."
+        return "The compact RGB+Aux DNN evaluation passes the configured claim-quality gate versus RGB-only."
     return (
         "The compact RGB+Aux DNN evaluation does not pass the configured gate versus RGB-only. "
         "Do not claim learned RGB+Aux detector improvement from this evidence."

@@ -2080,16 +2080,21 @@ def _build_evidence_map(
 
     if rgb_aux_dnn_gate is not None:
         passed = bool(rgb_aux_dnn_gate.get("pass"))
+        evidence_status = _dnn_evidence_status(rgb_aux_dnn_gate)
         current.append(
             {
                 "area": "RGB+Aux DNN fine-tune gate",
-                "status": "supported" if passed else "not_supported",
+                "status": evidence_status if passed else "not_supported",
                 "claim_strength": str(rgb_aux_dnn_gate.get("claim_status", "")),
                 "evidence": _rgb_aux_dnn_gate_evidence(rgb_aux_dnn_gate),
                 "claim_boundary": (
-                    "Compact learned RGB+Aux detector evidence only; it is not full YOLO-scale RGB+Aux fine-tuning proof."
-                    if passed
-                    else "Do not claim learned RGB+Aux detector improvement until this gate passes on a larger held-out split."
+                    "Diagnostic compact learned RGB+Aux evidence only; do not use it as a detector-performance claim."
+                    if evidence_status == "diagnostic"
+                    else (
+                        "Compact learned RGB+Aux detector evidence only; it is not full YOLO-scale RGB+Aux fine-tuning proof."
+                        if passed
+                        else "Do not claim learned RGB+Aux detector improvement until this gate passes on a larger held-out split."
+                    )
                 ),
                 "next_evidence": "Train matched RGB-only and RGB+Aux models on a larger held-out split, then rerun this gate.",
             }
@@ -2097,16 +2102,21 @@ def _build_evidence_map(
 
     if rgb_aux_dnn_sweep is not None:
         passed = bool(rgb_aux_dnn_sweep.get("pass"))
+        evidence_status = _dnn_evidence_status(rgb_aux_dnn_sweep)
         current.append(
             {
                 "area": "RGB+Aux DNN operating-point sweep",
-                "status": "supported" if passed else "not_supported",
+                "status": evidence_status if passed else "not_supported",
                 "claim_strength": str(rgb_aux_dnn_sweep.get("claim_status", "")),
                 "evidence": _rgb_aux_dnn_sweep_evidence(rgb_aux_dnn_sweep),
                 "claim_boundary": (
-                    "Confidence-sweep evidence only; it does not retrain the model or add held-out scale."
-                    if passed
-                    else "Do not claim a learned RGB+Aux detector operating point until the confidence sweep finds a passing point."
+                    "Diagnostic confidence-sweep evidence only; it does not establish claim-quality learned detector improvement."
+                    if evidence_status == "diagnostic"
+                    else (
+                        "Confidence-sweep evidence only; it does not retrain the model or add held-out scale."
+                        if passed
+                        else "Do not claim a learned RGB+Aux detector operating point until the confidence sweep finds a passing point."
+                    )
                 ),
                 "next_evidence": "Improve detector calibration/training so one threshold preserves recall while meeting precision and FP budgets.",
             }
@@ -2634,6 +2644,14 @@ def _rgb_aux_dnn_gate_evidence(gate: Mapping[str, Any]) -> str:
     )
 
 
+def _dnn_evidence_status(summary: Mapping[str, Any]) -> str:
+    claim_status = str(summary.get("claim_status", "")).lower()
+    profile = str(summary.get("profile", "")).lower()
+    if "diagnostic" in claim_status or profile == "diagnostic":
+        return "diagnostic"
+    return "supported" if bool(summary.get("pass")) else "not_supported"
+
+
 def _rgb_aux_dnn_sweep_evidence(sweep: Mapping[str, Any]) -> str:
     best_recall = (
         sweep.get("best_recall_positive_delta_row")
@@ -2924,7 +2942,14 @@ def _claim_decisions(
         elif status == "training_path_only":
             decisions.append({"status": "needs_eval", "claim": "The RGB+Aux DNN training path exists, but direct held-out detector evaluation is still missing."})
     if rgb_aux_dnn_gate is not None:
-        if bool(rgb_aux_dnn_gate.get("pass")):
+        if bool(rgb_aux_dnn_gate.get("pass")) and _dnn_evidence_status(rgb_aux_dnn_gate) == "diagnostic":
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": "RGB+Aux DNN diagnostic gate passed for the compact dense detector, but it is not claim-quality learned-detector evidence.",
+                }
+            )
+        elif bool(rgb_aux_dnn_gate.get("pass")):
             decisions.append(
                 {
                     "status": "supported",
@@ -2943,7 +2968,14 @@ def _claim_decisions(
                 }
             )
     if rgb_aux_dnn_sweep is not None:
-        if bool(rgb_aux_dnn_sweep.get("pass")):
+        if bool(rgb_aux_dnn_sweep.get("pass")) and _dnn_evidence_status(rgb_aux_dnn_sweep) == "diagnostic":
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": "RGB+Aux DNN confidence sweep found diagnostic operating points; use this as learned-aux feasibility, not detector superiority.",
+                }
+            )
+        elif bool(rgb_aux_dnn_sweep.get("pass")):
             decisions.append(
                 {
                     "status": "supported",

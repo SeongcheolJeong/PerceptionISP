@@ -40,6 +40,19 @@ class RgbAuxDnnSweepTest(unittest.TestCase):
         self.assertIn("absolute_precision", failed_by_conf[0.80])
         self.assertIn("absolute_recall", failed_by_conf[0.93])
 
+    def test_diagnostic_profile_pass_is_not_claim_ready(self) -> None:
+        pairs = [
+            _pair(0.10, aux=(32, 0.018, 0.59, 0.0, 33.0), rgb=(32, 0.013, 0.52, 0.0, 40.0)),
+            _pair(0.40, aux=(32, 0.024, 0.59, 0.0, 25.0), rgb=(32, 0.027, 0.52, 0.0, 22.0)),
+        ]
+
+        summary = build_rgb_aux_dnn_sweep(pairs, profile="diagnostic")
+
+        self.assertTrue(summary["pass"])
+        self.assertTrue(summary["metric_pass"])
+        self.assertEqual(summary["claim_status"], "rgb_aux_dnn_sweep_diagnostic_pass")
+        self.assertIn("diagnostic RGB+Aux DNN sweep gate", summary["interpretation"])
+
     def test_sweep_writes_report_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

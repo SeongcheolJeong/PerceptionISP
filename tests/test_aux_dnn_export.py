@@ -156,6 +156,68 @@ class AuxDNNExportTest(unittest.TestCase):
         self.assertEqual(kwargs["progress_label"], "load:yolo-dataset:5+3")
         self.assertEqual(kwargs["cache_dir"], Path("cache/raw"))
 
+    def test_load_samples_for_pascalraw_dataset_forwards_manifest_options(self) -> None:
+        manifest = Path("reports/unit_pascalraw_manifest.json")
+        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_detection_samples", return_value=()) as loader:
+            samples = _load_samples(
+                source="pascalraw-dataset",
+                dataset="data/raw_datasets/pascalraw",
+                split="val",
+                count=3,
+                offset=5,
+                width=64,
+                height=48,
+                cfa_pattern="auto",
+                use_camerae2e=False,
+                progress_interval=2,
+                pascalraw_manifest=manifest,
+                pascalraw_native_raw=False,
+            )
+
+        self.assertEqual(samples, ())
+        args = loader.call_args.args
+        kwargs = loader.call_args.kwargs
+        self.assertEqual(args[0], "data/raw_datasets/pascalraw")
+        self.assertEqual(args[1], manifest)
+        self.assertEqual(kwargs["limit"], 3)
+        self.assertEqual(kwargs["offset"], 5)
+        self.assertEqual(kwargs["width"], 64)
+        self.assertEqual(kwargs["height"], 48)
+        self.assertEqual(kwargs["cfa_pattern"], "auto")
+        self.assertEqual(kwargs["use_camerae2e"], False)
+        self.assertEqual(kwargs["progress_interval"], 2)
+        self.assertEqual(kwargs["progress_label"], "load:pascalraw-dataset:5+3")
+
+    def test_load_samples_for_pascalraw_native_dataset_uses_native_loader(self) -> None:
+        manifest = Path("reports/unit_pascalraw_native_manifest.json")
+        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_native_detection_samples", return_value=()) as loader:
+            samples = _load_samples(
+                source="pascalraw-dataset",
+                dataset="data/raw_datasets/pascalraw",
+                split="val",
+                count=4,
+                offset=7,
+                width=80,
+                height=60,
+                cfa_pattern="RGGB",
+                use_camerae2e=True,
+                progress_interval=2,
+                pascalraw_manifest=manifest,
+                pascalraw_native_raw=True,
+            )
+
+        self.assertEqual(samples, ())
+        args = loader.call_args.args
+        kwargs = loader.call_args.kwargs
+        self.assertEqual(args[0], "data/raw_datasets/pascalraw")
+        self.assertEqual(args[1], manifest)
+        self.assertEqual(kwargs["limit"], 4)
+        self.assertEqual(kwargs["offset"], 7)
+        self.assertEqual(kwargs["width"], 80)
+        self.assertEqual(kwargs["height"], 60)
+        self.assertEqual(kwargs["progress_interval"], 2)
+        self.assertEqual(kwargs["progress_label"], "load:pascalraw-dataset:native:7+4")
+
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_torch_dataset_and_stem_consume_exported_tensors(self) -> None:
         import torch

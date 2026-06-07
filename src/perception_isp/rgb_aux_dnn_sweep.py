@@ -90,18 +90,12 @@ def build_rgb_aux_dnn_sweep(
     )
     passed = bool(passed_rows)
     metric_pass = bool(metric_rows)
-    if passed:
-        claim_status = "rgb_aux_dnn_sweep_claim_ready"
-    elif metric_pass:
-        claim_status = "rgb_aux_dnn_sweep_needs_scale"
-    else:
-        claim_status = "rgb_aux_dnn_sweep_no_claim_operating_point"
     return {
         "name": "RGB+Aux DNN confidence sweep",
         "status": "pass" if passed else "fail",
         "pass": passed,
         "metric_pass": metric_pass,
-        "claim_status": claim_status,
+        "claim_status": _claim_status(str(profile), passed=passed, metric_pass=metric_pass),
         "profile": str(profile),
         "thresholds": thresholds,
         "row_count": len(rows),
@@ -110,7 +104,7 @@ def build_rgb_aux_dnn_sweep(
         "best_metric_row": best_metric,
         "best_recall_positive_delta_row": best_recall_positive,
         "lowest_fp_positive_recall_delta_row": lowest_fp_positive,
-        "interpretation": _interpretation(passed=passed, metric_pass=metric_pass),
+        "interpretation": _interpretation(str(profile), passed=passed, metric_pass=metric_pass),
         "claim_boundary": (
             "This sweep only changes dense-detector confidence on saved RGB+Aux/RGB-only compact DNN outputs. "
             "It does not retrain the model, increase held-out scale, or prove full detector superiority."
@@ -296,7 +290,19 @@ def _metric(row: Mapping[str, Any], section: str, key: str) -> float:
     return float(value)
 
 
-def _interpretation(*, passed: bool, metric_pass: bool) -> str:
+def _claim_status(profile: str, *, passed: bool, metric_pass: bool) -> str:
+    if profile == "diagnostic":
+        return "rgb_aux_dnn_sweep_diagnostic_pass" if (passed or metric_pass) else "rgb_aux_dnn_sweep_diagnostic_no_operating_point"
+    if passed:
+        return "rgb_aux_dnn_sweep_claim_ready"
+    if metric_pass:
+        return "rgb_aux_dnn_sweep_needs_scale"
+    return "rgb_aux_dnn_sweep_no_claim_operating_point"
+
+
+def _interpretation(profile: str, *, passed: bool, metric_pass: bool) -> str:
+    if profile == "diagnostic" and (passed or metric_pass):
+        return "At least one confidence threshold passes the diagnostic RGB+Aux DNN sweep gate; this is operating-point evidence, not a claim-ready detector result."
     if passed:
         return "At least one confidence threshold passes the configured RGB+Aux DNN sweep gate."
     if metric_pass:

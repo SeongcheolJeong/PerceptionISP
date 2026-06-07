@@ -40,6 +40,32 @@ class RgbAuxDnnGateTest(unittest.TestCase):
         self.assertIn("absolute_fp_per_sample", failed)
         self.assertIn("small_recall_vs_rgb_only", failed)
 
+    def test_diagnostic_profile_pass_is_not_claim_ready(self) -> None:
+        rgb_aux = _dense_summary(
+            mode="rgb_aux",
+            channels=16,
+            sample_count=8,
+            precision=0.0,
+            recall=0.0,
+            small_recall=0.0,
+            fp=22.0,
+        )
+        rgb_only = _dense_summary(
+            mode="rgb_only",
+            channels=16,
+            sample_count=8,
+            precision=0.008,
+            recall=0.18,
+            small_recall=0.0,
+            fp=30.0,
+        )
+
+        summary = build_rgb_aux_dnn_gate(rgb_aux, rgb_only, thresholds={"profile": "diagnostic", "min_samples": 8})
+
+        self.assertTrue(summary["pass"])
+        self.assertEqual(summary["claim_status"], "rgb_aux_dnn_diagnostic_pass")
+        self.assertIn("diagnostic smoke gate", summary["interpretation"])
+
     def test_gate_writes_report_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

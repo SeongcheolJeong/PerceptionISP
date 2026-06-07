@@ -28,9 +28,15 @@ from .types import PerceptionISPConfig, json_ready
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Export PerceptionISP RGB+aux tensors for DNN training.")
-    parser.add_argument("--source", choices=["synthetic", "camerae2e-synthetic", "yolo-dataset", "kitti-dataset"], default="synthetic")
+    parser.add_argument(
+        "--source",
+        choices=["synthetic", "camerae2e-synthetic", "yolo-dataset", "kitti-dataset", "pascalraw-dataset"],
+        default="synthetic",
+    )
     parser.add_argument("--dataset", default=None)
     parser.add_argument("--split", default="val")
+    parser.add_argument("--pascalraw-manifest", default=None, help="PASCALRAW subset manifest JSON for --source pascalraw-dataset.")
+    parser.add_argument("--pascalraw-native-raw", action="store_true", help="Use full PASCALRAW NEF native Bayer RAW instead of downsampled PNG remosaic.")
     parser.add_argument("--count", type=int, default=4)
     parser.add_argument("--offset", type=int, default=0, help="Skip this many dataset images before applying --count.")
     parser.add_argument("--width", type=int, default=320)
@@ -60,6 +66,8 @@ def main(argv: Any = None) -> int:
         use_camerae2e=not bool(args.no_camerae2e),
         progress_interval=int(args.load_progress_interval),
         cache_dir=args.raw_cache_dir,
+        pascalraw_manifest=args.pascalraw_manifest,
+        pascalraw_native_raw=bool(args.pascalraw_native_raw),
     )
     config = PerceptionISPConfig(
         tone_mapping=args.tone_mapping,
@@ -78,6 +86,8 @@ def main(argv: Any = None) -> int:
             "source": args.source,
             "dataset": args.dataset,
             "split": args.split,
+            "pascalraw_manifest": args.pascalraw_manifest,
+            "pascalraw_native_raw": bool(args.pascalraw_native_raw),
             "count": int(args.count),
             "offset": int(args.offset),
             "width": int(args.width),
@@ -207,6 +217,8 @@ def _load_samples(
     use_camerae2e: bool,
     progress_interval: int = 0,
     cache_dir: str | Path | None = None,
+    pascalraw_manifest: str | Path | None = None,
+    pascalraw_native_raw: bool = False,
 ) -> Sequence[EvaluationSample]:
     if source == "synthetic":
         from .synthetic_eval import make_synthetic_evaluation_samples
@@ -233,6 +245,38 @@ def _load_samples(
             progress_interval=progress_interval,
             progress_label=f"load:kitti-dataset:{offset}+{count}",
             cache_dir=cache_dir,
+        )
+    if source == "pascalraw-dataset":
+        if not dataset:
+            raise ValueError("--dataset is required for --source pascalraw-dataset")
+        if not pascalraw_manifest:
+            raise ValueError("--pascalraw-manifest is required for --source pascalraw-dataset")
+        if bool(pascalraw_native_raw):
+            from .pascalraw_loader import load_pascalraw_native_detection_samples
+
+            return load_pascalraw_native_detection_samples(
+                dataset,
+                pascalraw_manifest,
+                limit=count,
+                offset=offset,
+                width=width,
+                height=height,
+                progress_interval=progress_interval,
+                progress_label=f"load:pascalraw-dataset:native:{offset}+{count}",
+            )
+        from .pascalraw_loader import load_pascalraw_detection_samples
+
+        return load_pascalraw_detection_samples(
+            dataset,
+            pascalraw_manifest,
+            limit=count,
+            offset=offset,
+            width=width,
+            height=height,
+            cfa_pattern=cfa_pattern,
+            use_camerae2e=use_camerae2e,
+            progress_interval=progress_interval,
+            progress_label=f"load:pascalraw-dataset:{offset}+{count}",
         )
     if not dataset:
         raise ValueError("--dataset is required for --source yolo-dataset")
