@@ -107,6 +107,12 @@ Known limits:
   `fp_reduction_success=304`, `recall_tradeoff=24`, `recall_loss_failure=56`,
   and `fp_regression_failure=57` across the full run. It is qualitative review
   evidence, not a replacement for metric gates or native RAW/CFA coverage.
+- `claim_evidence_summary` converts the claim-readiness dashboard into reusable
+  claim language. It records the current claim level as
+  `narrow_fp_reducer_claim_ready`, keeps broad HumanISP superiority, task-level
+  recall improvement, and trained RGB+aux DNN improvement in the blocked/not
+  claim-ready section, and keeps diagnostic evidence separate from performance
+  claims.
 - The condition gate currently uses KITTI metadata/proxy slices; it does not replace real night/rain/fog/HDR RAW datasets.
 - The benchmark-protocol checklist is a claim blocker/coverage tool; it does not create missing real-RAW or adverse-condition evidence by itself.
 - CameraE2E integration is optional and environment-dependent.

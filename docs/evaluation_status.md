@@ -636,12 +636,15 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Visual success/failure casebook | `pass` as qualitative review evidence; `reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human` selects 32 visual cases from the same 1496-image claim report: 8 FP-reduction successes, 8 recall tradeoffs, 8 recall-loss failures, and 8 FP-regression failures. Across all samples, `fp_reduction_success=304`, `recall_tradeoff=24`, `recall_loss_failure=56`, `fp_regression_failure=57`, with net `dFP=-336` and `dTP=-55`. This helps explain where the narrow FP-reduction claim works and fails, but it is not a replacement for held-out gates, native RAW/CFA coverage, or trained RGB+Aux DNN evaluation |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
+| Claim-evidence summary | `pass`; `reports/perception_claim_evidence_summary_score_label_aux_t001_native_bayer_v1` records `claim_level=narrow_fp_reducer_claim_ready`. It turns the dashboard into reusable language: recall-budgeted FP reduction is supported, while broad HumanISP superiority, task-level recall improvement, and trained RGB+Aux DNN detector improvement remain blocked or not claim-ready |
 
 The readiness bundle also writes:
 
 ```text
 reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/index.html
 reports/perception_claim_readiness_with_naive_extended/benchmark_protocol/protocol_coverage_summary.json
+reports/perception_claim_evidence_summary_score_label_aux_t001_native_bayer_v1/index.html
+reports/perception_claim_evidence_summary_score_label_aux_t001_native_bayer_v1/claim_evidence_summary.json
 ```
 
 This protocol coverage is a blocker checklist, not a metric result. It checks

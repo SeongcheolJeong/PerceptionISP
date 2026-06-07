@@ -1046,6 +1046,26 @@ Treat it as condition-level CFA/LensPSF evidence only; broad HumanISP
 superiority and task-level recall improvement remain blocked by the held-out
 gates.
 
+Create a concise claim-evidence summary from the dashboard when preparing a
+report or presentation:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.claim_evidence_summary \
+  reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_native_bayer_v1 \
+  --output-dir reports/perception_claim_evidence_summary_score_label_aux_t001_native_bayer_v1
+```
+
+The current claim-evidence summary is:
+
+```text
+reports/perception_claim_evidence_summary_score_label_aux_t001_native_bayer_v1/index.html
+```
+
+It records `claim_level=narrow_fp_reducer_claim_ready`: the supported
+performance language is recall-budgeted FP reduction on 1,496 held-out samples,
+while broad HumanISP superiority, task-level recall improvement, and trained
+RGB+Aux DNN performance improvement remain blocked or not claim-ready.
+
 Build a visual success/failure casebook from the same 1496-image claim report:
 
 ```bash
@@ -1448,6 +1468,7 @@ The latest extended-inclusive protocol report is:
 ```text
 reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_native_bayer_v1/index.html
+reports/perception_claim_evidence_summary_score_label_aux_t001_native_bayer_v1/index.html
 reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
