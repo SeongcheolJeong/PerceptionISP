@@ -160,6 +160,45 @@ class EvalCliHelpersTest(unittest.TestCase):
             self.assertEqual(printed["run_config"]["aodraw_cfa"], "RGGB")
             self.assertIn("person", printed["run_config"]["ground_truth_label_keep"])
 
+    def test_cli_can_run_pascalraw_dataset_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_pascalraw_cli_sample(root)
+            manifest_path = root / "manifest.json"
+            output_dir = root / "report"
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = eval_cli_main(
+                    [
+                        "--source",
+                        "pascalraw-dataset",
+                        "--dataset",
+                        str(root),
+                        "--pascalraw-manifest",
+                        str(manifest_path),
+                        "--count",
+                        "1",
+                        "--width",
+                        "8",
+                        "--height",
+                        "8",
+                        "--rgb-detector",
+                        "numpy",
+                        "--no-camerae2e",
+                        "--no-visuals",
+                        "--output-dir",
+                        str(output_dir),
+                    ]
+                )
+
+            printed = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((output_dir / "comparison_summary.json").exists())
+            self.assertEqual(printed["run_config"]["source"], "pascalraw-dataset")
+            self.assertFalse(printed["run_config"]["use_camerae2e"])
+            self.assertEqual(printed["run_config"]["pascalraw_manifest"], str(manifest_path))
+
 
 def _write_aodraw_cli_sample(root: Path) -> None:
     raw_path = root / "images_downsampled_raw" / "00000001.npy"
@@ -183,6 +222,29 @@ def _write_aodraw_cli_sample(root: Path) -> None:
             "box_count": 1,
             "expected_raw_relative_path": "images_downsampled_raw/00000001.npy",
             "expected_srgb_relative_path": "images_downsampled_srgb/00000001.JPG",
+            "boxes": [{"xyxy": [2.0, 2.0, 6.0, 6.0], "label": "person", "area": 16.0}],
+        }
+    ]
+    (root / "manifest.json").write_text(json.dumps(manifest))
+
+
+def _write_pascalraw_cli_sample(root: Path) -> None:
+    image_path = root / "images" / "2014_000001.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    rgb = np.zeros((8, 8, 3), dtype=np.uint8)
+    rgb[2:6, 2:6, :] = 180
+    Image.fromarray(rgb).save(image_path)
+    manifest = [
+        {
+            "sample_id": "2014_000001",
+            "file_name": "2014_000001.png",
+            "selection_condition": "daylight_raw_derived_downsampled",
+            "tags": ["daylight_raw_derived_downsampled"],
+            "width": 8,
+            "height": 8,
+            "box_count": 1,
+            "expected_image_relative_path": "images/2014_000001.png",
+            "expected_zip_member": "2014_000001.png",
             "boxes": [{"xyxy": [2.0, 2.0, 6.0, 6.0], "label": "person", "area": 16.0}],
         }
     ]

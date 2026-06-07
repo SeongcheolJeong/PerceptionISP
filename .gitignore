@@ -23,6 +23,7 @@ reports/
 exports/
 
 # Downloaded datasets and images
+data/raw_datasets/
 data/**/*.zip
 data/**/images/
 data/**/labels/

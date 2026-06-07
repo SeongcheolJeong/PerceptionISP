@@ -22,7 +22,15 @@ def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Compare HumanISP and PerceptionISP perception outputs.")
     parser.add_argument(
         "--source",
-        choices=["synthetic", "camerae2e-synthetic", "sample-image", "yolo-dataset", "kitti-dataset", "aodraw-dataset"],
+        choices=[
+            "synthetic",
+            "camerae2e-synthetic",
+            "sample-image",
+            "yolo-dataset",
+            "kitti-dataset",
+            "aodraw-dataset",
+            "pascalraw-dataset",
+        ],
         default="synthetic",
     )
     parser.add_argument("--image-url", default=None, help="Image URL for --source sample-image.")
@@ -33,6 +41,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aodraw-black-level", type=float, default=None, help="Optional AODRaw black level override.")
     parser.add_argument("--aodraw-white-level", type=float, default=None, help="Optional AODRaw white level override.")
     parser.add_argument("--aodraw-require-srgb", action="store_true", help="Require paired AODRaw sRGB files for reference RGB metrics.")
+    parser.add_argument("--pascalraw-manifest", default=None, help="PASCALRAW subset manifest JSON for --source pascalraw-dataset.")
     parser.add_argument("--no-camerae2e", action="store_true", help="Use direct RGB remosaic instead of CameraE2E for dataset sources.")
     parser.add_argument("--count", type=int, default=4)
     parser.add_argument("--offset", type=int, default=0, help="Skip this many dataset images before applying --count.")
@@ -177,6 +186,25 @@ def main(argv: Any = None) -> int:
             progress_interval=int(args.load_progress_interval),
             progress_label=f"load:{args.source}:{args.offset}+{args.count}",
         )
+    elif args.source == "pascalraw-dataset":
+        if not args.dataset:
+            raise ValueError("--dataset is required when --source pascalraw-dataset")
+        if not args.pascalraw_manifest:
+            raise ValueError("--pascalraw-manifest is required when --source pascalraw-dataset")
+        from .pascalraw_loader import load_pascalraw_detection_samples
+
+        samples = load_pascalraw_detection_samples(
+            args.dataset,
+            args.pascalraw_manifest,
+            limit=args.count,
+            offset=int(args.offset),
+            width=args.width,
+            height=args.height,
+            cfa_pattern=args.cfa,
+            use_camerae2e=not bool(args.no_camerae2e),
+            progress_interval=int(args.load_progress_interval),
+            progress_label=f"load:{args.source}:{args.offset}+{args.count}",
+        )
     else:
         samples = make_synthetic_evaluation_samples(
             count=args.count,
@@ -238,6 +266,7 @@ def main(argv: Any = None) -> int:
         "aodraw_black_level": args.aodraw_black_level,
         "aodraw_white_level": args.aodraw_white_level,
         "aodraw_require_srgb": bool(args.aodraw_require_srgb),
+        "pascalraw_manifest": args.pascalraw_manifest,
         "rgb_detector": rgb_detector.name,
         "rgb_detector_model": args.rgb_detector_model,
         "rgb_detector_confidence": float(args.rgb_detector_confidence),
