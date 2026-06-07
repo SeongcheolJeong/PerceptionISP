@@ -223,6 +223,13 @@ def _checks(conditions: Sequence[Mapping[str, Any]], *, expected_condition_count
     edge_auc_positive = [
         row for row in edge_auc_rows if bool(row.get("edge_lower_predicts_removed_fp")) and float(row.get("edge_auc_low_predicts_removed_fp", 0.0)) > 0.5
     ]
+    scene_delta_negative = _negative_condition_count(scene_auc_rows, "scene_edge_support_delta_removed_fp_minus_kept_tp")
+    edge_delta_negative = _negative_condition_count(edge_auc_rows, "edge_support_delta_removed_fp_minus_kept_tp")
+    scene_auc_mean = _condition_mean(scene_auc_rows, "scene_edge_auc_low_predicts_removed_fp")
+    edge_auc_mean = _condition_mean(edge_auc_rows, "edge_auc_low_predicts_removed_fp")
+    scene_delta_mean = _condition_mean(scene_auc_rows, "scene_edge_support_delta_removed_fp_minus_kept_tp")
+    edge_delta_mean = _condition_mean(edge_auc_rows, "edge_support_delta_removed_fp_minus_kept_tp")
+    edge_majority_threshold = 0 if not edge_auc_rows else (len(edge_auc_rows) // 2) + 1
     return (
         {
             "id": "condition_bridges_available",
@@ -240,9 +247,44 @@ def _checks(conditions: Sequence[Mapping[str, Any]], *, expected_condition_count
             "evidence": f"positive_conditions={len(scene_auc_positive)}/{len(scene_auc_rows)}",
         },
         {
+            "id": "source_scene_edge_consistent_across_conditions",
+            "status": "pass"
+            if scene_auc_rows
+            and len(scene_auc_positive) == len(scene_auc_rows)
+            and scene_delta_negative == len(scene_auc_rows)
+            and scene_auc_mean is not None
+            and scene_auc_mean > 0.5
+            and scene_delta_mean is not None
+            and scene_delta_mean < 0.0
+            else "fail",
+            "evidence": (
+                f"auc_positive={len(scene_auc_positive)}/{len(scene_auc_rows)} "
+                f"delta_negative={scene_delta_negative}/{len(scene_auc_rows)} "
+                f"mean_delta={_fmt(scene_delta_mean, signed=True)} mean_auc={_fmt(scene_auc_mean)}"
+            ),
+        },
+        {
             "id": "aux_edge_predicts_removed_fp_in_some_conditions",
             "status": "pass" if edge_auc_positive else "fail",
             "evidence": f"positive_conditions={len(edge_auc_positive)}/{len(edge_auc_rows)}",
+        },
+        {
+            "id": "aux_edge_consistent_across_majority_conditions",
+            "status": "pass"
+            if edge_auc_rows
+            and len(edge_auc_positive) >= edge_majority_threshold
+            and edge_delta_negative >= edge_majority_threshold
+            and edge_auc_mean is not None
+            and edge_auc_mean > 0.5
+            and edge_delta_mean is not None
+            and edge_delta_mean < 0.0
+            else "fail",
+            "evidence": (
+                f"auc_positive={len(edge_auc_positive)}/{len(edge_auc_rows)} "
+                f"delta_negative={edge_delta_negative}/{len(edge_auc_rows)} "
+                f"threshold={edge_majority_threshold} "
+                f"mean_delta={_fmt(edge_delta_mean, signed=True)} mean_auc={_fmt(edge_auc_mean)}"
+            ),
         },
     )
 

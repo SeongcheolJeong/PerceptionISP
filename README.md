@@ -824,7 +824,9 @@ The current proposal-edge audit report is:
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/index.html
 ```
 
-It passes all four diagnostic checks across the same 12 conditions. The
+It passes all six diagnostic checks across the same 12 conditions, including
+all-condition source scene-edge consistency and majority-condition aux-edge
+consistency. The
 calibrated proposal path removes 197 FP proposals and 0 TP proposals versus the
 RGB+Aux fusion proposal baseline, with net `dFP=-195` and `dTP=-2`. Source
 scene-edge support is directionally positive in 12/12 conditions, with best

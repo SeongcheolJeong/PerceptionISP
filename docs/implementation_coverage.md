@@ -67,10 +67,12 @@ Known limits:
   to same-sample proposal edge and source-scene-edge correlations. The current
   native report removes 197 FP and 0 TP proposals across 12 conditions, with
   source-scene-edge support directionally positive in 12/12 conditions and
-  aux-edge support positive in 10/12. Mean source scene-edge delta/AUC is
-  `-0.0184`/`0.5933`, and mean aux-edge delta/AUC is `-0.0087`/`0.5298`. This
-  is calibrated proposal-path bridge evidence, not incremental aux-only
-  ablation and not a trained RGB+aux DNN result.
+  aux-edge support positive in 10/12. The audit now gates all-condition
+  source-edge consistency and majority-condition aux-edge consistency. Mean
+  source scene-edge delta/AUC is `-0.0184`/`0.5933`, and mean aux-edge
+  delta/AUC is `-0.0087`/`0.5298`. This is calibrated proposal-path bridge
+  evidence, not incremental aux-only ablation and not a trained RGB+aux DNN
+  result.
 - `cfa_lenspsf_native_audit` separates native CameraE2E source-CFA rows from
   rows that were remapped to a requested target CFA. The current
   `native_bayer_v1` KITTI val64 audit has 12 native rows with 768 samples and 0
