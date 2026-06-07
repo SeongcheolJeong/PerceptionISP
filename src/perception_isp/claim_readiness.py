@@ -460,6 +460,8 @@ def _scene_edge_confidence_summary(path: str | Path | None) -> Dict[str, Any]:
         "failed_checks": failed,
         "check_count": len(checks),
         "case_count": len(data.get("cases", ())),
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [float(value) for value in data.get("psf_sigmas", ())],
         "human_rgb_proxy_source_edge_f1_mean": _optional_float(aggregate.get("human_rgb_proxy_source_edge_f1_mean")),
         "perception_rgb_proxy_source_edge_f1_mean": _optional_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
         "perception_aux_strength_source_edge_f1_mean": _optional_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),

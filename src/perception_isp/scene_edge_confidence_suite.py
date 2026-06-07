@@ -33,7 +33,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--width", type=int, default=320)
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--scene-scale", type=float, default=2.0, help="Reference scene scale relative to sensor output for source-edge oracle.")
-    parser.add_argument("--cfa", default="auto")
+    parser.add_argument("--cfa", action="append", default=None, help="CFA pattern to evaluate. Repeatable; defaults to auto.")
+    parser.add_argument("--psf-sigma", action="append", type=float, default=None, help="Lens PSF sigma in sensor pixels. Repeatable; defaults to 0.0.")
     parser.add_argument("--no-camerae2e", action="store_true")
     parser.add_argument("--tone-mapping", default="detector_log")
     parser.add_argument("--denoise-strength", type=float, default=0.30)
@@ -42,7 +43,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--output-dir", default="reports/perception_scene_edge_confidence_sample_image")
     args = parser.parse_args(argv)
 
-    samples = load_scene_edge_samples(
+    samples = load_scene_edge_sample_grid(
         source=str(args.source),
         image_path=args.image_path,
         dataset=args.dataset,
@@ -52,7 +53,8 @@ def main(argv: Any = None) -> int:
         width=int(args.width),
         height=int(args.height),
         scene_scale=float(args.scene_scale),
-        cfa_pattern=str(args.cfa),
+        cfa_patterns=tuple(str(value) for value in (args.cfa or ("auto",))),
+        psf_sigmas=tuple(float(value) for value in (args.psf_sigma or (0.0,))),
         use_camerae2e=not bool(args.no_camerae2e),
     )
     config = PerceptionISPConfig(
@@ -72,6 +74,8 @@ def main(argv: Any = None) -> int:
                     "status": summary["status"],
                     "case_count": len(summary["cases"]),
                     "check_count": len(summary["checks"]),
+                    "cfa_patterns": summary.get("cfa_patterns", ()),
+                    "psf_sigmas": summary.get("psf_sigmas", ()),
                     "failed_checks": [row["id"] for row in summary["checks"] if row["status"] != "pass"],
                 }
             ),
@@ -79,6 +83,42 @@ def main(argv: Any = None) -> int:
         )
     )
     return 0
+
+
+def load_scene_edge_sample_grid(
+    *,
+    source: str,
+    image_path: str | Path = "data/sample_images/bus.jpg",
+    dataset: str | None = None,
+    split: str = "val",
+    count: int = 1,
+    offset: int = 0,
+    width: int = 320,
+    height: int = 240,
+    scene_scale: float = 1.0,
+    cfa_patterns: Sequence[str] = ("auto",),
+    psf_sigmas: Sequence[float] = (0.0,),
+    use_camerae2e: bool = True,
+) -> Tuple[EvaluationSample, ...]:
+    samples: list[EvaluationSample] = []
+    for cfa_pattern in tuple(str(value) for value in cfa_patterns):
+        base_samples = load_scene_edge_samples(
+            source=source,
+            image_path=image_path,
+            dataset=dataset,
+            split=split,
+            count=count,
+            offset=offset,
+            width=width,
+            height=height,
+            scene_scale=scene_scale,
+            cfa_pattern=cfa_pattern,
+            use_camerae2e=use_camerae2e,
+        )
+        for sample in base_samples:
+            for sigma in tuple(float(value) for value in psf_sigmas):
+                samples.append(_with_psf_condition(sample, psf_sigma=sigma))
+    return tuple(samples)
 
 
 def load_scene_edge_samples(
@@ -153,6 +193,9 @@ def build_scene_edge_confidence_suite(
         "cases": cases,
         "checks": checks,
         "aggregate": _aggregate(cases),
+        "cfa_patterns": sorted({str(case.get("cfa_pattern", "")) for case in cases if case.get("cfa_pattern")}),
+        "psf_sigmas": sorted({float(case.get("psf_sigma", 0.0)) for case in cases}),
+        "cfa_rankings": _cfa_rankings(cases),
         "status": "pass" if all(row["status"] == "pass" for row in checks) else "fail",
         "interpretation": (
             "This suite uses the source scene RGB edge map as a proxy oracle, then compares HumanISP RGB edge evidence, "
@@ -205,6 +248,43 @@ def _sample_image(path: Path, *, width: int, height: int, scene_scale: float, cf
     )
 
 
+def _with_psf_condition(sample: EvaluationSample, *, psf_sigma: float) -> EvaluationSample:
+    raw = sample.raw
+    height, width = _raw_height_width(raw.data)
+    sigma = max(float(psf_sigma), 0.0)
+    calibration = replace(raw.calibration, psf_sigma_map=np.full((int(height), int(width)), sigma, dtype=np.float64))
+    metadata = replace(
+        raw.metadata,
+        calibration_id=f"{raw.metadata.calibration_id}_psf_{sigma:.2f}",
+        lens_profile_id=f"{raw.metadata.lens_profile_id}_psf_{sigma:.2f}",
+    )
+    conditioned_raw = replace(
+        raw,
+        metadata=metadata,
+        calibration=calibration,
+        provenance={**dict(raw.provenance), "scene_edge_psf_sigma": sigma},
+    )
+    cfa = str(metadata.cfa_pattern)
+    sample_id = f"{sample.sample_id}_{cfa}_psf_{sigma:.2f}"
+    return replace(
+        sample,
+        sample_id=sample_id,
+        raw=conditioned_raw,
+        metadata={**dict(sample.metadata), "cfa_pattern": cfa, "psf_sigma": sigma},
+    )
+
+
+def _raw_height_width(raw_data: Any) -> Tuple[int, int]:
+    arr = np.asarray(raw_data)
+    if arr.ndim == 2:
+        return int(arr.shape[0]), int(arr.shape[1])
+    if arr.ndim == 3 and arr.shape[0] <= 8:
+        return int(arr.shape[1]), int(arr.shape[2])
+    if arr.ndim == 3:
+        return int(arr.shape[0]), int(arr.shape[1])
+    raise ValueError(f"unsupported RAW shape for scene-edge PSF condition: {arr.shape}")
+
+
 def _run_case(sample: EvaluationSample, *, pipeline: PerceptionISPPipeline) -> Dict[str, Any]:
     result = pipeline.run(sample.raw)
     human_rgb = np.asarray(result.human_rgb if result.human_rgb is not None else result.vision_rgb, dtype=np.float64)
@@ -214,6 +294,7 @@ def _run_case(sample: EvaluationSample, *, pipeline: PerceptionISPPipeline) -> D
     perception_strength = _edge_strength(_luma(perception_rgb))
     aux_confidence = np.asarray(result.maps["edge_confidence"], dtype=np.float64)
     aux_strength = np.asarray(result.maps["edge_strength"], dtype=np.float64)
+    psf_blur_confidence = np.asarray(result.maps.get("psf_blur_confidence", np.ones_like(aux_confidence)), dtype=np.float64)
     metrics = _case_metrics(
         source_strength=source_strength,
         source_edge=source_edge,
@@ -222,6 +303,7 @@ def _run_case(sample: EvaluationSample, *, pipeline: PerceptionISPPipeline) -> D
         aux_confidence=aux_confidence,
         aux_strength=aux_strength,
     )
+    metrics["psf_blur_confidence_mean"] = _mean(psf_blur_confidence)
     metrics["finite_outputs"] = bool(
         np.isfinite(reference_rgb).all()
         and np.isfinite(human_rgb).all()
@@ -229,10 +311,12 @@ def _run_case(sample: EvaluationSample, *, pipeline: PerceptionISPPipeline) -> D
         and all(np.isfinite(value).all() for value in result.maps.values())
     )
     metrics["raw_pattern_remapped"] = bool(sample.raw.provenance.get("pattern_remapped", False))
+    psf_sigma = _psf_sigma(sample.raw.calibration.psf_sigma_map)
     return {
         "id": str(sample.sample_id),
         "source": str(sample.source),
         "cfa_pattern": str(result.metadata.get("frame", {}).get("cfa_pattern", sample.raw.metadata.cfa_pattern)),
+        "psf_sigma": float(psf_sigma),
         "raw_provenance": dict(sample.raw.provenance),
         "metrics": metrics,
         "_assets_source": {
@@ -287,6 +371,7 @@ def _case_metrics(
         ("perception_aux_strength", aux_strength),
     ):
         edge = _edge_mask(signal)
+        metrics[f"{prefix}_mean"] = _mean(signal)
         on = _masked_mean(signal, source_edge)
         off = _masked_mean(signal, off_source)
         metrics[f"{prefix}_on_source_edge"] = on
@@ -318,7 +403,7 @@ def _checks(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
             "perception_aux_strength_source_edge_f1",
         )
     )
-    return [
+    checks = [
         {
             "id": "finite_scene_edge_outputs",
             "description": "Reference RGB, HumanISP RGB, PerceptionISP RGB, and aux maps are finite.",
@@ -356,6 +441,26 @@ def _checks(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
             "criteria": [{"metric": "pattern_remapped_count", "value": sum(1 for value in raw_remaps if value), "threshold": 0, "pass": not any(raw_remaps)}],
         },
     ]
+    psf_response = _psf_confidence_response(cases)
+    if psf_response.get("evaluated"):
+        checks.append(
+            {
+                "id": "lens_psf_confidence_response",
+                "description": "Higher LensPSF sigma should reduce PerceptionISP edge-confidence because blur lowers edge reliability.",
+                "status": "pass" if bool(psf_response.get("pass")) else "fail",
+                "criteria": [
+                    {
+                        "metric": "aux_confidence_mean_delta_high_minus_low_psf",
+                        "baseline": psf_response.get("baseline"),
+                        "target": psf_response.get("target"),
+                        "delta": psf_response.get("delta"),
+                        "threshold": 0.0,
+                        "pass": bool(psf_response.get("pass")),
+                    }
+                ],
+            }
+        )
+    return checks
 
 
 def _aggregate(cases: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -370,8 +475,43 @@ def _aggregate(cases: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         "perception_rgb_proxy_source_edge_f1",
         "perception_aux_confidence_source_edge_f1",
         "perception_aux_strength_source_edge_f1",
+        "perception_aux_confidence_mean",
+        "psf_blur_confidence_mean",
     )
     return {f"{key}_mean": _mean([float(row.get(key, 0.0)) for row in metrics_rows]) for key in keys}
+
+
+def _cfa_rankings(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
+    by_sigma: Dict[float, Dict[str, list[Mapping[str, Any]]]] = {}
+    for case in cases:
+        if not isinstance(case, Mapping):
+            continue
+        sigma = float(case.get("psf_sigma", 0.0))
+        cfa = str(case.get("cfa_pattern", ""))
+        by_sigma.setdefault(sigma, {}).setdefault(cfa, []).append(case)
+    rankings = []
+    for sigma, by_cfa in sorted(by_sigma.items()):
+        ranked = []
+        for cfa, rows in sorted(by_cfa.items()):
+            metrics_rows = [row.get("metrics", {}) for row in rows if isinstance(row.get("metrics"), Mapping)]
+            aux_strength_f1 = _mean([float(row.get("perception_aux_strength_source_edge_f1", 0.0)) for row in metrics_rows])
+            perception_f1 = _mean([float(row.get("perception_rgb_proxy_source_edge_f1", 0.0)) for row in metrics_rows])
+            human_f1 = _mean([float(row.get("human_rgb_proxy_source_edge_f1", 0.0)) for row in metrics_rows])
+            ranked.append(
+                {
+                    "cfa_pattern": cfa,
+                    "case_count": len(rows),
+                    "human_rgb_proxy_source_edge_f1": human_f1,
+                    "perception_rgb_proxy_source_edge_f1": perception_f1,
+                    "perception_aux_strength_source_edge_f1": aux_strength_f1,
+                    "score": float(aux_strength_f1 + 0.25 * perception_f1),
+                }
+            )
+        ranked.sort(key=lambda row: float(row.get("score", 0.0)), reverse=True)
+        for index, row in enumerate(ranked, start=1):
+            row["rank"] = index
+        rankings.append({"psf_sigma": float(sigma), "ranked_cfas": ranked})
+    return rankings
 
 
 def _materialize_assets(summary: Mapping[str, Any], destination: Path) -> None:
@@ -395,6 +535,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     check_rows = "".join(_check_row(row) for row in summary.get("checks", ()))
     case_rows = "".join(_case_row(row, destination) for row in summary.get("cases", ()))
     aggregate_rows = "".join(_aggregate_row(key, value) for key, value in sorted((summary.get("aggregate", {}) or {}).items()))
+    ranking_rows = "".join(_ranking_row(row) for row in summary.get("cfa_rankings", ()))
     status = str(summary.get("status", ""))
     return f"""<!doctype html>
 <html lang=\"en\">
@@ -417,7 +558,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
 <body>
   <h1>PerceptionISP Scene Edge Confidence</h1>
   <div class=\"note\">{html_lib.escape(str(summary.get('interpretation', '')))} {html_lib.escape(str(summary.get('claim_boundary', '')))}</div>
-  <p>Status: <code class=\"{html_lib.escape(status)}\">{html_lib.escape(status)}</code>. Samples: {int(summary.get('sample_count', 0))}.</p>
+  <p>Status: <code class=\"{html_lib.escape(status)}\">{html_lib.escape(status)}</code>. Samples: {int(summary.get('sample_count', 0))}. CFA: <code>{html_lib.escape(', '.join(str(value) for value in summary.get('cfa_patterns', ())) or 'none')}</code>. LensPSF sigma: <code>{html_lib.escape(', '.join(_fmt(value) for value in summary.get('psf_sigmas', ())) or 'none')}</code>.</p>
   <h2>Checks</h2>
   <table>
     <thead><tr><th>Status</th><th>Check</th><th>Description</th><th>Criteria</th></tr></thead>
@@ -428,9 +569,14 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     <thead><tr><th>Metric</th><th>Mean</th></tr></thead>
     <tbody>{aggregate_rows}</tbody>
   </table>
+  <h2>CFA Ranking</h2>
+  <table>
+    <thead><tr><th>LensPSF Sigma</th><th>Ranked CFA Patterns</th></tr></thead>
+    <tbody>{ranking_rows}</tbody>
+  </table>
   <h2>Cases</h2>
   <table>
-    <thead><tr><th>Sample</th><th>Visuals</th><th>Human Sep</th><th>Perception RGB Sep</th><th>Aux Conf Sep</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Conf F1</th><th>CFA</th></tr></thead>
+    <thead><tr><th>Sample</th><th>Visuals</th><th>Human Sep</th><th>Perception RGB Sep</th><th>Aux Conf Sep</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Conf F1</th><th>CFA</th><th>LensPSF</th></tr></thead>
     <tbody>{case_rows}</tbody>
   </table>
   <p>Raw JSON: <code>{SCENE_EDGE_CONFIDENCE_SUMMARY}</code></p>
@@ -466,6 +612,19 @@ def _aggregate_row(key: str, value: Any) -> str:
     return f"<tr><td><code>{html_lib.escape(str(key))}</code></td><td>{_fmt(value)}</td></tr>"
 
 
+def _ranking_row(row: Mapping[str, Any]) -> str:
+    ranked = []
+    for item in row.get("ranked_cfas", ()):
+        if not isinstance(item, Mapping):
+            continue
+        ranked.append(
+            f"{int(item.get('rank', 0))}. {html_lib.escape(str(item.get('cfa_pattern', '')))} "
+            f"auxStrengthF1={_fmt(item.get('perception_aux_strength_source_edge_f1'))} "
+            f"perRgbF1={_fmt(item.get('perception_rgb_proxy_source_edge_f1'))}"
+        )
+    return f"<tr><td>{_fmt(row.get('psf_sigma'))}</td><td>{' | '.join(ranked) or 'none'}</td></tr>"
+
+
 def _case_row(row: Mapping[str, Any], destination: Path) -> str:
     metrics = row.get("metrics", {}) if isinstance(row.get("metrics"), Mapping) else {}
     assets = row.get("assets", {}) if isinstance(row.get("assets"), Mapping) else {}
@@ -492,8 +651,10 @@ def _case_row(row: Mapping[str, Any], destination: Path) -> str:
         f"<td>{_fmt(metrics.get('perception_aux_confidence_scene_edge_separation'), signed=True)}</td>"
         f"<td>{_fmt(metrics.get('human_rgb_proxy_source_edge_f1'))}</td>"
         f"<td>{_fmt(metrics.get('perception_rgb_proxy_source_edge_f1'))}</td>"
+        f"<td>{_fmt(metrics.get('perception_aux_strength_source_edge_f1'))}</td>"
         f"<td>{_fmt(metrics.get('perception_aux_confidence_source_edge_f1'))}</td>"
         f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{_fmt(row.get('psf_sigma'))}</td>"
         "</tr>"
     )
 
@@ -662,6 +823,39 @@ def _mean(values: Any) -> float:
     if finite.size == 0:
         return 0.0
     return float(np.mean(finite))
+
+
+def _psf_sigma(map_value: Any) -> float:
+    if map_value is None:
+        return 0.0
+    return _mean(np.asarray(map_value, dtype=np.float64))
+
+
+def _psf_confidence_response(cases: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    sigmas = sorted({float(case.get("psf_sigma", 0.0)) for case in cases})
+    if len(sigmas) < 2:
+        return {"evaluated": False}
+    low = float(sigmas[0])
+    high = float(sigmas[-1])
+    by_sigma: Dict[float, list[float]] = {low: [], high: []}
+    for case in cases:
+        sigma = float(case.get("psf_sigma", 0.0))
+        if sigma not in by_sigma:
+            continue
+        metrics = case.get("metrics", {}) if isinstance(case.get("metrics"), Mapping) else {}
+        by_sigma[sigma].append(float(metrics.get("perception_aux_confidence_mean", 0.0)))
+    baseline = _mean(by_sigma[low])
+    target = _mean(by_sigma[high])
+    delta = float(target - baseline)
+    return {
+        "evaluated": True,
+        "baseline_sigma": low,
+        "target_sigma": high,
+        "baseline": baseline,
+        "target": target,
+        "delta": delta,
+        "pass": delta <= 0.0,
+    }
 
 
 def _fmt(value: Any, *, signed: bool = False) -> str:

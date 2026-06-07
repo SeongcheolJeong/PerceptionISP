@@ -472,6 +472,8 @@ def _load_scene_edge_confidence(spec: str | Path) -> Dict[str, Any]:
         "check_count": len(checks),
         "case_count": len(data.get("cases", ())),
         "failed_checks": failed,
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [_maybe_float(value) for value in data.get("psf_sigmas", ())],
         "human_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("human_rgb_proxy_source_edge_f1_mean")),
         "perception_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
         "perception_aux_strength_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),
@@ -1296,11 +1298,13 @@ def _scene_edge_html(scene_edge: Mapping[str, Any], destination: Path) -> str:
         f"{html_lib.escape(str(scene_edge.get('interpretation', '')))} "
         f"{html_lib.escape(str(scene_edge.get('claim_boundary', '')))}</p>"
         "<table>"
-        "<thead><tr><th>Report</th><th>Cases</th><th>Checks</th><th>Failed</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th></tr></thead>"
+        "<thead><tr><th>Report</th><th>Cases</th><th>Checks</th><th>CFA</th><th>LensPSF</th><th>Failed</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th></tr></thead>"
         "<tbody><tr>"
         f"<td>{_report_link(scene_edge, destination)}</td>"
         f"<td>{int(scene_edge.get('case_count', 0))}</td>"
         f"<td>{int(scene_edge.get('check_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in scene_edge.get('cfa_patterns', ())) or 'none')}</td>"
+        f"<td>{html_lib.escape(', '.join(_fmt(value) for value in scene_edge.get('psf_sigmas', ()) if value is not None) or 'none')}</td>"
         f"<td>{html_lib.escape(failed)}</td>"
         f"<td>{_fmt(scene_edge.get('human_rgb_proxy_source_edge_f1_mean'))}</td>"
         f"<td>{_fmt(scene_edge.get('perception_rgb_proxy_source_edge_f1_mean'))}</td>"

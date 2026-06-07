@@ -1003,6 +1003,9 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
   --height 240 \
   --scene-scale 2 \
   --cfa auto \
+  --psf-sigma 0 \
+  --psf-sigma 0.8 \
+  --psf-sigma 1.6 \
   --tone-mapping detector_log \
   --denoise-strength 0.30 \
   --demosaic-method edge_aware \
@@ -1014,17 +1017,24 @@ The current report is:
 
 ```text
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
+reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/index.html
 ```
 
-It feeds a `640 x 480` scene image through CameraE2E and evaluates a `320 x
-240` sensor output, with source/target CFA both `GRBG` and no pattern remap.
-The high-resolution scene edge map is downsampled as the proxy oracle. On this
-sample, HumanISP RGB edge-proxy F1 is `0.6644`, PerceptionISP RGB edge-proxy F1
-is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and PerceptionISP
-aux edge-confidence F1 is `0.3727`. This shows the current aux edge-strength
-map tracks scene edges strongly, while aux edge-confidence is a reliability gate
-rather than a dense edge-location map. It is front-end scene-edge evidence, not
-object-boundary ground truth or detector-performance evidence.
+The CameraE2E report feeds a `640 x 480` scene image through CameraE2E and
+evaluates a `320 x 240` sensor output, with source/target CFA both `GRBG` and
+no pattern remap. It now sweeps LensPSF sigma `0.0`, `0.8`, and `1.6` sensor
+pixels. The high-resolution scene edge map is downsampled as the proxy oracle.
+Across those PSF conditions, HumanISP RGB edge-proxy F1 is `0.6519`,
+PerceptionISP RGB edge-proxy F1 is `0.6650`, PerceptionISP aux edge-strength F1
+is `0.7473`, and PerceptionISP aux edge-confidence F1 is `0.3727`. The
+LensPSF confidence-response check also passes, so increasing PSF reduces
+PerceptionISP edge-confidence as expected.
+
+The separate `bus_cfa_psf_sweep` report intentionally uses direct RGB-to-RAW
+remosaicing rather than CameraE2E true-CFA output so CFA patterns can be swept
+without source/target CFA remapping. It covers `BGGR`, `GBRG`, `GRBG`, and
+`RGGB` at the same PSF sigmas. Treat both reports as front-end scene-edge
+evidence, not object-boundary ground truth or detector-performance evidence.
 
 To verify that the test is not merely passing an RGB scene through both ISPs,
 run the scene-information stress suite. It creates a higher-resolution scene

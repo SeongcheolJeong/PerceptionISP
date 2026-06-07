@@ -94,6 +94,51 @@ class SceneEdgeConfidenceSuiteTest(unittest.TestCase):
             self.assertEqual(printed["failed_checks"], [])
             self.assertTrue((root / "cli" / SCENE_EDGE_CONFIDENCE_SUMMARY).exists())
 
+    def test_cli_builds_cfa_and_lens_psf_sweep(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scene_rgb = make_synthetic_scene_rgb(width=96, height=64, frame_counter=1, seed=303)
+            image_path = root / "scene.png"
+            from PIL import Image
+
+            Image.fromarray((scene_rgb * 255.0).round().astype("uint8")).save(image_path)
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = scene_edge_main(
+                    [
+                        "--source",
+                        "sample-image",
+                        "--image-path",
+                        str(image_path),
+                        "--width",
+                        "48",
+                        "--height",
+                        "32",
+                        "--scene-scale",
+                        "2",
+                        "--no-camerae2e",
+                        "--cfa",
+                        "RGGB",
+                        "--cfa",
+                        "GRBG",
+                        "--psf-sigma",
+                        "0",
+                        "--psf-sigma",
+                        "1",
+                        "--output-dir",
+                        str(root / "sweep"),
+                    ]
+                )
+            printed = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(printed["case_count"], 4)
+            self.assertEqual(printed["failed_checks"], [])
+            persisted = json.loads((root / "sweep" / SCENE_EDGE_CONFIDENCE_SUMMARY).read_text())
+            self.assertEqual(persisted["cfa_patterns"], ["GRBG", "RGGB"])
+            self.assertEqual(persisted["psf_sigmas"], [0.0, 1.0])
+            self.assertEqual({row["id"]: row["status"] for row in persisted["checks"]}["lens_psf_confidence_response"], "pass")
+            self.assertEqual(len(persisted["cfa_rankings"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

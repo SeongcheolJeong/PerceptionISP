@@ -263,6 +263,7 @@ reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
+reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
 ```

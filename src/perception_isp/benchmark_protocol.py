@@ -705,12 +705,16 @@ def _load_scene_edge_confidence(path: str | Path | None) -> Dict[str, Any]:
         "case_count": len(data.get("cases", ())),
         "check_count": len(checks),
         "failed_checks": failed,
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [float(value) for value in data.get("psf_sigmas", ())],
         "human_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("human_rgb_proxy_source_edge_f1_mean")),
         "perception_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
         "perception_aux_strength_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),
         "perception_aux_confidence_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_confidence_source_edge_f1_mean")),
         "summary": (
             f"{status}, cases={len(data.get('cases', ()))}, checks={len(checks)}, failed={len(failed)}, "
+            f"cfa={', '.join(str(value) for value in data.get('cfa_patterns', ())) or 'none'}, "
+            f"psf={', '.join(str(value) for value in data.get('psf_sigmas', ())) or 'none'}, "
             f"humanF1={_fmt_optional(aggregate.get('human_rgb_proxy_source_edge_f1_mean'))}, "
             f"perRgbF1={_fmt_optional(aggregate.get('perception_rgb_proxy_source_edge_f1_mean'))}, "
             f"auxStrengthF1={_fmt_optional(aggregate.get('perception_aux_strength_source_edge_f1_mean'))}"
