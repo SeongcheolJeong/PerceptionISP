@@ -105,6 +105,13 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertTrue(
                 any(
+                    item["claim"].startswith("Same-sample aux bridge passed")
+                    and item["status"] == "diagnostic"
+                    for item in dashboard["decisions"]
+                )
+            )
+            self.assertTrue(
+                any(
                     item["claim"].startswith("Benchmark protocol coverage is incomplete")
                     and item["status"] == "not_supported"
                     for item in dashboard["decisions"]
@@ -118,6 +125,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
+            self.assertIn("Same-Sample Aux Bridge", html)
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
@@ -702,6 +710,26 @@ def _write_aux_contribution_audit(path: Path) -> Path:
                         "deltas": {"precision@0.50_mean": 0.005, "recall@0.50_mean": -0.002, "fp@0.50_mean": -0.060},
                     }
                 ],
+                "sample_bridge": {
+                    "status": "pass",
+                    "baseline_input": "perception_calibrated_score_label_fusion_rgb_aux",
+                    "target_input": "perception_calibrated_score_label_aux_fusion_rgb_aux",
+                    "compared_sample_count": 10,
+                    "baseline_detection_count": 30,
+                    "target_detection_count": 28,
+                    "baseline_only_detection_count": 2,
+                    "target_only_detection_count": 0,
+                    "removed_fp_count": 2,
+                    "removed_tp_count": 0,
+                    "added_fp_count": 0,
+                    "added_tp_count": 0,
+                    "fp_delta_count": -2,
+                    "tp_delta_count": 0,
+                    "removed_fp_fraction": 1.0,
+                    "removed_fp_to_tp_ratio": 2.0,
+                    "support_means": {},
+                    "interpretation": "unit same-sample bridge",
+                },
                 "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},
                 "interpretation": "unit aux contribution audit",
             }

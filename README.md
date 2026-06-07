@@ -1101,6 +1101,11 @@ branch. Combined with the scene-edge reports, the dashboard now shows a
 directionally positive bridge: scene-edge RGB F1 delta `+0.0124`, aux
 edge-strength delta `+0.1830`, and incremental aux proposal-scoring dFP@0.50
 `-0.0622`.
+The same-sample bridge inside the aux contribution audit compares
+`score_label` and `score_label_aux` proposal outputs on the same 1496 KITTI
+samples: adding aux removes 111 proposals, 95 of them false positives and 16 of
+them true positives, for net `fp_delta_count=-93` and `tp_delta_count=-16`.
+So the incremental aux removal set is 85.6% false positives.
 This still does not prove a trained RGB+aux DNN detector claim or same-sample
 causality.
 
@@ -1227,8 +1232,10 @@ That is an evidence-coverage result, not a broad-superiority result; the
 dashboard still says broad HumanISP superiority is not supported, while
 recall-budgeted FP reduction versus HumanISP is supported. It also reports a
 diagnostic front-end/downstream bridge between positive scene-edge deltas and
-downstream FP reduction, without treating that as causal proof. The condition
-gate passes the `fp_reducer` profile on 8 evaluated condition slices; the
+downstream FP reduction, plus a same-sample aux proposal bridge where
+incremental aux scoring removes 95 FP and 16 TP proposals, without treating
+that as a trained-DNN or broad-superiority proof. The condition gate passes the
+`fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 
 The current 1496-image naive RAW-like baseline is:

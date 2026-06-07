@@ -183,6 +183,9 @@ def build_aux_contribution_audit(
                 ],
             }
         )
+    sample_bridge = _sample_bridge_from_inputs(inputs, baseline_input=score_label_input, target_input=score_label_aux_input)
+    if sample_bridge is not None:
+        checks.extend(_sample_bridge_checks(sample_bridge))
     return {
         "source_rollup": "" if source_rollup is None else str(source_rollup),
         "calibration_summary": "" if calibration_summary_path is None else str(calibration_summary_path),
@@ -199,6 +202,7 @@ def build_aux_contribution_audit(
         "missing_inputs": missing,
         "comparisons": comparisons,
         "feature_audit": feature_audit,
+        "sample_bridge": sample_bridge,
         "checks": checks,
         "status": "pass" if checks and all(row["status"] == "pass" for row in checks) else "fail",
         "interpretation": (
@@ -329,6 +333,258 @@ def _feature_audit(summary: Mapping[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, baseline_input: str, target_input: str) -> Dict[str, Any] | None:
+    baseline_report = _load_comparison_summary(inputs.get(str(baseline_input), {}).get("summary_path") if isinstance(inputs.get(str(baseline_input)), Mapping) else None)
+    target_report = _load_comparison_summary(inputs.get(str(target_input), {}).get("summary_path") if isinstance(inputs.get(str(target_input)), Mapping) else None)
+    if baseline_report is None or target_report is None:
+        return None
+    baseline_samples = [row for row in baseline_report.get("samples", ()) if isinstance(row, Mapping)]
+    target_samples = [row for row in target_report.get("samples", ()) if isinstance(row, Mapping)]
+    if not baseline_samples or not target_samples:
+        return None
+    target_by_id = {str(row.get("sample_id", index)): row for index, row in enumerate(target_samples)}
+    label_agnostic = bool(
+        (target_report.get("run_config", {}) if isinstance(target_report.get("run_config"), Mapping) else {}).get(
+            "label_agnostic",
+            (baseline_report.get("run_config", {}) if isinstance(baseline_report.get("run_config"), Mapping) else {}).get("label_agnostic", False),
+        )
+    )
+    counts = {
+        "compared_sample_count": 0,
+        "baseline_detection_count": 0,
+        "target_detection_count": 0,
+        "common_detection_count": 0,
+        "baseline_only_detection_count": 0,
+        "target_only_detection_count": 0,
+        "baseline_fp_count": 0,
+        "target_fp_count": 0,
+        "baseline_tp_count": 0,
+        "target_tp_count": 0,
+        "removed_fp_count": 0,
+        "removed_tp_count": 0,
+        "added_fp_count": 0,
+        "added_tp_count": 0,
+    }
+    support_groups: Dict[str, list[Dict[str, float]]] = {
+        "removed_fp": [],
+        "removed_tp": [],
+        "kept_fp": [],
+        "kept_tp": [],
+        "added_fp": [],
+        "added_tp": [],
+    }
+    examples: list[Dict[str, Any]] = []
+    for index, baseline_sample in enumerate(baseline_samples):
+        sample_id = str(baseline_sample.get("sample_id", index))
+        target_sample = target_by_id.get(sample_id)
+        if target_sample is None:
+            continue
+        baseline_detections = _detections_for_sample(baseline_sample, baseline_input)
+        target_detections = _detections_for_sample(target_sample, target_input)
+        ground_truth = _ground_truth_for_sample(baseline_sample)
+        baseline_positive = _positive_detection_indices(baseline_detections, ground_truth, label_agnostic=label_agnostic)
+        target_positive = _positive_detection_indices(target_detections, ground_truth, label_agnostic=label_agnostic)
+        counts["compared_sample_count"] += 1
+        counts["baseline_detection_count"] += len(baseline_detections)
+        counts["target_detection_count"] += len(target_detections)
+        counts["baseline_tp_count"] += len(baseline_positive)
+        counts["target_tp_count"] += len(target_positive)
+        counts["baseline_fp_count"] += len(baseline_detections) - len(baseline_positive)
+        counts["target_fp_count"] += len(target_detections) - len(target_positive)
+        matched_targets: set[int] = set()
+        for detection_index, detection in enumerate(baseline_detections):
+            target_index = _matching_detection_index(detection, target_detections)
+            is_tp = detection_index in baseline_positive
+            if target_index >= 0:
+                counts["common_detection_count"] += 1
+                matched_targets.add(target_index)
+                support_groups["kept_tp" if is_tp else "kept_fp"].append(_support_values(detection))
+                continue
+            counts["baseline_only_detection_count"] += 1
+            if is_tp:
+                counts["removed_tp_count"] += 1
+                support_groups["removed_tp"].append(_support_values(detection))
+            else:
+                counts["removed_fp_count"] += 1
+                support_groups["removed_fp"].append(_support_values(detection))
+            if len(examples) < 12:
+                examples.append(
+                    {
+                        "sample_id": sample_id,
+                        "label": str((detection.get("box", {}) if isinstance(detection.get("box"), Mapping) else {}).get("label", "object")),
+                        "baseline_score": _maybe_float(detection.get("score")),
+                        "target_status": "removed_tp" if is_tp else "removed_fp",
+                        **_support_values(detection),
+                    }
+                )
+        for target_index, detection in enumerate(target_detections):
+            if target_index in matched_targets:
+                continue
+            is_tp = target_index in target_positive
+            counts["target_only_detection_count"] += 1
+            if is_tp:
+                counts["added_tp_count"] += 1
+                support_groups["added_tp"].append(_support_values(detection))
+            else:
+                counts["added_fp_count"] += 1
+                support_groups["added_fp"].append(_support_values(detection))
+    if counts["compared_sample_count"] <= 0:
+        return None
+    removed_count = counts["baseline_only_detection_count"]
+    counts["fp_delta_count"] = counts["target_fp_count"] - counts["baseline_fp_count"]
+    counts["tp_delta_count"] = counts["target_tp_count"] - counts["baseline_tp_count"]
+    counts["removed_fp_fraction"] = counts["removed_fp_count"] / max(float(removed_count), 1.0)
+    counts["removed_tp_fraction"] = counts["removed_tp_count"] / max(float(removed_count), 1.0)
+    counts["removed_fp_to_tp_ratio"] = counts["removed_fp_count"] / max(float(counts["removed_tp_count"]), 1.0)
+    return {
+        "status": "pass",
+        "baseline_input": str(baseline_input),
+        "target_input": str(target_input),
+        "label_agnostic": label_agnostic,
+        **counts,
+        "support_means": {name: _support_mean(rows) for name, rows in support_groups.items()},
+        "examples": examples,
+        "interpretation": (
+            "This same-sample bridge compares score_label and score_label_aux proposal outputs on matched samples. "
+            "It shows which detections aux features remove or add, and whether those detections are true positives or false positives."
+        ),
+    }
+
+
+def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, Any]]:
+    removed_count = int(sample_bridge.get("baseline_only_detection_count", 0))
+    removed_fp = int(sample_bridge.get("removed_fp_count", 0))
+    removed_tp = int(sample_bridge.get("removed_tp_count", 0))
+    fp_delta = int(sample_bridge.get("fp_delta_count", 0))
+    return [
+        {
+            "id": "same_sample_aux_bridge_available",
+            "description": "Score_label and score_label_aux sample reports should overlap and expose per-detection aux metadata.",
+            "status": "pass" if removed_count > 0 else "fail",
+            "criteria": [
+                {"metric": "compared_sample_count", "value": int(sample_bridge.get("compared_sample_count", 0)), "threshold": 1, "pass": int(sample_bridge.get("compared_sample_count", 0)) > 0},
+                {"metric": "baseline_only_detection_count", "value": removed_count, "threshold": 1, "pass": removed_count > 0},
+            ],
+        },
+        {
+            "id": "incremental_aux_removes_more_fp_than_tp",
+            "description": "Detections removed by adding aux features should be mostly false positives.",
+            "status": "pass" if removed_fp > removed_tp else "fail",
+            "criteria": [
+                {"metric": "removed_fp_count", "value": removed_fp, "threshold": removed_tp, "pass": removed_fp > removed_tp},
+                {"metric": "removed_fp_fraction", "value": _maybe_float(sample_bridge.get("removed_fp_fraction")), "threshold": 0.5, "pass": _maybe_float(sample_bridge.get("removed_fp_fraction")) > 0.5},
+            ],
+        },
+        {
+            "id": "incremental_aux_net_fp_reduction_same_sample",
+            "description": "Same-sample target output should contain fewer false positives than score_label baseline output.",
+            "status": "pass" if fp_delta < 0 else "fail",
+            "criteria": [{"metric": "fp_delta_count", "value": fp_delta, "threshold": 0, "pass": fp_delta < 0}],
+        },
+    ]
+
+
+def _load_comparison_summary(path_value: Any) -> Dict[str, Any] | None:
+    if not path_value:
+        return None
+    path = Path(str(path_value)).expanduser()
+    if path.is_dir():
+        path = path / "comparison_summary.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    return data if isinstance(data, dict) else None
+
+
+def _detections_for_sample(sample: Mapping[str, Any], input_name: str) -> list[Mapping[str, Any]]:
+    for detector in sample.get("detectors", ()):
+        if isinstance(detector, Mapping) and str(detector.get("input_name")) == str(input_name):
+            return [row for row in detector.get("detections", ()) if isinstance(row, Mapping)]
+    return []
+
+
+def _ground_truth_for_sample(sample: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [row for row in sample.get("ground_truth", ()) if isinstance(row, Mapping)]
+
+
+def _positive_detection_indices(detections: Sequence[Mapping[str, Any]], ground_truth: Sequence[Mapping[str, Any]], *, label_agnostic: bool) -> set[int]:
+    ordered = sorted(range(len(detections)), key=lambda index: _maybe_float(detections[index].get("score")), reverse=True)
+    used_gt: set[int] = set()
+    positives: set[int] = set()
+    for detection_index in ordered:
+        detection_box = _box_payload(detections[detection_index])
+        best_iou = 0.0
+        best_gt = -1
+        for gt_index, gt_payload in enumerate(ground_truth):
+            if gt_index in used_gt:
+                continue
+            gt_box = _box_payload(gt_payload)
+            if not label_agnostic and str(detection_box.get("label", "")) != str(gt_box.get("label", "")):
+                continue
+            value = _box_iou(detection_box, gt_box)
+            if value > best_iou:
+                best_iou = value
+                best_gt = gt_index
+        if best_iou >= 0.50 and best_gt >= 0:
+            positives.add(detection_index)
+            used_gt.add(best_gt)
+    return positives
+
+
+def _matching_detection_index(detection: Mapping[str, Any], targets: Sequence[Mapping[str, Any]]) -> int:
+    box = _box_payload(detection)
+    for index, target in enumerate(targets):
+        target_box = _box_payload(target)
+        if str(box.get("label", "")) == str(target_box.get("label", "")) and _box_iou(box, target_box) >= 0.99:
+            return index
+    return -1
+
+
+def _box_payload(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    box = payload.get("box", payload)
+    if not isinstance(box, Mapping):
+        box = {}
+    values = tuple(float(value) for value in box.get("xyxy", (0.0, 0.0, 0.0, 0.0)))
+    if len(values) != 4:
+        values = (0.0, 0.0, 0.0, 0.0)
+    return {"xyxy": values, "label": str(box.get("label", "object"))}
+
+
+def _box_iou(a: Mapping[str, Any], b: Mapping[str, Any]) -> float:
+    ax1, ay1, ax2, ay2 = tuple(float(value) for value in a.get("xyxy", (0.0, 0.0, 0.0, 0.0)))
+    bx1, by1, bx2, by2 = tuple(float(value) for value in b.get("xyxy", (0.0, 0.0, 0.0, 0.0)))
+    intersection_w = max(min(ax2, bx2) - max(ax1, bx1), 0.0)
+    intersection_h = max(min(ay2, by2) - max(ay1, by1), 0.0)
+    intersection = intersection_w * intersection_h
+    union = _box_area(a) + _box_area(b) - intersection
+    return 0.0 if union <= 0.0 else float(intersection / union)
+
+
+def _box_area(box: Mapping[str, Any]) -> float:
+    x1, y1, x2, y2 = tuple(float(value) for value in box.get("xyxy", (0.0, 0.0, 0.0, 0.0)))
+    return max(x2 - x1, 0.0) * max(y2 - y1, 0.0)
+
+
+def _support_values(detection: Mapping[str, Any]) -> Dict[str, float]:
+    metadata = detection.get("metadata", {}) if isinstance(detection.get("metadata"), Mapping) else {}
+    fusion = metadata.get("fusion", {}) if isinstance(metadata.get("fusion"), Mapping) else {}
+    return {
+        "score": _maybe_float(detection.get("score")),
+        "aux_support": _maybe_float(fusion.get("aux_support")),
+        "edge_support": _maybe_float(fusion.get("edge_support")),
+        "saturation_support": _maybe_float(fusion.get("saturation_support")),
+        "reliability_support": _maybe_float(fusion.get("reliability_support")),
+        "aux_box_iou": _maybe_float(fusion.get("aux_box_iou")),
+    }
+
+
+def _support_mean(rows: Sequence[Mapping[str, float]]) -> Dict[str, float | int]:
+    if not rows:
+        return {"count": 0}
+    keys = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
+    return {"count": len(rows), **{f"{key}_mean": sum(float(row.get(key, 0.0)) for row in rows) / len(rows) for key in keys}}
+
+
 def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     check_rows = "".join(_check_row(row) for row in summary.get("checks", ()))
     comparison_rows = "".join(_comparison_row(row, destination) for row in summary.get("comparisons", ()))
@@ -336,6 +592,8 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
         comparison_rows = '<tr><td colspan="10">No comparisons were available.</td></tr>'
     feature_audit = summary.get("feature_audit")
     feature_html = _feature_html(feature_audit) if isinstance(feature_audit, Mapping) else "<p>No calibration-summary feature audit was provided.</p>"
+    sample_bridge = summary.get("sample_bridge")
+    sample_bridge_html = _sample_bridge_html(sample_bridge) if isinstance(sample_bridge, Mapping) else "<p>No same-sample bridge audit was available.</p>"
     status = str(summary.get("status", ""))
     status_class = "pass" if status == "pass" else "fail"
     return f"""<!doctype html>
@@ -371,6 +629,8 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   </table>
   <h2>Aux Feature Audit</h2>
   {feature_html}
+  <h2>Same-Sample Bridge</h2>
+  {sample_bridge_html}
   <p>Raw JSON: <code>{AUX_CONTRIBUTION_SUMMARY}</code></p>
 </body>
 </html>
@@ -436,6 +696,69 @@ def _feature_html(feature_audit: Mapping[str, Any]) -> str:
         "</tr></tbody></table>"
         "<table><thead><tr><th>Aux Feature</th><th>Weight</th></tr></thead>"
         f"<tbody>{aux_rows}</tbody></table>"
+    )
+
+
+def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
+    support_rows = "".join(
+        _sample_bridge_support_row(name, values)
+        for name, values in (sample_bridge.get("support_means", {}) if isinstance(sample_bridge.get("support_means"), Mapping) else {}).items()
+        if isinstance(values, Mapping)
+    )
+    if not support_rows:
+        support_rows = '<tr><td colspan="7">No support means were available.</td></tr>'
+    example_rows = "".join(_sample_bridge_example_row(row) for row in sample_bridge.get("examples", ()) if isinstance(row, Mapping))
+    if not example_rows:
+        example_rows = '<tr><td colspan="7">No removed detection examples were available.</td></tr>'
+    return (
+        f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Baseline Det</th><th>Target Det</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td><code>{html_lib.escape(str(sample_bridge.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(sample_bridge.get('target_input', '')))}</code></td>"
+        f"<td>{int(sample_bridge.get('compared_sample_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('baseline_detection_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('target_detection_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('removed_fp_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('removed_tp_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('fp_delta_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('tp_delta_count', 0))}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Group</th><th>Count</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th><th>Aux Box IoU</th></tr></thead>"
+        f"<tbody>{support_rows}</tbody></table>"
+        "<table>"
+        "<thead><tr><th>Sample</th><th>Status</th><th>Label</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th></tr></thead>"
+        f"<tbody>{example_rows}</tbody></table>"
+    )
+
+
+def _sample_bridge_support_row(name: str, values: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(name))}</code></td>"
+        f"<td>{int(values.get('count', 0))}</td>"
+        f"<td>{_fmt(values.get('score_mean'))}</td>"
+        f"<td>{_fmt(values.get('aux_support_mean'))}</td>"
+        f"<td>{_fmt(values.get('edge_support_mean'))}</td>"
+        f"<td>{_fmt(values.get('reliability_support_mean'))}</td>"
+        f"<td>{_fmt(values.get('aux_box_iou_mean'))}</td>"
+        "</tr>"
+    )
+
+
+def _sample_bridge_example_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('sample_id', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('target_status', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('label', '')))}</td>"
+        f"<td>{_fmt(row.get('baseline_score'))}</td>"
+        f"<td>{_fmt(row.get('aux_support'))}</td>"
+        f"<td>{_fmt(row.get('edge_support'))}</td>"
+        f"<td>{_fmt(row.get('reliability_support'))}</td>"
+        "</tr>"
     )
 
 

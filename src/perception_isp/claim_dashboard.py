@@ -596,6 +596,7 @@ def _load_aux_contribution_audit(spec: str | Path) -> Dict[str, Any]:
         )
     status = str(data.get("status", ""))
     feature_audit = data.get("feature_audit", {}) if isinstance(data.get("feature_audit"), Mapping) else {}
+    sample_bridge = _load_aux_sample_bridge(data.get("sample_bridge"))
     return {
         "name": label or _default_name(summary_path),
         "summary_path": str(summary_path),
@@ -607,7 +608,33 @@ def _load_aux_contribution_audit(spec: str | Path) -> Dict[str, Any]:
         "comparisons": comparisons,
         "aux_feature_count": int(feature_audit.get("aux_feature_count", 0)),
         "aux_features": [str(value) for value in feature_audit.get("aux_features", ())],
+        "sample_bridge": sample_bridge,
         "interpretation": str(data.get("interpretation", "")),
+    }
+
+
+def _load_aux_sample_bridge(payload: Any) -> Dict[str, Any] | None:
+    if not isinstance(payload, Mapping):
+        return None
+    return {
+        "status": str(payload.get("status", "")),
+        "baseline_input": str(payload.get("baseline_input", "")),
+        "target_input": str(payload.get("target_input", "")),
+        "compared_sample_count": int(payload.get("compared_sample_count", 0)),
+        "baseline_detection_count": int(payload.get("baseline_detection_count", 0)),
+        "target_detection_count": int(payload.get("target_detection_count", 0)),
+        "baseline_only_detection_count": int(payload.get("baseline_only_detection_count", 0)),
+        "target_only_detection_count": int(payload.get("target_only_detection_count", 0)),
+        "removed_fp_count": int(payload.get("removed_fp_count", 0)),
+        "removed_tp_count": int(payload.get("removed_tp_count", 0)),
+        "added_fp_count": int(payload.get("added_fp_count", 0)),
+        "added_tp_count": int(payload.get("added_tp_count", 0)),
+        "fp_delta_count": int(payload.get("fp_delta_count", 0)),
+        "tp_delta_count": int(payload.get("tp_delta_count", 0)),
+        "removed_fp_fraction": _maybe_float_or_none(payload.get("removed_fp_fraction")),
+        "removed_fp_to_tp_ratio": _maybe_float_or_none(payload.get("removed_fp_to_tp_ratio")),
+        "support_means": payload.get("support_means", {}) if isinstance(payload.get("support_means"), Mapping) else {},
+        "interpretation": str(payload.get("interpretation", "")),
     }
 
 
@@ -776,6 +803,20 @@ def _claim_decisions(
     if aux_contribution_audit is not None:
         if bool(aux_contribution_audit.get("pass")):
             decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
+            sample_bridge = aux_contribution_audit.get("sample_bridge")
+            if isinstance(sample_bridge, Mapping) and int(sample_bridge.get("removed_fp_count", 0)) > int(sample_bridge.get("removed_tp_count", 0)):
+                decisions.append(
+                    {
+                        "status": "diagnostic",
+                        "claim": (
+                            "Same-sample aux bridge passed: incremental aux scoring removed "
+                            f"{int(sample_bridge.get('removed_fp_count', 0))} FP and "
+                            f"{int(sample_bridge.get('removed_tp_count', 0))} TP proposals "
+                            f"with net FP delta {int(sample_bridge.get('fp_delta_count', 0))}. "
+                            "This is proposal-level evidence, not a trained DNN detector claim."
+                        ),
+                    }
+                )
         else:
             failed = ", ".join(str(value) for value in aux_contribution_audit.get("failed_checks", ())) or "configured aux contribution checks"
             decisions.append({"status": "not_supported", "claim": f"Aux contribution audit failed for {failed}; do not claim aux helps proposal scoring yet."})
@@ -1140,6 +1181,8 @@ def _aux_contribution_html(aux_contribution: Mapping[str, Any], destination: Pat
     rows = "".join(_aux_contribution_row(row) for row in aux_contribution.get("comparisons", ()))
     if not rows:
         rows = '<tr><td colspan="6">No aux contribution comparisons were available.</td></tr>'
+    sample_bridge = aux_contribution.get("sample_bridge")
+    sample_bridge_html = _aux_sample_bridge_html(sample_bridge) if isinstance(sample_bridge, Mapping) else "<p>No same-sample aux bridge was available.</p>"
     return (
         f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(aux_contribution.get('status', '')))}</code>. "
         f"{html_lib.escape(str(aux_contribution.get('interpretation', '')))}</p>"
@@ -1155,6 +1198,8 @@ def _aux_contribution_html(aux_contribution: Mapping[str, Any], destination: Pat
         "<table>"
         "<thead><tr><th>Comparison</th><th>Target</th><th>Baseline</th><th>dP@0.50</th><th>dR@0.50</th><th>dFP@0.50</th></tr></thead>"
         f"<tbody>{rows}</tbody></table>"
+        "<h3>Same-Sample Aux Bridge</h3>"
+        f"{sample_bridge_html}"
     )
 
 
@@ -1168,6 +1213,24 @@ def _aux_contribution_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('delta_recall@0.50'), signed=True)}</td>"
         f"<td>{_fmt(row.get('delta_fp@0.50'), signed=True)}</td>"
         "</tr>"
+    )
+
+
+def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
+    return (
+        f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td><code>{html_lib.escape(str(sample_bridge.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(sample_bridge.get('target_input', '')))}</code></td>"
+        f"<td>{int(sample_bridge.get('compared_sample_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('removed_fp_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('removed_tp_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('fp_delta_count', 0))}</td>"
+        f"<td>{int(sample_bridge.get('tp_delta_count', 0))}</td>"
+        f"<td>{_fmt(sample_bridge.get('removed_fp_fraction'))}</td>"
+        "</tr></tbody></table>"
     )
 
 
