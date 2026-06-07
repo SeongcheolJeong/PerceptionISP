@@ -46,8 +46,39 @@ class CfaLensPsfNativeAuditTest(unittest.TestCase):
 
             self.assertEqual(summary["status"], "pass")
             self.assertEqual(summary["groups"]["native"]["run_count"], 2)
+            self.assertEqual(summary["groups"]["simulated_native"]["run_count"], 0)
             self.assertEqual(summary["groups"]["remapped"]["run_count"], 0)
-            self.assertEqual(summary["checks"][2]["status"], "pass")
+            self.assertEqual({row["id"]: row["status"] for row in summary["checks"]}["simulated_rows_separated"], "pass")
+            self.assertEqual({row["id"]: row["status"] for row in summary["checks"]}["remapped_rows_separated"], "pass")
+
+    def test_raw_derived_camerae2e_rows_are_simulated_not_native(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sweep = _write_sweep(
+                root / "sweep",
+                runs=[
+                    _run(
+                        "cfa-rggb_psf-0p00",
+                        "RGGB",
+                        0,
+                        0.0,
+                        -0.2,
+                        source_cfa="RGGB",
+                        raw_derived_png_input_count=4,
+                        camerae2e_used_count=4,
+                    ),
+                ],
+            )
+
+            summary = build_native_audit_from_path(sweep)
+
+            self.assertEqual(summary["status"], "warning")
+            self.assertEqual(summary["groups"]["native"]["run_count"], 0)
+            self.assertEqual(summary["groups"]["simulated_native"]["run_count"], 1)
+            self.assertEqual(summary["runs"][0]["native_status"], "simulated_native")
+            statuses = {row["id"]: row["status"] for row in summary["checks"]}
+            self.assertEqual(statuses["native_rows_identified"], "fail")
+            self.assertEqual(statuses["simulated_rows_separated"], "warning")
 
 
 def _write_sweep(path: Path, *, runs: list[dict] | None = None) -> Path:
@@ -67,20 +98,38 @@ def _write_sweep(path: Path, *, runs: list[dict] | None = None) -> Path:
     return path
 
 
-def _run(run_id: str, cfa: str, remapped: int, remapped_fraction: float, fp_delta: float, *, source_cfa: str = "GRBG") -> dict:
+def _run(
+    run_id: str,
+    cfa: str,
+    remapped: int,
+    remapped_fraction: float,
+    fp_delta: float,
+    *,
+    source_cfa: str = "GRBG",
+    native_raw_input_count: int | None = None,
+    raw_derived_png_input_count: int | None = None,
+    camerae2e_used_count: int | None = None,
+) -> dict:
+    raw_summary = {
+        "sample_count": 4,
+        "source_cfa_patterns": {source_cfa: 4},
+        "target_cfa_patterns": {cfa: 4},
+        "pattern_remapped_count": remapped,
+        "pattern_remapped_fraction": remapped_fraction,
+    }
+    if native_raw_input_count is not None:
+        raw_summary["native_raw_input_count"] = native_raw_input_count
+    if raw_derived_png_input_count is not None:
+        raw_summary["raw_derived_png_input_count"] = raw_derived_png_input_count
+    if camerae2e_used_count is not None:
+        raw_summary["camerae2e_used_count"] = camerae2e_used_count
     return {
         "run_id": run_id,
         "report": f"{run_id}/index.html",
         "cfa_pattern": cfa,
         "psf_sigma": 0.0,
         "sample_count": 4,
-        "raw_condition_summary": {
-            "sample_count": 4,
-            "source_cfa_patterns": {source_cfa: 4},
-            "target_cfa_patterns": {cfa: 4},
-            "pattern_remapped_count": remapped,
-            "pattern_remapped_fraction": remapped_fraction,
-        },
+        "raw_condition_summary": raw_summary,
         "metrics": {
             "human_rgb": {"fp@0.50_mean": 1.0},
             "perception_calibrated_score_label_aux_fusion_rgb_aux_t001": {

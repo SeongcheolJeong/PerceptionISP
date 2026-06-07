@@ -73,6 +73,27 @@ class AODRawDownloadWatchTest(unittest.TestCase):
             self.assertEqual(summary["missing_file_count"], 2)
             self.assertFalse((root / "aodraw" / "images_downsampled_srgb" / "00000001.JPG").exists())
 
+    def test_raw_only_watch_reaches_ready_without_srgb(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            downloads = root / "Downloads"
+            _write(downloads / "images_downsampled_raw" / "00000001.npy", b"raw")
+
+            summary = watch_aodraw_downloads(
+                manifest=_manifest(),
+                download_roots=(downloads,),
+                dataset_root=root / "aodraw",
+                kind="raw",
+                max_iterations=2,
+                interval_seconds=0.0,
+            )
+
+            self.assertEqual(summary["status"], "ready")
+            self.assertTrue(summary["evaluation_ready"])
+            self.assertEqual(summary["missing_file_count"], 0)
+            self.assertTrue((root / "aodraw" / "images_downsampled_raw" / "00000001.npy").exists())
+            self.assertFalse((root / "aodraw" / "images_downsampled_srgb" / "00000001.JPG").exists())
+
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

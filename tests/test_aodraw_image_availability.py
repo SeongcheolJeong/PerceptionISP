@@ -50,6 +50,24 @@ class AODRawImageAvailabilityTest(unittest.TestCase):
             self.assertIn("images_downsampled_raw/00000002.npy", missing)
             self.assertIn("images_downsampled_srgb/00000002.JPG", missing)
 
+    def test_raw_only_audit_passes_without_srgb_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = _manifest()
+            for row in manifest:
+                _touch(root / row["expected_raw_relative_path"])
+
+            summary = build_aodraw_image_availability(manifest, dataset_root=root, kind="raw")
+
+            self.assertEqual(summary["status"], "pass")
+            self.assertEqual(summary["kind"], "raw")
+            self.assertTrue(summary["evaluation_ready"])
+            self.assertEqual(summary["required_file_count"], 2)
+            self.assertEqual(summary["missing_srgb_count"], 0)
+            checks = {row["id"]: row["status"] for row in summary["checks"]}
+            self.assertEqual(checks["raw_files_available"], "pass")
+            self.assertEqual(checks["srgb_files_available"], "pass")
+
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -70,6 +88,8 @@ class AODRawImageAvailabilityTest(unittest.TestCase):
                         str(manifest_path),
                         "--dataset-root",
                         str(root / "dataset"),
+                        "--kind",
+                        "raw",
                         "--output-dir",
                         str(root / "cli"),
                     ]
@@ -77,7 +97,7 @@ class AODRawImageAvailabilityTest(unittest.TestCase):
             printed = json.loads(stdout.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertFalse(printed["evaluation_ready"])
-            self.assertEqual(printed["missing_file_count"], 4)
+            self.assertEqual(printed["missing_file_count"], 2)
             self.assertTrue((root / "cli" / "aodraw_missing_files.json").exists())
 
 

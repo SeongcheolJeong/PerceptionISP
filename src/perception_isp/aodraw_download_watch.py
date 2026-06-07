@@ -85,7 +85,7 @@ def watch_aodraw_downloads(
             kind=kind,
             dry_run=dry_run,
         )
-        availability = build_aodraw_image_availability(manifest, dataset_root=dataset_root)
+        availability = build_aodraw_image_availability(manifest, dataset_root=dataset_root, kind=kind)
         if availability_output_dir is not None:
             write_aodraw_image_availability(availability, availability_output_dir)
         iterations.append(

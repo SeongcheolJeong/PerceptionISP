@@ -57,6 +57,7 @@ def build_native_audit(
     rows = [_run_summary(run, sweep_dir=sweep_dir) for run in sweep_summary.get("runs", ()) if isinstance(run, Mapping)]
     groups = {
         "native": _group_summary([row for row in rows if row["native_status"] == "native"]),
+        "simulated_native": _group_summary([row for row in rows if row["native_status"] == "simulated_native"]),
         "partial_remap": _group_summary([row for row in rows if row["native_status"] == "partial_remap"]),
         "remapped": _group_summary([row for row in rows if row["native_status"] == "remapped"]),
     }
@@ -100,10 +101,19 @@ def _run_summary(run: Mapping[str, Any], *, sweep_dir: Path) -> Dict[str, Any]:
     deltas = run.get("delta_vs_human", {}).get(primary, {}) if isinstance(run.get("delta_vs_human"), Mapping) else {}
     sample_count = int(raw.get("sample_count", run.get("sample_count", 0)))
     remapped_count = int(raw.get("pattern_remapped_count", 0))
+    native_raw_count = int(raw.get("native_raw_input_count", 0))
+    raw_derived_count = int(raw.get("raw_derived_png_input_count", 0))
+    camerae2e_count = int(raw.get("camerae2e_used_count", 0))
     remapped_fraction = _optional_float(raw.get("pattern_remapped_fraction"))
     if remapped_fraction is None:
         remapped_fraction = 0.0 if sample_count <= 0 else float(remapped_count / max(sample_count, 1))
-    native_status = "native" if remapped_count == 0 else "remapped" if remapped_count == sample_count and sample_count > 0 else "partial_remap"
+    native_status = _native_status(
+        sample_count=sample_count,
+        remapped_count=remapped_count,
+        native_raw_count=native_raw_count,
+        raw_derived_count=raw_derived_count,
+        camerae2e_count=camerae2e_count,
+    )
     report = str(run.get("report", ""))
     return {
         "run_id": str(run.get("run_id", "")),
@@ -116,6 +126,9 @@ def _run_summary(run: Mapping[str, Any], *, sweep_dir: Path) -> Dict[str, Any]:
         "target_cfa_patterns": {str(k): int(v) for k, v in raw.get("target_cfa_patterns", {}).items()} if isinstance(raw.get("target_cfa_patterns"), Mapping) else {},
         "pattern_remapped_count": remapped_count,
         "pattern_remapped_fraction": remapped_fraction,
+        "native_raw_input_count": native_raw_count,
+        "raw_derived_png_input_count": raw_derived_count,
+        "camerae2e_used_count": camerae2e_count,
         "native_status": native_status,
         "primary_input": primary,
         "precision@0.50_mean": _optional_float(metrics.get("precision@0.50_mean")),
@@ -151,6 +164,7 @@ def _group_summary(rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
 
 def _checks(rows: Sequence[Mapping[str, Any]], groups: Mapping[str, Mapping[str, Any]]) -> list[Dict[str, Any]]:
     native_runs = int(groups.get("native", {}).get("run_count", 0))
+    simulated_runs = int(groups.get("simulated_native", {}).get("run_count", 0))
     remapped_runs = int(groups.get("remapped", {}).get("run_count", 0))
     partial_runs = int(groups.get("partial_remap", {}).get("run_count", 0))
     all_rows_native = bool(rows) and native_runs == len(rows) and remapped_runs == 0 and partial_runs == 0
@@ -163,7 +177,12 @@ def _checks(rows: Sequence[Mapping[str, Any]], groups: Mapping[str, Mapping[str,
         {
             "id": "native_rows_identified",
             "status": "pass" if native_runs > 0 else "fail",
-            "evidence": f"native_runs={native_runs}",
+            "evidence": f"native_runs={native_runs} simulated_native_runs={simulated_runs}",
+        },
+        {
+            "id": "simulated_rows_separated",
+            "status": "pass" if simulated_runs == 0 else "warning",
+            "evidence": f"simulated_native_runs={simulated_runs}",
         },
         {
             "id": "remapped_rows_separated",
@@ -171,6 +190,25 @@ def _checks(rows: Sequence[Mapping[str, Any]], groups: Mapping[str, Mapping[str,
             "evidence": f"remapped_runs={remapped_runs} partial_runs={partial_runs}",
         },
     ]
+
+
+def _native_status(
+    *,
+    sample_count: int,
+    remapped_count: int,
+    native_raw_count: int,
+    raw_derived_count: int,
+    camerae2e_count: int,
+) -> str:
+    if remapped_count == sample_count and sample_count > 0:
+        return "remapped"
+    if remapped_count > 0:
+        return "partial_remap"
+    if sample_count > 0 and native_raw_count == sample_count:
+        return "native"
+    if sample_count > 0 and (raw_derived_count > 0 or camerae2e_count > 0):
+        return "simulated_native"
+    return "native"
 
 
 def _primary_downstream_input(run: Mapping[str, Any]) -> str:

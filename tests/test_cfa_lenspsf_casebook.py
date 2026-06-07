@@ -30,6 +30,7 @@ class CfaLensPsfCasebookTest(unittest.TestCase):
             self.assertEqual(summary["selected_case_count"], 2)
             checks = {row["id"]: row["status"] for row in summary["checks"]}
             self.assertEqual(checks["casebook_uses_native_cfa_rows"], "pass")
+            self.assertEqual(checks["casebook_separates_simulated_native_rows"], "pass")
             self.assertEqual(checks["casebook_includes_counterexamples"], "pass")
 
             html_path = write_cfa_lenspsf_casebook(summary, root / "casebook")
@@ -39,8 +40,24 @@ class CfaLensPsfCasebookTest(unittest.TestCase):
             self.assertTrue(Path(written["showcase_cases"][0]["visual_path"]).exists())
             self.assertIn("CFA/LensPSF Visual Casebook", html_path.read_text())
 
+    def test_simulated_native_casebook_is_warning_not_true_native(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sweep = _write_sweep_fixture(root / "sweep", raw_derived=True)
 
-def _write_sweep_fixture(path: Path) -> Path:
+            summary = build_cfa_lenspsf_casebook_from_path(
+                sweep,
+                max_cases_per_category=1,
+                max_showcase_cases=4,
+            )
+
+            checks = {row["id"]: row["status"] for row in summary["checks"]}
+            self.assertEqual(summary["status"], "warning")
+            self.assertEqual(checks["casebook_uses_native_cfa_rows"], "fail")
+            self.assertEqual(checks["casebook_separates_simulated_native_rows"], "warning")
+
+
+def _write_sweep_fixture(path: Path, *, raw_derived: bool = False) -> Path:
     path.mkdir()
     image_path = path / "scene.png"
     image = np.zeros((40, 48, 3), dtype=np.uint8)
@@ -67,6 +84,9 @@ def _write_sweep_fixture(path: Path) -> Path:
                 "raw_condition_summary": {
                     "pattern_remapped_fraction": 0.0,
                     "true_sensor_cfa_mosaic_fraction": 1.0,
+                    "native_raw_input_fraction": 0.0 if raw_derived else 1.0,
+                    "raw_derived_png_input_fraction": 1.0 if raw_derived else 0.0,
+                    "camerae2e_used_fraction": 1.0 if raw_derived else 0.0,
                 },
                 "metrics": {
                     "human_rgb": {},

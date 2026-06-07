@@ -237,6 +237,9 @@ def _condition_summary(
             "selected_case_count": 0,
             "pattern_remapped_fraction": _maybe_float(raw_summary.get("pattern_remapped_fraction")),
             "true_sensor_cfa_mosaic_fraction": _maybe_float(raw_summary.get("true_sensor_cfa_mosaic_fraction")),
+            "native_raw_input_fraction": _maybe_float(raw_summary.get("native_raw_input_fraction")),
+            "raw_derived_png_input_fraction": _maybe_float(raw_summary.get("raw_derived_png_input_fraction")),
+            "camerae2e_used_fraction": _maybe_float(raw_summary.get("camerae2e_used_fraction")),
         }
     aggregate = casebook.get("aggregate", {}) if isinstance(casebook.get("aggregate"), Mapping) else {}
     return {
@@ -253,6 +256,9 @@ def _condition_summary(
         "fp_delta_count": int(aggregate.get("fp_delta_count", 0)),
         "pattern_remapped_fraction": _maybe_float(raw_summary.get("pattern_remapped_fraction")),
         "true_sensor_cfa_mosaic_fraction": _maybe_float(raw_summary.get("true_sensor_cfa_mosaic_fraction")),
+        "native_raw_input_fraction": _maybe_float(raw_summary.get("native_raw_input_fraction")),
+        "raw_derived_png_input_fraction": _maybe_float(raw_summary.get("raw_derived_png_input_fraction")),
+        "camerae2e_used_fraction": _maybe_float(raw_summary.get("camerae2e_used_fraction")),
         "casebook": dict(casebook),
     }
 
@@ -283,10 +289,8 @@ def _checks(
     psf = {float(row.get("psf_sigma", 0.0)) for row in conditions if row.get("psf_sigma") is not None}
     success_count = int(category_totals.get("fp_reduction_success", {}).get("selected_case_count", 0))
     counter_count = sum(int(category_totals.get(name, {}).get("selected_case_count", 0)) for name in ("recall_tradeoff", "recall_loss_failure", "fp_regression_failure"))
-    native_rows = [
-        row for row in conditions
-        if row.get("pattern_remapped_fraction") == 0.0 and row.get("true_sensor_cfa_mosaic_fraction") == 1.0
-    ]
+    true_native_rows = [row for row in conditions if _is_true_native_condition(row)]
+    simulated_native_rows = [row for row in conditions if _is_simulated_native_condition(row)]
     return (
         {
             "id": "condition_casebooks_available",
@@ -300,8 +304,13 @@ def _checks(
         },
         {
             "id": "casebook_uses_native_cfa_rows",
-            "status": "pass" if len(native_rows) == condition_count and condition_count > 0 else "fail",
-            "evidence": f"native={len(native_rows)}/{condition_count}",
+            "status": "pass" if len(true_native_rows) == condition_count and condition_count > 0 else "fail",
+            "evidence": f"true_native={len(true_native_rows)}/{condition_count} simulated_native={len(simulated_native_rows)}",
+        },
+        {
+            "id": "casebook_separates_simulated_native_rows",
+            "status": "pass" if not simulated_native_rows else "warning",
+            "evidence": f"simulated_native={len(simulated_native_rows)}/{condition_count}",
         },
         {
             "id": "casebook_has_selected_cases",
@@ -319,6 +328,23 @@ def _checks(
             "evidence": f"selected_counterexamples={counter_count}",
         },
     )
+
+
+def _is_true_native_condition(row: Mapping[str, Any]) -> bool:
+    if row.get("pattern_remapped_fraction") != 0.0 or row.get("true_sensor_cfa_mosaic_fraction") != 1.0:
+        return False
+    raw_derived = row.get("raw_derived_png_input_fraction")
+    camerae2e = row.get("camerae2e_used_fraction")
+    native_raw = row.get("native_raw_input_fraction")
+    if raw_derived is None and camerae2e is None and native_raw is None:
+        return True
+    return float(native_raw or 0.0) == 1.0 and float(raw_derived or 0.0) == 0.0
+
+
+def _is_simulated_native_condition(row: Mapping[str, Any]) -> bool:
+    if row.get("pattern_remapped_fraction") != 0.0 or row.get("true_sensor_cfa_mosaic_fraction") != 1.0:
+        return False
+    return float(row.get("raw_derived_png_input_fraction") or 0.0) > 0.0 or float(row.get("camerae2e_used_fraction") or 0.0) > 0.0
 
 
 def _showcase_cases(conditions: Sequence[Mapping[str, Any]], *, max_count: int) -> Tuple[Dict[str, Any], ...]:

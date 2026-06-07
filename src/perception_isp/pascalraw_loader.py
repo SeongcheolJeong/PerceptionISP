@@ -233,6 +233,8 @@ def load_pascalraw_native_manifest_row(
         "target_cfa_pattern": pattern,
         "pattern_remapped": False,
         "true_sensor_cfa_mosaic": True,
+        "native_raw_input": True,
+        "raw_derived_png_input": False,
         "native_resolution_matches_target": bool(raw_meta["native_resolution_matches_target"]),
         "native_resolution_at_least_target": bool(raw_meta["native_resolution_at_least_target"]),
         "raw_resize_mode": str(raw_meta["raw_resize_mode"]),

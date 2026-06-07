@@ -42,9 +42,11 @@ INPUT_ORDER = (
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Run detector comparisons across CFA and LensPSF conditions.")
-    parser.add_argument("--source", choices=("yolo-dataset", "kitti-dataset"), default="yolo-dataset")
+    parser.add_argument("--source", choices=("yolo-dataset", "kitti-dataset", "pascalraw-dataset"), default="yolo-dataset")
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--split", default="val")
+    parser.add_argument("--pascalraw-manifest", default=None, help="PASCALRAW subset manifest JSON for --source pascalraw-dataset.")
+    parser.add_argument("--pascalraw-native-raw", action="store_true", help="Use full PASCALRAW NEF native Bayer RAW. Only auto/RGGB CFA conditions are valid.")
     parser.add_argument("--count", type=int, default=32)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--width", type=int, default=640)
@@ -133,6 +135,8 @@ def main(argv: Any = None) -> int:
             progress_interval=int(args.load_progress_interval),
             progress_label=f"load:cfa-psf:{cfa_pattern}",
             cache_dir=args.raw_cache_dir,
+            pascalraw_manifest=args.pascalraw_manifest,
+            pascalraw_native_raw=bool(args.pascalraw_native_raw),
         )
         if label_map:
             base_samples = remap_sample_labels(base_samples, label_map)
@@ -242,6 +246,9 @@ def raw_condition_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any
     native_cfa_bridge_versions = {}
     pattern_remapped_count = 0
     true_sensor_cfa_mosaic_count = 0
+    native_raw_input_count = 0
+    raw_derived_png_input_count = 0
+    camerae2e_used_count = 0
     psf_recorded_count = 0
     for sample in samples:
         metadata = sample.get("metadata", {})
@@ -260,6 +267,9 @@ def raw_condition_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any
         _bump(native_cfa_bridge_versions, raw_provenance.get("camerae2e_native_cfa_bridge_version"))
         pattern_remapped_count += int(bool(raw_provenance.get("pattern_remapped", False)))
         true_sensor_cfa_mosaic_count += int(bool(raw_provenance.get("true_sensor_cfa_mosaic", False)))
+        native_raw_input_count += int(_is_native_raw_input(raw_provenance))
+        raw_derived_png_input_count += int(_is_raw_derived_png_input(raw_provenance))
+        camerae2e_used_count += int(bool(raw_provenance.get("camerae2e_used", False)))
     total = int(len(samples))
     return {
         "sample_count": total,
@@ -270,6 +280,12 @@ def raw_condition_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any
         "camerae2e_native_cfa_bridge_versions": native_cfa_bridge_versions,
         "true_sensor_cfa_mosaic_count": int(true_sensor_cfa_mosaic_count),
         "true_sensor_cfa_mosaic_fraction": 0.0 if total <= 0 else float(true_sensor_cfa_mosaic_count / total),
+        "native_raw_input_count": int(native_raw_input_count),
+        "native_raw_input_fraction": 0.0 if total <= 0 else float(native_raw_input_count / total),
+        "raw_derived_png_input_count": int(raw_derived_png_input_count),
+        "raw_derived_png_input_fraction": 0.0 if total <= 0 else float(raw_derived_png_input_count / total),
+        "camerae2e_used_count": int(camerae2e_used_count),
+        "camerae2e_used_fraction": 0.0 if total <= 0 else float(camerae2e_used_count / total),
         "psf_sigmas": psf_values,
         "pattern_remapped_count": int(pattern_remapped_count),
         "pattern_remapped_fraction": 0.0 if total <= 0 else float(pattern_remapped_count / total),
@@ -298,6 +314,8 @@ def build_sweep_summary(
         "source": str(args.source),
         "dataset": str(args.dataset),
         "split": str(args.split),
+        "pascalraw_manifest": getattr(args, "pascalraw_manifest", None),
+        "pascalraw_native_raw": bool(getattr(args, "pascalraw_native_raw", False)),
         "count": int(args.count),
         "offset": int(args.offset),
         "width": int(args.width),
@@ -430,6 +448,8 @@ def _load_samples(
     progress_interval: int,
     progress_label: str,
     cache_dir: str | Path | None,
+    pascalraw_manifest: str | Path | None = None,
+    pascalraw_native_raw: bool = False,
 ) -> Sequence[EvaluationSample]:
     if source == "kitti-dataset":
         from .kitti_dataset import load_kitti_detection_samples
@@ -446,6 +466,39 @@ def _load_samples(
             progress_interval=progress_interval,
             progress_label=progress_label,
             cache_dir=cache_dir,
+        )
+    if source == "pascalraw-dataset":
+        if not pascalraw_manifest:
+            raise ValueError("--pascalraw-manifest is required for --source pascalraw-dataset")
+        if bool(pascalraw_native_raw):
+            normalized_cfa = str(cfa_pattern).upper()
+            if normalized_cfa not in {"AUTO", "RGGB"}:
+                raise ValueError("--pascalraw-native-raw only supports auto/RGGB CFA; use remosaic mode for simulated CFA sweeps")
+            from .pascalraw_loader import load_pascalraw_native_detection_samples
+
+            return load_pascalraw_native_detection_samples(
+                dataset,
+                pascalraw_manifest,
+                limit=count,
+                offset=offset,
+                width=width,
+                height=height,
+                progress_interval=progress_interval,
+                progress_label=f"{progress_label}:native",
+            )
+        from .pascalraw_loader import load_pascalraw_detection_samples
+
+        return load_pascalraw_detection_samples(
+            dataset,
+            pascalraw_manifest,
+            limit=count,
+            offset=offset,
+            width=width,
+            height=height,
+            cfa_pattern=cfa_pattern,
+            use_camerae2e=use_camerae2e,
+            progress_interval=progress_interval,
+            progress_label=progress_label,
         )
     from .yolo_dataset import load_yolo_detection_samples
 
@@ -464,6 +517,18 @@ def _load_samples(
     )
 
 
+def _is_native_raw_input(raw_provenance: Mapping[str, Any]) -> bool:
+    if "native_raw_input" in raw_provenance:
+        return bool(raw_provenance.get("native_raw_input"))
+    return str(raw_provenance.get("bridge", "")) == "pascalraw_native_nef"
+
+
+def _is_raw_derived_png_input(raw_provenance: Mapping[str, Any]) -> bool:
+    if "raw_derived_png_input" in raw_provenance:
+        return bool(raw_provenance.get("raw_derived_png_input"))
+    return str(raw_provenance.get("bridge_dataset", "")) == "pascalraw_downsampled_png"
+
+
 def _run_config(
     *,
     args: Any,
@@ -480,6 +545,8 @@ def _run_config(
         "source": args.source,
         "dataset": args.dataset,
         "split": args.split,
+        "pascalraw_manifest": getattr(args, "pascalraw_manifest", None),
+        "pascalraw_native_raw": bool(getattr(args, "pascalraw_native_raw", False)),
         "count": int(args.count),
         "offset": int(args.offset),
         "width": int(args.width),

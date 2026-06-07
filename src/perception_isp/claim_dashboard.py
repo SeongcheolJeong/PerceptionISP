@@ -2296,11 +2296,24 @@ def _cfa_lenspsf_proposal_evidence(audit: Mapping[str, Any]) -> str:
 def _cfa_lenspsf_native_evidence(audit: Mapping[str, Any]) -> str:
     groups = audit.get("groups", {}) if isinstance(audit.get("groups"), Mapping) else {}
     native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
+    simulated = groups.get("simulated_native", {}) if isinstance(groups.get("simulated_native"), Mapping) else {}
     remapped = groups.get("remapped", {}) if isinstance(groups.get("remapped"), Mapping) else {}
     partial = groups.get("partial_remap", {}) if isinstance(groups.get("partial_remap"), Mapping) else {}
     native_best = native.get("best_delta_fp@0.50", {}) if isinstance(native.get("best_delta_fp@0.50"), Mapping) else {}
+    simulated_best = simulated.get("best_delta_fp@0.50", {}) if isinstance(simulated.get("best_delta_fp@0.50"), Mapping) else {}
     remapped_best = remapped.get("best_delta_fp@0.50", {}) if isinstance(remapped.get("best_delta_fp@0.50"), Mapping) else {}
+    simulated_count = int(simulated.get("run_count", 0))
     remapped_count = int(remapped.get("run_count", 0))
+    simulated_clause = (
+        "simulated_native=0 runs/0 samples"
+        if simulated_count == 0
+        else (
+            f"simulated_native={simulated_count} runs/{int(simulated.get('sample_count', 0))} samples "
+            f"CFA={', '.join(str(value) for value in simulated.get('cfa_patterns', ())) or 'none'} "
+            f"mean dFP={_fmt(simulated.get('mean_delta_fp@0.50'), signed=True)} "
+            f"best={simulated_best.get('run_id', '')}@{_fmt(simulated_best.get('delta'), signed=True)}"
+        )
+    )
     remapped_clause = (
         "remapped=0 runs/0 samples"
         if remapped_count == 0
@@ -2317,6 +2330,7 @@ def _cfa_lenspsf_native_evidence(audit: Mapping[str, Any]) -> str:
         f"CFA={', '.join(str(value) for value in native.get('cfa_patterns', ())) or 'none'} "
         f"mean dFP={_fmt(native.get('mean_delta_fp@0.50'), signed=True)} "
         f"best={native_best.get('run_id', '')}@{_fmt(native_best.get('delta'), signed=True)}; "
+        f"{simulated_clause}; "
         f"{remapped_clause}; "
         f"partial={int(partial.get('run_count', 0))}"
     )

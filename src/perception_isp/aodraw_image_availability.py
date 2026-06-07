@@ -21,10 +21,11 @@ def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Audit local AODRaw image files required by a subset manifest.")
     parser.add_argument("manifest", help="AODRaw subset manifest JSON, or subset-plan summary JSON containing a manifest key.")
     parser.add_argument("--dataset-root", default="data/raw_datasets/aodraw")
+    parser.add_argument("--kind", choices=["all", "raw", "srgb"], default="all")
     parser.add_argument("--output-dir", default="reports/perception_aodraw_image_availability")
     args = parser.parse_args(argv)
 
-    summary = build_aodraw_image_availability(args.manifest, dataset_root=args.dataset_root)
+    summary = build_aodraw_image_availability(args.manifest, dataset_root=args.dataset_root, kind=str(args.kind))
     html_path = write_aodraw_image_availability(summary, args.output_dir)
     print(
         json.dumps(
@@ -46,10 +47,16 @@ def main(argv: Any = None) -> int:
     return 0
 
 
-def build_aodraw_image_availability(manifest: str | Path | Sequence[Mapping[str, Any]], *, dataset_root: str | Path) -> Dict[str, Any]:
+def build_aodraw_image_availability(
+    manifest: str | Path | Sequence[Mapping[str, Any]],
+    *,
+    dataset_root: str | Path,
+    kind: str = "all",
+) -> Dict[str, Any]:
     rows = _load_manifest(manifest)
     root = Path(dataset_root).expanduser()
-    file_checks = _file_checks(rows, root)
+    normalized_kind = _normalize_kind(kind)
+    file_checks = _file_checks(rows, root, kind=normalized_kind)
     required_files = sorted({str(row["relative_path"]) for row in file_checks})
     missing_files = [row for row in file_checks if not bool(row["exists"])]
     missing_raw = [row for row in missing_files if row["kind"] == "raw"]
@@ -63,6 +70,7 @@ def build_aodraw_image_availability(manifest: str | Path | Sequence[Mapping[str,
         "evaluation_ready": evaluation_ready,
         "dataset_root": str(root),
         "manifest_source": str(manifest) if not isinstance(manifest, Sequence) or isinstance(manifest, (str, bytes, Path)) else "in_memory",
+        "kind": normalized_kind,
         "manifest_row_count": len(rows),
         "required_file_count": len(required_files),
         "available_file_count": len(file_checks) - len(missing_files),
@@ -108,10 +116,15 @@ def _load_manifest(manifest: str | Path | Sequence[Mapping[str, Any]]) -> list[D
     return [dict(row) for row in payload if isinstance(row, Mapping)]
 
 
-def _file_checks(rows: Sequence[Mapping[str, Any]], root: Path) -> list[Dict[str, Any]]:
+def _file_checks(rows: Sequence[Mapping[str, Any]], root: Path, *, kind: str) -> list[Dict[str, Any]]:
     checks: list[Dict[str, Any]] = []
+    keys = []
+    if kind in {"all", "raw"}:
+        keys.append(("raw", "expected_raw_relative_path"))
+    if kind in {"all", "srgb"}:
+        keys.append(("srgb", "expected_srgb_relative_path"))
     for index, row in enumerate(rows):
-        for kind, key in (("raw", "expected_raw_relative_path"), ("srgb", "expected_srgb_relative_path")):
+        for item_kind, key in keys:
             relative_path = str(row.get(key, "")).strip()
             full_path = root / relative_path if relative_path else root
             exists = bool(relative_path) and full_path.is_file()
@@ -122,7 +135,7 @@ def _file_checks(rows: Sequence[Mapping[str, Any]], root: Path) -> list[Dict[str
                     "image_id": int(row.get("image_id", -1)),
                     "file_name": str(row.get("file_name", "")),
                     "selection_condition": str(row.get("selection_condition", "")),
-                    "kind": kind,
+                    "kind": item_kind,
                     "relative_path": relative_path,
                     "absolute_path": str(full_path),
                     "exists": exists,
@@ -130,6 +143,13 @@ def _file_checks(rows: Sequence[Mapping[str, Any]], root: Path) -> list[Dict[str
                 }
             )
     return checks
+
+
+def _normalize_kind(value: str) -> str:
+    normalized = str(value).strip().lower()
+    if normalized not in {"all", "raw", "srgb"}:
+        raise ValueError(f"Unsupported AODRaw availability kind: {value}")
+    return normalized
 
 
 def _checks(
@@ -217,7 +237,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <h1>AODRaw Image Availability Audit</h1>
   <div class="note">{html_lib.escape(str(summary.get('claim_boundary', '')))}</div>
   <p>Status: <code>{html_lib.escape(str(summary.get('status', '')))}</code>; evaluation_ready=<code>{html_lib.escape(str(summary.get('evaluation_ready', '')))}</code>.</p>
-  <p>Dataset root: <code>{html_lib.escape(str(summary.get('dataset_root', '')))}</code></p>
+  <p>Dataset root: <code>{html_lib.escape(str(summary.get('dataset_root', '')))}</code>; kind: <code>{html_lib.escape(str(summary.get('kind', 'all')))}</code></p>
   <p>Required files: {int(summary.get('required_file_count', 0))}; missing: {int(summary.get('missing_file_count', 0))}; missing RAW: {int(summary.get('missing_raw_count', 0))}; missing sRGB: {int(summary.get('missing_srgb_count', 0))}.</p>
   <p>{html_lib.escape(str(summary.get('next_action', '')))}</p>
   <h2>Checks</h2>

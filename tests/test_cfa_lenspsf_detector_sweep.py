@@ -4,9 +4,11 @@ import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from unittest import mock
 
 from perception_isp.cfa_lenspsf_detector_sweep import (
     SUMMARY_FILENAME,
+    _load_samples,
     build_sweep_summary,
     condition_id,
     parse_cfa_patterns,
@@ -36,6 +38,9 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
                         "true_sensor_cfa_mosaic": True,
                         "camerae2e_camera_type": "bayer-rggb",
                         "camerae2e_native_cfa_bridge_version": "native_bayer_v1",
+                        "camerae2e_used": True,
+                        "raw_derived_png_input": True,
+                        "native_raw_input": False,
                         "eval_psf_sigma": 0.8,
                     }
                 },
@@ -51,6 +56,9 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
                         "true_sensor_cfa_mosaic": True,
                         "camerae2e_camera_type": "bayer-rggb",
                         "camerae2e_native_cfa_bridge_version": "native_bayer_v1",
+                        "camerae2e_used": True,
+                        "raw_derived_png_input": True,
+                        "native_raw_input": False,
                         "eval_psf_sigma": 0.8,
                     }
                 },
@@ -65,9 +73,36 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
         self.assertEqual(summary["true_sensor_cfa_mosaic_count"], 2)
         self.assertEqual(summary["camerae2e_camera_types"], {"bayer-rggb": 2})
         self.assertEqual(summary["camerae2e_native_cfa_bridge_versions"], {"native_bayer_v1": 2})
+        self.assertEqual(summary["camerae2e_used_count"], 2)
+        self.assertEqual(summary["raw_derived_png_input_count"], 2)
+        self.assertEqual(summary["native_raw_input_count"], 0)
         self.assertEqual(summary["psf_recorded_count"], 2)
         self.assertAlmostEqual(summary["pattern_remapped_fraction"], 1.0)
         self.assertAlmostEqual(summary["true_sensor_cfa_mosaic_fraction"], 1.0)
+
+    def test_raw_condition_summary_infers_native_pascalraw_bridge(self) -> None:
+        samples = [
+            {
+                "isp_metadata": {
+                    "raw_provenance": {
+                        "bridge": "pascalraw_native_nef",
+                        "source_cfa_pattern": "RGGB",
+                        "target_cfa_pattern": "RGGB",
+                        "requested_cfa_pattern": "sensor_native",
+                        "pattern_remapped": False,
+                        "true_sensor_cfa_mosaic": True,
+                        "camerae2e_used": False,
+                        "eval_psf_sigma": 0.0,
+                    }
+                }
+            }
+        ]
+
+        summary = raw_condition_summary(samples)
+
+        self.assertEqual(summary["native_raw_input_count"], 1)
+        self.assertEqual(summary["raw_derived_png_input_count"], 0)
+        self.assertEqual(summary["camerae2e_used_count"], 0)
 
     def test_summarize_condition_run_computes_deltas_and_raw_summary(self) -> None:
         result = _comparison_result(cfa="GRBG", psf=0.8, human_fp=1.0, perception_fp=0.7)
@@ -114,12 +149,91 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
             path.write_text("{}\n")
             self.assertTrue(path.exists())
 
+    def test_load_samples_for_pascalraw_remosaic_forwards_cfa_options(self) -> None:
+        manifest = Path("reports/unit_pascalraw_manifest.json")
+        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_detection_samples", return_value=()) as loader:
+            samples = _load_samples(
+                source="pascalraw-dataset",
+                dataset="data/raw_datasets/pascalraw",
+                split="val",
+                count=5,
+                offset=2,
+                width=128,
+                height=96,
+                cfa_pattern="GRBG",
+                use_camerae2e=True,
+                progress_interval=3,
+                progress_label="load:cfa-psf:GRBG",
+                cache_dir=None,
+                pascalraw_manifest=manifest,
+                pascalraw_native_raw=False,
+            )
+
+        self.assertEqual(samples, ())
+        self.assertEqual(loader.call_args.args[0], "data/raw_datasets/pascalraw")
+        self.assertEqual(loader.call_args.args[1], manifest)
+        self.assertEqual(loader.call_args.kwargs["cfa_pattern"], "GRBG")
+        self.assertEqual(loader.call_args.kwargs["use_camerae2e"], True)
+        self.assertEqual(loader.call_args.kwargs["limit"], 5)
+        self.assertEqual(loader.call_args.kwargs["offset"], 2)
+
+    def test_load_samples_for_pascalraw_native_rejects_simulated_cfa(self) -> None:
+        with self.assertRaises(ValueError):
+            _load_samples(
+                source="pascalraw-dataset",
+                dataset="data/raw_datasets/pascalraw",
+                split="val",
+                count=5,
+                offset=2,
+                width=128,
+                height=96,
+                cfa_pattern="GRBG",
+                use_camerae2e=True,
+                progress_interval=3,
+                progress_label="load:cfa-psf:GRBG",
+                cache_dir=None,
+                pascalraw_manifest=Path("reports/unit_pascalraw_manifest.json"),
+                pascalraw_native_raw=True,
+            )
+
+    def test_load_samples_for_pascalraw_native_uses_native_loader(self) -> None:
+        manifest = Path("reports/unit_pascalraw_manifest.json")
+        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_native_detection_samples", return_value=()) as loader:
+            samples = _load_samples(
+                source="pascalraw-dataset",
+                dataset="data/raw_datasets/pascalraw",
+                split="val",
+                count=5,
+                offset=2,
+                width=128,
+                height=96,
+                cfa_pattern="RGGB",
+                use_camerae2e=True,
+                progress_interval=3,
+                progress_label="load:cfa-psf:RGGB",
+                cache_dir=None,
+                pascalraw_manifest=manifest,
+                pascalraw_native_raw=True,
+            )
+
+        self.assertEqual(samples, ())
+        self.assertEqual(loader.call_args.args[0], "data/raw_datasets/pascalraw")
+        self.assertEqual(loader.call_args.args[1], manifest)
+        self.assertEqual(loader.call_args.kwargs["limit"], 5)
+        self.assertEqual(loader.call_args.kwargs["offset"], 2)
+        self.assertEqual(loader.call_args.kwargs["width"], 128)
+        self.assertEqual(loader.call_args.kwargs["height"], 96)
+        self.assertEqual(loader.call_args.kwargs["progress_interval"], 3)
+        self.assertEqual(loader.call_args.kwargs["progress_label"], "load:cfa-psf:RGGB:native")
+
 
 def _args() -> Namespace:
     return Namespace(
         source="yolo-dataset",
         dataset="data/kitti/data.yaml",
         split="val",
+        pascalraw_manifest=None,
+        pascalraw_native_raw=False,
         count=2,
         offset=0,
         width=640,
