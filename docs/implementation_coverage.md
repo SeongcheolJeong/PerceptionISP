@@ -59,24 +59,23 @@ Known limits:
   `psf_sigma_map` into RAW calibration and records it in run config, sample
   metadata, and RAW provenance. `cfa_lenspsf_detector_sweep` uses that path to
   run fixed-detector CFA/LensPSF condition sweeps and report remap/provenance
-  checks. The current KITTI val32 sweep is diagnostic only; it is not enough to
-  claim detector robustness across lens blur or native CFA conditions.
+  checks. The current `native_bayer_v1` KITTI val32 sweep covers
+  GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6` at `640 x 192`, with 384/384 samples
+  recorded as true native CFA mosaics and no bridge remapping. It is diagnostic
+  condition evidence, not broad detector robustness.
 - `cfa_lenspsf_proposal_audit` joins the KITTI val32 CFA/LensPSF detector sweep
   to same-sample proposal edge and source-scene-edge correlations. The current
-  report removes 121 FP and 0 TP proposals across 12 conditions, with
-  source-scene-edge support directionally positive in 10/12 conditions and
-  aux-edge support positive in 3/12. This is calibrated proposal-path bridge
-  evidence, not native-CFA proof, not incremental aux-only ablation, and not a
-  trained RGB+aux DNN result.
+  native report removes 151 FP and 0 TP proposals across 12 conditions, with
+  source-scene-edge support directionally positive in 12/12 conditions and
+  aux-edge support positive in 9/12. This is calibrated proposal-path bridge
+  evidence, not incremental aux-only ablation and not a trained RGB+aux DNN
+  result.
 - `cfa_lenspsf_native_audit` separates native CameraE2E source-CFA rows from
-  rows that were remapped to a requested target CFA. The current KITTI val32
-  audit has 3 native `GRBG` rows with 96 samples and 9 fully remapped non-GRBG
-  rows with 288 samples. This is an evidence guardrail for the historical
-  report: the native rows can support native-CFA discussion, while the non-GRBG
-  rows remain bridge/remap sensitivity evidence. `camerae2e_bridge` now supports
-  explicit native Bayer CameraE2E requests for `RGGB`, `GRBG`, `BGGR`, and
-  `GBRG` through bridge version `native_bayer_v1`; claim-scale non-GRBG
-  native-CFA evidence requires rerunning the sweep with a fresh raw cache.
+  rows that were remapped to a requested target CFA. The current
+  `native_bayer_v1` KITTI val32 audit has 12 native rows with 384 samples and 0
+  remapped rows for `RGGB`, `GRBG`, `BGGR`, and `GBRG`. The older val32
+  `bayer_psf` report predates `native_bayer_v1`; its non-GRBG rows remain
+  historical bridge/remap sensitivity evidence only.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor

@@ -703,7 +703,10 @@ def _load_cfa_lenspsf_detector_sweep(spec: str | Path) -> Dict[str, Any]:
                 "delta_recall@0.50_mean": _maybe_float(primary_delta.get("recall@0.50_mean")),
                 "delta_fp@0.50_mean": _maybe_float(primary_delta.get("fp@0.50_mean")),
                 "pattern_remapped_fraction": _maybe_float(raw_summary.get("pattern_remapped_fraction")),
+                "true_sensor_cfa_mosaic_fraction": _maybe_float(raw_summary.get("true_sensor_cfa_mosaic_fraction")),
                 "psf_recorded_fraction": _maybe_float(raw_summary.get("psf_recorded_fraction")),
+                "camerae2e_camera_types": list((raw_summary.get("camerae2e_camera_types", {}) if isinstance(raw_summary.get("camerae2e_camera_types"), Mapping) else {}).keys()),
+                "camerae2e_native_cfa_bridge_versions": list((raw_summary.get("camerae2e_native_cfa_bridge_versions", {}) if isinstance(raw_summary.get("camerae2e_native_cfa_bridge_versions"), Mapping) else {}).keys()),
             }
         )
     status = str(data.get("status", ""))
@@ -1389,11 +1392,26 @@ def _cfa_lenspsf_detector_evidence(sweep: Mapping[str, Any]) -> str:
         for row in sweep.get("runs", ())
         if isinstance(row, Mapping)
     ]
+    true_cfa_values = [
+        _maybe_float_or_none(row.get("true_sensor_cfa_mosaic_fraction"))
+        for row in sweep.get("runs", ())
+        if isinstance(row, Mapping)
+    ]
     max_remap = max((value for value in remap_values if value is not None), default=None)
+    min_true_cfa = min((value for value in true_cfa_values if value is not None), default=None)
+    bridge_versions = sorted(
+        {
+            str(version)
+            for row in sweep.get("runs", ())
+            if isinstance(row, Mapping)
+            for version in row.get("camerae2e_native_cfa_bridge_versions", ())
+        }
+    )
     return (
         f"runs={int(sweep.get('run_count', 0))}/{int(sweep.get('expected_run_count', 0))}; "
         f"samples/run={int(sweep.get('count', 0))}; CFA={cfas}; LensPSF={psf}; "
-        f"{best_clause}; max_remap={_fmt(max_remap)}"
+        f"{best_clause}; max_remap={_fmt(max_remap)}; min_true_cfa={_fmt(min_true_cfa)}; "
+        f"bridge={', '.join(bridge_versions) or 'unknown'}"
     )
 
 
@@ -1419,16 +1437,24 @@ def _cfa_lenspsf_native_evidence(audit: Mapping[str, Any]) -> str:
     partial = groups.get("partial_remap", {}) if isinstance(groups.get("partial_remap"), Mapping) else {}
     native_best = native.get("best_delta_fp@0.50", {}) if isinstance(native.get("best_delta_fp@0.50"), Mapping) else {}
     remapped_best = remapped.get("best_delta_fp@0.50", {}) if isinstance(remapped.get("best_delta_fp@0.50"), Mapping) else {}
+    remapped_count = int(remapped.get("run_count", 0))
+    remapped_clause = (
+        "remapped=0 runs/0 samples"
+        if remapped_count == 0
+        else (
+            f"remapped={remapped_count} runs/{int(remapped.get('sample_count', 0))} samples "
+            f"CFA={', '.join(str(value) for value in remapped.get('cfa_patterns', ())) or 'none'} "
+            f"mean dFP={_fmt(remapped.get('mean_delta_fp@0.50'), signed=True)} "
+            f"best={remapped_best.get('run_id', '')}@{_fmt(remapped_best.get('delta'), signed=True)}"
+        )
+    )
     return (
         f"runs={int(audit.get('run_count', 0))}/{int(audit.get('expected_run_count', 0))}; "
         f"native={int(native.get('run_count', 0))} runs/{int(native.get('sample_count', 0))} samples "
         f"CFA={', '.join(str(value) for value in native.get('cfa_patterns', ())) or 'none'} "
         f"mean dFP={_fmt(native.get('mean_delta_fp@0.50'), signed=True)} "
         f"best={native_best.get('run_id', '')}@{_fmt(native_best.get('delta'), signed=True)}; "
-        f"remapped={int(remapped.get('run_count', 0))} runs/{int(remapped.get('sample_count', 0))} samples "
-        f"CFA={', '.join(str(value) for value in remapped.get('cfa_patterns', ())) or 'none'} "
-        f"mean dFP={_fmt(remapped.get('mean_delta_fp@0.50'), signed=True)} "
-        f"best={remapped_best.get('run_id', '')}@{_fmt(remapped_best.get('delta'), signed=True)}; "
+        f"{remapped_clause}; "
         f"partial={int(partial.get('run_count', 0))}"
     )
 
@@ -1779,13 +1805,19 @@ def _claim_decisions(
             groups = cfa_lenspsf_native_audit.get("groups", {}) if isinstance(cfa_lenspsf_native_audit.get("groups"), Mapping) else {}
             native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
             remapped = groups.get("remapped", {}) if isinstance(groups.get("remapped"), Mapping) else {}
+            remapped_count = int(remapped.get("run_count", 0))
+            remap_clause = (
+                "All audited rows are native CameraE2E CFA rows."
+                if remapped_count == 0
+                else "Use remapped rows only as bridge sensitivity evidence."
+            )
             decisions.append(
                 {
                     "status": "diagnostic",
                     "claim": (
                         "CFA/LensPSF native-CFA audit passed: "
-                        f"native rows {int(native.get('run_count', 0))}, remapped rows {int(remapped.get('run_count', 0))}. "
-                        "Use remapped rows only as bridge sensitivity evidence."
+                        f"native rows {int(native.get('run_count', 0))}, remapped rows {remapped_count}. "
+                        f"{remap_clause}"
                     ),
                 }
             )
@@ -2641,7 +2673,7 @@ def _cfa_lenspsf_detector_html(sweep: Mapping[str, Any], destination: Path) -> s
         "<h3>CFA/LensPSF Checks</h3>"
         f"<table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>"
         "<h3>Primary Downstream Input By Condition</h3>"
-        "<table><thead><tr><th>Run</th><th>CFA</th><th>PSF</th><th>Input</th><th>P50</th><th>R50</th><th>FP50</th><th>dP50</th><th>dR50</th><th>dFP50</th><th>Remap</th><th>PSF Rec</th></tr></thead>"
+        "<table><thead><tr><th>Run</th><th>CFA</th><th>PSF</th><th>Input</th><th>P50</th><th>R50</th><th>FP50</th><th>dP50</th><th>dR50</th><th>dFP50</th><th>Remap</th><th>True CFA</th><th>PSF Rec</th><th>Camera Type</th><th>Bridge</th></tr></thead>"
         f"<tbody>{run_rows}</tbody></table>"
     )
 
@@ -2664,7 +2696,10 @@ def _cfa_lenspsf_detector_run_row(row: Mapping[str, Any], destination: Path) -> 
         f"<td>{_fmt(row.get('delta_recall@0.50_mean'), signed=True)}</td>"
         f"<td>{_fmt(row.get('delta_fp@0.50_mean'), signed=True)}</td>"
         f"<td>{_fmt(row.get('pattern_remapped_fraction'))}</td>"
+        f"<td>{_fmt(row.get('true_sensor_cfa_mosaic_fraction'))}</td>"
         f"<td>{_fmt(row.get('psf_recorded_fraction'))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in row.get('camerae2e_camera_types', ())) or 'n/a')}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in row.get('camerae2e_native_cfa_bridge_versions', ())) or 'n/a')}</td>"
         "</tr>"
     )
 

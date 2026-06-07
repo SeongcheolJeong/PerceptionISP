@@ -71,6 +71,13 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
+            detector_run = dashboard["cfa_lenspsf_detector_sweep"]["runs"][0]
+            self.assertEqual(detector_run["true_sensor_cfa_mosaic_fraction"], 1.0)
+            self.assertEqual(detector_run["camerae2e_camera_types"], ["bayer-grbg"])
+            self.assertEqual(detector_run["camerae2e_native_cfa_bridge_versions"], ["native_bayer_v1"])
+            detector_evidence = next(row for row in dashboard["evidence_map"]["current_evidence"] if row["area"] == "CFA/LensPSF detector condition sweep")
+            self.assertIn("min_true_cfa=1.0000", detector_evidence["evidence"])
+            self.assertIn("native_bayer_v1", detector_evidence["evidence"])
             self.assertTrue(dashboard["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_native_audit"]["pass"])
             self.assertTrue(dashboard["casebook"]["pass"])
@@ -896,7 +903,13 @@ def _write_cfa_lenspsf_detector_sweep(path: Path) -> Path:
                 "cfa_pattern": "GRBG",
                 "psf_sigma": 0.0,
                 "sample_count": 16,
-                "raw_condition_summary": {"pattern_remapped_fraction": 0.0, "psf_recorded_fraction": 1.0},
+                "raw_condition_summary": {
+                    "pattern_remapped_fraction": 0.0,
+                    "true_sensor_cfa_mosaic_fraction": 1.0,
+                    "psf_recorded_fraction": 1.0,
+                    "camerae2e_camera_types": {"bayer-grbg": 16},
+                    "camerae2e_native_cfa_bridge_versions": {"native_bayer_v1": 16},
+                },
                 "metrics": {
                     "perception_calibrated_score_label_aux_fusion_rgb_aux_t001": {
                         "precision@0.50_mean": 0.65,
