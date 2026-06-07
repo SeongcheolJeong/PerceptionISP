@@ -1,6 +1,7 @@
 """Perception-oriented automotive ISP software reference."""
 
 from .camerae2e_bridge import camerae2e_or_synthetic_raw, raw_from_camerae2e, raw_from_camerae2e_rgb
+from .aodraw_loader import load_aodraw_detection_samples
 from .aux_dnn import (
     RGB_AUX_CHANNELS,
     RGB_AUX_EXTENDED_CHANNELS,
@@ -72,6 +73,7 @@ __all__ = [
     "raw_from_camerae2e",
     "raw_from_camerae2e_rgb",
     "load_kitti_detection_samples",
+    "load_aodraw_detection_samples",
     "load_yolo_detection_samples",
     "write_comparison_report",
 ]
