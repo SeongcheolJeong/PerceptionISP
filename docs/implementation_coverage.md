@@ -59,28 +59,28 @@ Known limits:
   `psf_sigma_map` into RAW calibration and records it in run config, sample
   metadata, and RAW provenance. `cfa_lenspsf_detector_sweep` uses that path to
   run fixed-detector CFA/LensPSF condition sweeps and report remap/provenance
-  checks. The current `native_bayer_v1` KITTI val64 sweep covers
-  GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6` at `640 x 192`, with 768/768 samples
+  checks. The current `native_bayer_v1` KITTI val128 sweep covers
+  GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6` at `640 x 192`, with 1536/1536 samples
   recorded as true native CFA mosaics and no bridge remapping. It is diagnostic
   condition evidence, not broad detector robustness.
-- `cfa_lenspsf_proposal_audit` joins the KITTI val64 CFA/LensPSF detector sweep
+- `cfa_lenspsf_proposal_audit` joins the KITTI val128 CFA/LensPSF detector sweep
   to same-sample proposal edge and source-scene-edge correlations. The current
-  native report removes 197 FP and 0 TP proposals across 12 conditions, with
+  native report removes 334 FP and 3 TP proposals across 12 conditions, with
   source-scene-edge support directionally positive in 12/12 conditions and
-  aux-edge support positive in 10/12. The audit now gates all-condition
+  aux-edge support positive in 12/12. The audit now gates all-condition
   source-edge consistency and majority-condition aux-edge consistency. Mean
-  source scene-edge delta/AUC is `-0.0184`/`0.5933`, and mean aux-edge
-  delta/AUC is `-0.0087`/`0.5298`. This is calibrated proposal-path bridge
+  source scene-edge delta/AUC is `-0.0188`/`0.5930`, and mean aux-edge
+  delta/AUC is `-0.0138`/`0.5470`. This is calibrated proposal-path bridge
   evidence, not incremental aux-only ablation and not a trained RGB+aux DNN
   result.
 - `cfa_lenspsf_native_audit` separates native CameraE2E source-CFA rows from
   rows that were remapped to a requested target CFA. The current
-  `native_bayer_v1` KITTI val64 audit has 12 native rows with 768 samples and 0
+  `native_bayer_v1` KITTI val128 audit has 12 native rows with 1536 samples and 0
   remapped rows for `RGGB`, `GRBG`, `BGGR`, and `GBRG`. The older val32
   `bayer_psf` report predates `native_bayer_v1`; its non-GRBG rows remain
   historical bridge/remap sensitivity evidence only.
 - `cfa_lenspsf_casebook` builds a visual condition-slice casebook over the same
-  native CFA/LensPSF detector sweep. The current KITTI val64 casebook covers
+  native CFA/LensPSF detector protocol. The current KITTI val64 casebook covers
   12/12 native CFA/LensPSF conditions, selects 26 review cases, and includes 24
   selected FP-reduction successes plus 2 selected recall-loss counterexamples.
   It is qualitative review evidence, not a metric gate or trained RGB+aux DNN

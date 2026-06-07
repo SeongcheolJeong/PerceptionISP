@@ -129,6 +129,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 "Object edge-fidelity suite passed; HumanISP, PerceptionISP, and aux edge maps are compared against object/sensor edge oracles across CFA and LensPSF, but this is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
+
             self.assertIn(
                 "Scene edge-confidence suite passed; HumanISP RGB, PerceptionISP RGB, aux edge-strength, and aux edge-confidence are compared against a high-information scene-edge proxy, but this is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
@@ -221,6 +222,37 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
+
+    def test_large_native_cfa_lenspsf_evidence_changes_next_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
+            _scale_cfa_lenspsf_detector(detector, count=128, run_count=12)
+            _scale_cfa_lenspsf_proposal(proposal, sample_count=1536, condition_count=12)
+            _scale_cfa_lenspsf_native(native, sample_count=1536, run_count=12)
+
+            dashboard = build_claim_dashboard(
+                claim_gate_specs=[],
+                cfa_lenspsf_detector_sweep=detector,
+                cfa_lenspsf_proposal_audit=proposal,
+                cfa_lenspsf_native_audit=native,
+            )
+
+            future = {row["evidence"]: row["current_gap"] for row in dashboard["evidence_map"]["future_evidence"]}
+            self.assertIn(
+                "Large native CFA/LensPSF proposal bridge exists",
+                future["Scene-edge proposal correlation across CFA/LensPSF"],
+            )
+            self.assertIn(
+                "Detector sweep exists at larger native scale",
+                future["CFA/LensPSF detector sweep"],
+            )
+            current = {row["area"]: row["next_evidence"] for row in dashboard["evidence_map"]["current_evidence"]}
+            self.assertIn("adverse-condition RAW/native scene slices", current["CFA/LensPSF detector condition sweep"])
+            self.assertIn("incremental aux ablation", current["CFA/LensPSF proposal-edge bridge"])
+            self.assertIn("Keep the native/remap guardrail", current["CFA/LensPSF native-CFA separation"])
 
     def test_dashboard_cli_outputs_compact_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1204,6 +1236,44 @@ def _write_casebook(path: Path) -> Path:
     }
     (path / "casebook_summary.json").write_text(json.dumps(payload) + "\n")
     return path
+
+
+def _scale_cfa_lenspsf_detector(path: Path, *, count: int, run_count: int) -> None:
+    summary = path / "cfa_lenspsf_detector_sweep_summary.json"
+    payload = json.loads(summary.read_text())
+    payload["count"] = count
+    payload["run_count"] = run_count
+    payload["expected_run_count"] = run_count
+    payload["checks"][0]["evidence"] = f"runs={run_count} expected={run_count}"
+    payload["checks"][1]["evidence"] = f"recorded={count * run_count} samples={count * run_count}"
+    summary.write_text(json.dumps(payload) + "\n")
+
+
+def _scale_cfa_lenspsf_proposal(path: Path, *, sample_count: int, condition_count: int) -> None:
+    summary = path / "cfa_lenspsf_proposal_audit_summary.json"
+    payload = json.loads(summary.read_text())
+    payload["condition_count"] = condition_count
+    payload["expected_condition_count"] = condition_count
+    payload["aggregate"]["condition_count"] = condition_count
+    payload["aggregate"]["sample_count"] = sample_count
+    payload["aggregate"]["scene_edge_positive_condition_count"] = condition_count
+    payload["aggregate"]["edge_positive_condition_count"] = condition_count
+    payload["checks"][0]["evidence"] = f"bridges={condition_count} expected={condition_count}"
+    payload["checks"][2]["evidence"] = f"positive_conditions={condition_count}/{condition_count}"
+    payload["checks"][3]["evidence"] = f"positive_conditions={condition_count}/{condition_count}"
+    summary.write_text(json.dumps(payload) + "\n")
+
+
+def _scale_cfa_lenspsf_native(path: Path, *, sample_count: int, run_count: int) -> None:
+    summary = path / "cfa_lenspsf_native_audit_summary.json"
+    payload = json.loads(summary.read_text())
+    payload["run_count"] = run_count
+    payload["expected_run_count"] = run_count
+    payload["groups"]["native"]["sample_count"] = sample_count
+    payload["groups"]["native"]["run_count"] = run_count
+    payload["checks"][0]["evidence"] = f"runs={run_count}"
+    payload["checks"][1]["evidence"] = f"native_runs={run_count}"
+    summary.write_text(json.dumps(payload) + "\n")
 
 
 if __name__ == "__main__":

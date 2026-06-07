@@ -30,6 +30,7 @@ CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
 CFA_LENSPSF_NATIVE_AUDIT_SUMMARY = "cfa_lenspsf_native_audit_summary.json"
 CFA_LENSPSF_CASEBOOK_SUMMARY = "cfa_lenspsf_casebook_summary.json"
 CASEBOOK_SUMMARY = "casebook_summary.json"
+LARGE_CFA_LENSPSF_SAMPLE_THRESHOLD = 1000
 
 
 def main(argv: Any = None) -> int:
@@ -1145,6 +1146,42 @@ def _task_metrics_interpretation(status: str, *, baseline_input: str, target_inp
     return "Task metrics are diagnostic evidence only."
 
 
+def _cfa_lenspsf_total_sample_count(
+    *,
+    detector_sweep: Mapping[str, Any] | None,
+    proposal_audit: Mapping[str, Any] | None,
+    native_audit: Mapping[str, Any] | None,
+) -> int:
+    counts: list[int] = []
+    if detector_sweep is not None:
+        run_count = int(detector_sweep.get("run_count", 0))
+        count_per_run = int(detector_sweep.get("count", 0))
+        if run_count and count_per_run:
+            counts.append(run_count * count_per_run)
+        run_samples = [
+            int(row.get("sample_count", 0))
+            for row in detector_sweep.get("runs", ())
+            if isinstance(row, Mapping)
+        ]
+        if run_samples:
+            counts.append(sum(run_samples))
+    if proposal_audit is not None:
+        aggregate = proposal_audit.get("aggregate", {}) if isinstance(proposal_audit.get("aggregate"), Mapping) else {}
+        counts.append(int(aggregate.get("sample_count", 0)))
+        condition_samples = [
+            int(row.get("sample_count", 0))
+            for row in proposal_audit.get("conditions", ())
+            if isinstance(row, Mapping)
+        ]
+        if condition_samples:
+            counts.append(sum(condition_samples))
+    if native_audit is not None:
+        groups = native_audit.get("groups", {}) if isinstance(native_audit.get("groups"), Mapping) else {}
+        native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
+        counts.append(int(native.get("sample_count", 0)))
+    return max(counts, default=0)
+
+
 def _build_evidence_map(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
@@ -1165,6 +1202,14 @@ def _build_evidence_map(
     casebook: Mapping[str, Any] | None,
 ) -> Dict[str, Any]:
     current: list[Dict[str, Any]] = []
+    large_cfa_lenspsf_samples = (
+        _cfa_lenspsf_total_sample_count(
+            detector_sweep=cfa_lenspsf_detector_sweep,
+            proposal_audit=cfa_lenspsf_proposal_audit,
+            native_audit=cfa_lenspsf_native_audit,
+        )
+        >= LARGE_CFA_LENSPSF_SAMPLE_THRESHOLD
+    )
     broad = _first_claim(claims, "broad_superiority")
     if broad is not None:
         current.append(
@@ -1274,6 +1319,11 @@ def _build_evidence_map(
         )
 
     if cfa_lenspsf_detector_sweep is not None:
+        detector_next = (
+            "Add adverse-condition RAW/native scene slices and task-specific gates while keeping the same fixed detector protocol."
+            if large_cfa_lenspsf_samples
+            else "Scale the sweep to more held-out samples and add same-sample proposal edge correlation per CFA/LensPSF condition."
+        )
         current.append(
             {
                 "area": "CFA/LensPSF detector condition sweep",
@@ -1281,11 +1331,16 @@ def _build_evidence_map(
                 "claim_strength": "condition_detector_diagnostic",
                 "evidence": _cfa_lenspsf_detector_evidence(cfa_lenspsf_detector_sweep),
                 "claim_boundary": "Condition-level detector evidence only; do not treat remapped CFA rows as native sensor-CFA proof.",
-                "next_evidence": "Scale the sweep to more held-out samples and add same-sample proposal edge correlation per CFA/LensPSF condition.",
+                "next_evidence": detector_next,
             }
         )
 
     if cfa_lenspsf_proposal_audit is not None:
+        proposal_next = (
+            "Add an incremental aux ablation or trained RGB+Aux detector gate, plus adverse-condition native slices."
+            if large_cfa_lenspsf_samples
+            else "Scale the same proposal bridge to larger held-out condition sweeps and separate native-CFA simulation from bridge remap sensitivity."
+        )
         current.append(
             {
                 "area": "CFA/LensPSF proposal-edge bridge",
@@ -1293,11 +1348,16 @@ def _build_evidence_map(
                 "claim_strength": "condition_proposal_bridge",
                 "evidence": _cfa_lenspsf_proposal_evidence(cfa_lenspsf_proposal_audit),
                 "claim_boundary": "Condition-level calibrated proposal evidence; not an incremental aux-only ablation, trained DNN result, or native CFA proof.",
-                "next_evidence": "Scale the same proposal bridge to larger held-out condition sweeps and separate native-CFA simulation from bridge remap sensitivity.",
+                "next_evidence": proposal_next,
             }
         )
 
     if cfa_lenspsf_native_audit is not None:
+        native_next = (
+            "Keep the native/remap guardrail active and expand to adverse scenes or real RAW-native datasets where available."
+            if large_cfa_lenspsf_samples
+            else "Rerun larger CameraE2E sweeps with native_bayer_v1 and a fresh raw cache for each target Bayer CFA, or keep historical remapped rows explicitly labeled as remap sensitivity."
+        )
         current.append(
             {
                 "area": "CFA/LensPSF native-CFA separation",
@@ -1305,7 +1365,7 @@ def _build_evidence_map(
                 "claim_strength": "claim_boundary_guardrail",
                 "evidence": _cfa_lenspsf_native_evidence(cfa_lenspsf_native_audit),
                 "claim_boundary": "Native group can support native-CFA evidence; remapped group is bridge/remap sensitivity only.",
-                "next_evidence": "Rerun larger CameraE2E sweeps with native_bayer_v1 and a fresh raw cache for each target Bayer CFA, or keep historical remapped rows explicitly labeled as remap sensitivity.",
+                "next_evidence": native_next,
             }
         )
 
@@ -1713,7 +1773,17 @@ def _future_evidence_rows(
     scene_edge_correlation = _sample_bridge_scene_edge_correlation(aux_contribution_audit)
     has_edge_correlation = isinstance(edge_correlation, Mapping) and bool(edge_correlation.get("lower_feature_predicts_positive"))
     has_scene_edge_correlation = isinstance(scene_edge_correlation, Mapping) and bool(scene_edge_correlation.get("lower_feature_predicts_positive"))
-    if cfa_lenspsf_native_audit is not None:
+    large_cfa_lenspsf_samples = (
+        _cfa_lenspsf_total_sample_count(
+            detector_sweep=cfa_lenspsf_detector_sweep,
+            proposal_audit=cfa_lenspsf_proposal_audit,
+            native_audit=cfa_lenspsf_native_audit,
+        )
+        >= LARGE_CFA_LENSPSF_SAMPLE_THRESHOLD
+    )
+    if cfa_lenspsf_native_audit is not None and cfa_lenspsf_proposal_audit is not None and large_cfa_lenspsf_samples:
+        scene_aux_gap = "Large native CFA/LensPSF proposal bridge exists; next step is adverse-condition/task-specific slices and a true aux ablation or trained detector gate."
+    elif cfa_lenspsf_native_audit is not None:
         scene_aux_gap = "Native/remap CFA separation exists; next step is larger scale native_bayer_v1 reruns with same-sample scene-edge proposal correlation."
     elif cfa_lenspsf_proposal_audit is not None:
         scene_aux_gap = "CFA/LensPSF proposal-edge bridge exists; next step is larger scale and native-CFA separation."
@@ -1725,7 +1795,9 @@ def _future_evidence_rows(
         scene_aux_gap = "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
     else:
         scene_aux_gap = "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
-    if cfa_lenspsf_native_audit is not None:
+    if cfa_lenspsf_native_audit is not None and cfa_lenspsf_detector_sweep is not None and large_cfa_lenspsf_samples:
+        cfa_gap = "Detector sweep exists at larger native scale; next step is adverse-condition RAW scenes, more diverse high-information scenes, and task-specific gates."
+    elif cfa_lenspsf_native_audit is not None:
         cfa_gap = "Detector sweep exists and native/remap rows are separated; rerun at larger sample scale with native_bayer_v1 and fresh raw caches for all target Bayer patterns."
     elif cfa_lenspsf_detector_sweep is not None:
         cfa_gap = "Detector sweep exists; expand sample scale and connect each condition to same-sample proposal edge correlation."
