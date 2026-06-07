@@ -12,7 +12,9 @@ from PIL import Image
 
 from perception_isp.eval_cli import (
     apply_psf_sigma_to_samples,
+    filter_sample_labels,
     main as eval_cli_main,
+    parse_label_keep,
     parse_label_map,
     raw_height_width,
     remap_sample_labels,
@@ -29,6 +31,17 @@ class EvalCliHelpersTest(unittest.TestCase):
         self.assertEqual(mapping["cyclist"], "bicycle")
         self.assertEqual(mapping["Person_sitting"], "person")
 
+    def test_parse_aodraw_coco_label_map_preset(self) -> None:
+        mapping = parse_label_map("aodraw-coco")
+        self.assertEqual(mapping["traffic_light"], "traffic light")
+        self.assertEqual(mapping["fire_hydrant"], "fire hydrant")
+
+    def test_parse_label_keep_presets(self) -> None:
+        labels = parse_label_keep("aodraw-coco-overlap")
+        self.assertIn("person", labels)
+        self.assertIn("traffic light", labels)
+        self.assertIn("car", labels)
+
     def test_parse_custom_label_map(self) -> None:
         self.assertEqual(parse_label_map("pedestrian=person,van=car"), {"pedestrian": "person", "van": "car"})
 
@@ -44,6 +57,29 @@ class EvalCliHelpersTest(unittest.TestCase):
         self.assertEqual(remapped[0].ground_truth[0].label, "person")
         self.assertEqual(remapped[0].ground_truth[1].label, "car")
         self.assertEqual(remapped[0].metadata["ground_truth_label_remapped_count"], 1)
+
+    def test_filter_sample_labels_drops_empty_samples_by_default(self) -> None:
+        raw = RawFrame(data=np.zeros((2, 2), dtype=float), metadata=SensorMetadata(cfa_pattern="RGGB"))
+        samples = (
+            EvaluationSample(
+                sample_id="keep",
+                raw=raw,
+                ground_truth=(BoundingBox((0, 0, 1, 1), label="person"), BoundingBox((1, 1, 2, 2), label="helmet")),
+            ),
+            EvaluationSample(
+                sample_id="drop",
+                raw=raw,
+                ground_truth=(BoundingBox((0, 0, 1, 1), label="surveillance_camera"),),
+            ),
+        )
+
+        filtered = filter_sample_labels(samples, ("person", "car"))
+
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0].sample_id, "keep")
+        self.assertEqual(len(filtered[0].ground_truth), 1)
+        self.assertEqual(filtered[0].ground_truth[0].label, "person")
+        self.assertEqual(filtered[0].metadata["ground_truth_label_filtered_count"], 1)
 
     def test_apply_psf_sigma_to_samples_updates_raw_calibration_and_metadata(self) -> None:
         raw = RawFrame(
@@ -106,6 +142,10 @@ class EvalCliHelpersTest(unittest.TestCase):
                         "8",
                         "--rgb-detector",
                         "numpy",
+                        "--ground-truth-label-map",
+                        "aodraw-coco",
+                        "--ground-truth-label-keep",
+                        "aodraw-coco-overlap",
                         "--no-visuals",
                         "--output-dir",
                         str(output_dir),
@@ -118,6 +158,7 @@ class EvalCliHelpersTest(unittest.TestCase):
             self.assertEqual(printed["run_config"]["source"], "aodraw-dataset")
             self.assertFalse(printed["run_config"]["use_camerae2e"])
             self.assertEqual(printed["run_config"]["aodraw_cfa"], "RGGB")
+            self.assertIn("person", printed["run_config"]["ground_truth_label_keep"])
 
 
 def _write_aodraw_cli_sample(root: Path) -> None:

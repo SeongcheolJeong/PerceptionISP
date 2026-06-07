@@ -72,6 +72,11 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--load-progress-interval", type=int, default=0, help="Print dataset loading progress every N samples; 0 disables progress logging.")
     parser.add_argument("--raw-cache-dir", default=None, help="Optional directory for cached dataset RAW samples.")
     parser.add_argument("--ground-truth-label-map", default=None, help="Comma-separated src=dst labels, or preset 'kitti-coco'.")
+    parser.add_argument(
+        "--ground-truth-label-keep",
+        default=None,
+        help="Comma-separated labels to keep after mapping, or preset 'coco80'/'aodraw-coco-overlap'. Empty samples are dropped.",
+    )
     args = parser.parse_args(argv)
     if args.proposal_calibration_model and bool(args.no_fusion):
         raise ValueError("--proposal-calibration-model requires fusion; remove --no-fusion")
@@ -182,6 +187,11 @@ def main(argv: Any = None) -> int:
     label_map = parse_label_map(args.ground_truth_label_map)
     if label_map:
         samples = remap_sample_labels(samples, label_map)
+    label_keep = parse_label_keep(args.ground_truth_label_keep)
+    if label_keep:
+        samples = filter_sample_labels(samples, label_keep)
+        if not samples:
+            raise ValueError("--ground-truth-label-keep removed every sample; choose a broader label set")
     samples = apply_psf_sigma_to_samples(samples, args.psf_sigma)
 
     config = PerceptionISPConfig(
@@ -244,6 +254,7 @@ def main(argv: Any = None) -> int:
         "load_progress_interval": int(args.load_progress_interval),
         "raw_cache_dir": args.raw_cache_dir,
         "ground_truth_label_map": label_map,
+        "ground_truth_label_keep": list(label_keep),
         "tone_mapping": args.tone_mapping,
         "denoise_strength": float(args.denoise_strength),
         "demosaic_method": str(args.demosaic_method),
@@ -272,6 +283,24 @@ def parse_label_map(value: str | None) -> dict[str, str]:
             "cyclist": "bicycle",
             "tram": "train",
         }
+    if normalized.lower().replace("_", "-") in {"aodraw-coco", "aodraw-to-coco"}:
+        return {
+            "traffic_light": "traffic light",
+            "fire_hydrant": "fire hydrant",
+            "stop_sign": "stop sign",
+            "parking_meter": "parking meter",
+            "cell_phone": "cell phone",
+            "dining_table": "dining table",
+            "potted_plant": "potted plant",
+            "teddy_bear": "teddy bear",
+            "hair_drier": "hair drier",
+            "sports_ball": "sports ball",
+            "baseball_bat": "baseball bat",
+            "baseball_glove": "baseball glove",
+            "tennis_racket": "tennis racket",
+            "wine_glass": "wine glass",
+            "hot_dog": "hot dog",
+        }
     mapping: dict[str, str] = {}
     for token in normalized.split(","):
         token = token.strip()
@@ -284,6 +313,26 @@ def parse_label_map(value: str | None) -> dict[str, str]:
             raise ValueError("label map entries must have non-empty src and dst labels")
         mapping[source] = target
     return mapping
+
+
+def parse_label_keep(value: str | None) -> tuple[str, ...]:
+    if value is None or not str(value).strip():
+        return ()
+    normalized = str(value).strip()
+    preset = normalized.lower().replace("_", "-")
+    if preset in {"coco80", "coco-80", "aodraw-coco-overlap", "aodraw-to-coco-overlap"}:
+        from .yolo_dataset import COCO80_CLASS_NAMES
+
+        return tuple(str(label) for label in COCO80_CLASS_NAMES)
+    labels = []
+    seen = set()
+    for token in normalized.split(","):
+        label = token.strip()
+        if not label or label in seen:
+            continue
+        labels.append(label)
+        seen.add(label)
+    return tuple(labels)
 
 
 def human_config_from_args(args: Any) -> PerceptionISPConfig | None:
@@ -332,6 +381,28 @@ def remap_sample_labels(samples: Sequence[EvaluationSample], label_map: Mapping[
         metadata["ground_truth_label_remapped_count"] = int(changed)
         remapped.append(replace(sample, ground_truth=tuple(boxes), metadata=metadata))
     return tuple(remapped)
+
+
+def filter_sample_labels(
+    samples: Sequence[EvaluationSample],
+    keep_labels: Sequence[str],
+    *,
+    keep_empty: bool = False,
+) -> tuple[EvaluationSample, ...]:
+    keep = {str(label) for label in keep_labels}
+    if not keep:
+        return tuple(samples)
+    filtered = []
+    for sample in samples:
+        boxes = tuple(box for box in sample.ground_truth if box.label in keep)
+        removed = len(sample.ground_truth) - len(boxes)
+        if not boxes and not keep_empty:
+            continue
+        metadata = dict(sample.metadata)
+        metadata["ground_truth_label_keep"] = sorted(keep)
+        metadata["ground_truth_label_filtered_count"] = int(removed)
+        filtered.append(replace(sample, ground_truth=boxes, metadata=metadata))
+    return tuple(filtered)
 
 
 def apply_psf_sigma_to_samples(
