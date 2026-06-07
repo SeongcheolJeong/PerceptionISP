@@ -16,6 +16,7 @@ from .types import json_ready
 SUMMARY_FILENAME = "aodraw_download_plan_summary.json"
 CHECKLIST_FILENAME = "aodraw_manual_download_checklist.md"
 TARGETS_FILENAME = "aodraw_download_targets.txt"
+CLEANUP_CONFIRM_TOKEN = "DELETE_AODRAW_CLEANUP_CANDIDATES"
 
 
 AODRAW_OFFICIAL_URLS = {
@@ -138,6 +139,7 @@ def build_aodraw_download_plan(
         "cleanup": cleanup,
         "cleanup_candidates": cleanup_candidates,
         "download_steps": steps,
+        "acquisition_commands": _acquisition_commands(cleanup),
         "required_subset_files": sorted(set(raw_files + srgb_files)),
         "missing_files": missing_files,
         "downsampled_raw_archives": dict(AODRAW_DOWNSAMPLED_RAW_ARCHIVES),
@@ -421,6 +423,47 @@ def _post_download_commands() -> list[str]:
     ]
 
 
+def _acquisition_commands(cleanup: Mapping[str, Any]) -> list[Dict[str, str]]:
+    candidate = str(cleanup.get("first_sufficient_candidate", "")).strip()
+    commands = []
+    if candidate:
+        commands.append(
+            {
+                "step": "free_space",
+                "status": "requires_explicit_approval",
+                "command": (
+                    "PYTHONPATH=src python3 -m perception_isp.aodraw_storage_cleanup "
+                    f"--candidate {json.dumps(candidate)} "
+                    f"--execute --confirm-token {CLEANUP_CONFIRM_TOKEN} "
+                    "--output-dir reports/perception_aodraw_storage_cleanup_execute_v1"
+                ),
+                "why": "Run only after accepting deletion of the selected cleanup candidate.",
+            }
+        )
+    commands.extend(
+        [
+            {
+                "step": "open_raw_download",
+                "status": "run_after_disk_headroom_passes",
+                "command": f"open -a Safari {json.dumps(AODRAW_OFFICIAL_URLS['downsampled_raw_baidu'])}",
+                "why": "Opens the official AODRaw downsampled RAW Baidu link in the logged-in Safari session.",
+            },
+            {
+                "step": "watch_and_evaluate",
+                "status": "run_after_download_lands",
+                "command": (
+                    "PYTHONPATH=src python3 -m perception_isp.aodraw_download_watch "
+                    "--kind raw --download-root ~/Downloads "
+                    "--dataset-root data/raw_datasets/aodraw "
+                    "--output-dir reports/perception_aodraw_download_watch_raw_latest"
+                ),
+                "why": "Imports completed RAW files, checks availability, and prints the RAW-only pipeline command when ready.",
+            },
+        ]
+    )
+    return commands
+
+
 def _ready_for_raw_download(checks: Sequence[Mapping[str, Any]]) -> bool:
     statuses = {str(row.get("id", "")): str(row.get("status", "")) for row in checks}
     required = (
@@ -465,6 +508,11 @@ def _render_checklist(summary: Mapping[str, Any]) -> str:
                 f"- `{row.get('path')}`: {row.get('size_gib')} GiB, risk={row.get('risk')}, "
                 f"{row.get('why')} Verification: {row.get('verification', '')}"
             )
+    lines.extend(["", "## Acquisition Commands"])
+    for row in summary.get("acquisition_commands", ()):
+        if isinstance(row, Mapping):
+            lines.append(f"- `{row.get('step')}` status=`{row.get('status')}`: {row.get('why')}")
+            lines.append(f"```bash\n{row.get('command')}\n```")
     lines.extend(["", "## Subset Files"])
     for path in summary.get("required_subset_files", ()):
         lines.append(f"- `{path}`")
@@ -478,6 +526,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     steps = "".join(_step_row(row) for row in summary.get("download_steps", ()) if isinstance(row, Mapping))
     checks = "".join(_check_row(row) for row in summary.get("checks", ()) if isinstance(row, Mapping))
     cleanup_rows = "".join(_cleanup_row(row) for row in summary.get("cleanup_candidates", ()) if isinstance(row, Mapping))
+    acquisition_rows = "".join(_command_row(row) for row in summary.get("acquisition_commands", ()) if isinstance(row, Mapping))
     commands = "".join(f"<pre>{html_lib.escape(str(command))}</pre>" for command in summary.get("post_download_commands", ()))
     urls = "".join(
         f"<li><code>{html_lib.escape(str(key))}</code>: <a href=\"{html_lib.escape(str(url))}\">{html_lib.escape(str(url))}</a></li>"
@@ -515,6 +564,8 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <h2>Storage Cleanup Candidates</h2>
   <div class="note">{html_lib.escape(str(summary.get('cleanup', {}).get('note', '')))}</div>
   <table><thead><tr><th>Path</th><th>Size GiB</th><th>Risk</th><th>Why</th><th>Verification</th><th>Manual Action</th></tr></thead><tbody>{cleanup_rows}</tbody></table>
+  <h2>Acquisition Commands</h2>
+  <table><thead><tr><th>Step</th><th>Status</th><th>Command</th><th>Why</th></tr></thead><tbody>{acquisition_rows}</tbody></table>
   <h2>Checks</h2>
   <table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{checks}</tbody></table>
   <h2>Post-download Commands</h2>
@@ -559,6 +610,18 @@ def _cleanup_row(row: Mapping[str, Any]) -> str:
         f"<td>{html_lib.escape(str(row.get('why', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('verification', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('manual_action', '')))}</td>"
+        "</tr>"
+    )
+
+
+def _command_row(row: Mapping[str, Any]) -> str:
+    status = html_lib.escape(str(row.get("status", "")))
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('step', '')))}</code></td>"
+        f"<td class=\"{status}\">{status}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('command', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('why', '')))}</td>"
         "</tr>"
     )
 

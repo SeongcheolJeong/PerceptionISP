@@ -62,6 +62,12 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertIn("aodraw_pipeline", summary["post_download_commands"][0])
             self.assertIn("raw_only", summary["post_download_commands"][0])
             self.assertNotIn("eval_cli", summary["post_download_commands"][0])
+            acquisition_commands = {row["step"]: row["command"] for row in summary["acquisition_commands"]}
+            self.assertNotIn("free_space", acquisition_commands)
+            self.assertIn("open -a Safari", acquisition_commands["open_raw_download"])
+            self.assertIn("pan.baidu.com", acquisition_commands["open_raw_download"])
+            self.assertIn("aodraw_download_watch", acquisition_commands["watch_and_evaluate"])
+            self.assertIn("--kind raw", acquisition_commands["watch_and_evaluate"])
 
     def test_build_plan_blocks_when_raw_zip_has_no_headroom(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -83,6 +89,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertEqual(checks["sufficient_disk_for_test_raw_zip_with_headroom"], "fail")
             self.assertGreater(summary["cleanup"]["additional_free_gib_needed"], 0.0)
             self.assertEqual(summary["cleanup"]["first_sufficient_candidate"], "data/raw_datasets/pascalraw_full_archive")
+            acquisition_commands = {row["step"]: row["command"] for row in summary["acquisition_commands"]}
+            self.assertIn("DELETE_AODRAW_CLEANUP_CANDIDATES", acquisition_commands["free_space"])
 
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

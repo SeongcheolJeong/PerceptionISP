@@ -9,12 +9,12 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
 
-from .aodraw_download_plan import _cleanup_candidates, _cleanup_summary, _disk_summary
+from .aodraw_download_plan import CLEANUP_CONFIRM_TOKEN, _cleanup_candidates, _cleanup_summary, _disk_summary
 from .types import json_ready
 
 
 SUMMARY_FILENAME = "aodraw_storage_cleanup_summary.json"
-CONFIRM_TOKEN = "DELETE_AODRAW_CLEANUP_CANDIDATES"
+CONFIRM_TOKEN = CLEANUP_CONFIRM_TOKEN
 
 
 def main(argv: Any = None) -> int:
