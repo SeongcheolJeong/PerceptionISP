@@ -26,6 +26,7 @@ SUMMARY_FILENAME = "scene_edge_aux_sweep_summary.json"
 
 DEFAULT_CANDIDATES = (
     "edge_confidence",
+    "edge_evidence",
     "edge_strength",
     "mean_norm_conf_strength",
     "sqrt_norm_conf_strength",
@@ -154,7 +155,8 @@ def _run_case(
     human_strength = _edge_strength(_luma(human_rgb))
     confidence = np.asarray(result.maps["edge_confidence"], dtype=np.float64)
     strength = np.asarray(result.maps["edge_strength"], dtype=np.float64)
-    signals = _candidate_signals(confidence=confidence, strength=strength)
+    edge_evidence = np.asarray(result.maps.get("edge_evidence", np.zeros_like(confidence)), dtype=np.float64)
+    signals = _candidate_signals(confidence=confidence, strength=strength, edge_evidence=edge_evidence)
     candidates = []
     for name in candidate_names:
         signal = np.asarray(signals[name], dtype=np.float64)
@@ -195,13 +197,15 @@ def _run_case(
     }
 
 
-def _candidate_signals(*, confidence: np.ndarray, strength: np.ndarray) -> Dict[str, np.ndarray]:
+def _candidate_signals(*, confidence: np.ndarray, strength: np.ndarray, edge_evidence: np.ndarray | None = None) -> Dict[str, np.ndarray]:
     c = np.clip(np.asarray(confidence, dtype=np.float64), 0.0, 1.0)
     s = np.clip(np.asarray(strength, dtype=np.float64), 0.0, 1.0)
     cn = _robust_norm(c)
     sn = _robust_norm(s)
+    evidence = np.sqrt(np.clip(cn * sn, 0.0, 1.0)) if edge_evidence is None else np.clip(np.asarray(edge_evidence, dtype=np.float64), 0.0, 1.0)
     return {
         "edge_confidence": c,
+        "edge_evidence": evidence,
         "edge_strength": s,
         "mean_norm_conf_strength": 0.5 * cn + 0.5 * sn,
         "sqrt_norm_conf_strength": np.sqrt(np.clip(cn * sn, 0.0, 1.0)),

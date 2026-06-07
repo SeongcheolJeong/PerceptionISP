@@ -106,6 +106,7 @@ class PerceptionISPPipeline:
             "hdr_confidence": np.asarray(hdr_payload["hdr_confidence"], dtype=np.float64),
             "edge_strength": np.asarray(edge_payload["edge_strength"], dtype=np.float64),
             "edge_confidence": np.asarray(edge_payload["edge_confidence"], dtype=np.float64),
+            "edge_evidence": np.asarray(edge_payload["edge_evidence"], dtype=np.float64),
             "demosaic_confidence": np.asarray(edge_payload["demosaic_confidence"], dtype=np.float64),
             "hdr_exposure_source": np.asarray(hdr_payload["exposure_source"], dtype=np.float64),
             "lens_gain": np.asarray(normalized_payload["lens_gain"], dtype=np.float64),
@@ -124,6 +125,7 @@ class PerceptionISPPipeline:
             "luma": np.asarray(cfa_payload["luma"], dtype=np.float64),
             "edge_strength": np.asarray(edge_payload["edge_strength"], dtype=np.float64),
             "edge_confidence": np.asarray(edge_payload["edge_confidence"], dtype=np.float64),
+            "edge_evidence": np.asarray(edge_payload["edge_evidence"], dtype=np.float64),
             "temporal_difference": np.asarray(temporal_payload["temporal_difference"], dtype=np.float64),
             "saturation": np.asarray(hdr_payload["saturation"], dtype=np.float64),
             "noise_variance": np.asarray(noise_payload["noise_variance"], dtype=np.float64),
@@ -415,6 +417,7 @@ class PerceptionISPPipeline:
         structure_edge_confidence = (lambda1 - lambda2) / (lambda1 + lambda2 + EPS)
         saturation_gate = 1.0 - np.asarray(hdr_payload["saturation"], dtype=np.float64)
         edge_confidence = np.clip(structure_edge_confidence * mtf * psf_blur_confidence * saturation_gate * confidence_base, 0.0, 1.0)
+        edge_evidence = _combined_edge_evidence(edge_confidence, edge_strength)
         orientation = 0.5 * np.arctan2(2.0 * jxy, jxx - jyy + EPS)
 
         luma_edge = np.sqrt(gradients[0][0] * gradients[0][0] + gradients[0][1] * gradients[0][1])
@@ -435,6 +438,7 @@ class PerceptionISPPipeline:
         return {
             "edge_strength": edge_strength,
             "edge_confidence": edge_confidence,
+            "edge_evidence": edge_evidence,
             "edge_orientation": orientation,
             "luma_edge": np.clip(luma_norm, 0.0, 1.0),
             "chroma_edge": np.clip(chroma_norm, 0.0, 1.0),
@@ -857,6 +861,7 @@ class PerceptionISPPipeline:
             "edge_strength": np.asarray(edge_payload["edge_strength"], dtype=np.float64),
             "edge_orientation": np.asarray(edge_payload["edge_orientation"], dtype=np.float64),
             "edge_confidence": np.asarray(edge_payload["edge_confidence"], dtype=np.float64),
+            "edge_evidence": np.asarray(edge_payload["edge_evidence"], dtype=np.float64),
             "edge_type": np.asarray(edge_payload["edge_type"], dtype=np.float64),
             "demosaic_confidence": np.asarray(edge_payload["demosaic_confidence"], dtype=np.float64),
             "blur_focus_confidence": np.asarray(edge_payload["blur_focus_confidence"], dtype=np.float64),
@@ -1165,6 +1170,21 @@ def _blur_focus_confidence(edge_strength: ArrayF, edge_confidence: ArrayF, edge_
         return np.zeros_like(edge_strength)
     local = edge_strength / threshold
     return np.clip(0.5 * local + 0.5 * edge_confidence, 0.0, 1.0)
+
+
+def _combined_edge_evidence(edge_confidence: ArrayF, edge_strength: ArrayF) -> ArrayF:
+    confidence = _robust_unit_map(edge_confidence)
+    strength = _robust_unit_map(edge_strength)
+    return np.sqrt(np.clip(confidence * strength, 0.0, 1.0))
+
+
+def _robust_unit_map(values: ArrayF) -> ArrayF:
+    arr = np.asarray(values, dtype=np.float64)
+    low = float(np.percentile(arr, 1.0))
+    high = float(np.percentile(arr, 99.0))
+    if not np.isfinite(low) or not np.isfinite(high) or high <= low:
+        return np.clip(arr, 0.0, 1.0)
+    return np.clip((arr - low) / (high - low), 0.0, 1.0)
 
 
 def _psf_blur_confidence(psf_sigma: ArrayF) -> ArrayF:

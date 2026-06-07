@@ -27,6 +27,7 @@ RGB_AUX_EXTENDED_CHANNELS = RGB_AUX_CHANNELS + (
     "aux_lens_gain",
     "aux_color_confidence",
     "aux_blur_focus_confidence",
+    "aux_edge_evidence",
     "aux_psf_blur_confidence",
     "aux_psf_edge_likelihood",
 )
@@ -133,6 +134,9 @@ def _dnn_channel(name: str, *, rgb: np.ndarray, aux: np.ndarray, aux_maps: Mappi
         return _map_or_fallback(aux_maps, "color_confidence", np.ones(shape, dtype=np.float64), shape)
     if normalized == "aux_blur_focus_confidence":
         return _map_or_fallback(aux_maps, "blur_focus_confidence", np.ones(shape, dtype=np.float64), shape)
+    if normalized == "aux_edge_evidence":
+        fallback_edge = _map_or_fallback(aux_maps, "edge_confidence", aux[:, :, 0], shape)
+        return _map_or_fallback(aux_maps, "edge_evidence", fallback_edge, shape)
     if normalized == "aux_psf_blur_confidence":
         return _map_or_fallback(aux_maps, "psf_blur_confidence", np.ones(shape, dtype=np.float64), shape)
     if normalized == "aux_psf_edge_likelihood":
@@ -405,8 +409,8 @@ def make_aux_dense_detector_model(
         def forward(self, value: Any) -> Any:
             import torch
 
-            rgb = value[:, : self.rgb_channels, :, :]
-            aux = value[:, self.rgb_channels :, :, :]
+            rgb = value[:, : self.rgb_channels, :, :].contiguous()
+            aux = value[:, self.rgb_channels :, :, :].contiguous()
             if int(aux.shape[1]) <= 0:
                 aux = aux.new_zeros((int(aux.shape[0]), self.aux_channels, int(aux.shape[2]), int(aux.shape[3])))
             return self.head(self.fusion(torch.cat((self.rgb_features(rgb), self.aux_features(aux)), dim=1)))

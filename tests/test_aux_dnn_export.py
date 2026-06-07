@@ -42,14 +42,18 @@ class AuxDNNExportTest(unittest.TestCase):
         self.assertEqual(extended.shape, (48, 64, len(RGB_AUX_EXTENDED_CHANNELS)))
         self.assertEqual(tuple(RGB_AUX_CHANNELS[:3]), ("rgb_r", "rgb_g", "rgb_b"))
         self.assertIn("aux_demosaic_confidence", RGB_AUX_EXTENDED_CHANNELS)
+        self.assertIn("aux_edge_evidence", RGB_AUX_EXTENDED_CHANNELS)
         self.assertIn("aux_psf_edge_likelihood", RGB_AUX_EXTENDED_CHANNELS)
         self.assertIn("clipping_distance", images.aux_maps)
+        self.assertIn("edge_evidence", images.aux_maps)
         self.assertIn("psf_edge_likelihood", images.aux_maps)
         self.assertTrue(np.isfinite(hwc).all())
         self.assertTrue(np.isfinite(extended).all())
         self.assertGreater(float(np.mean(hwc[:, :, 3])), 0.0)
         psf_index = RGB_AUX_EXTENDED_CHANNELS.index("aux_psf_edge_likelihood")
         self.assertTrue(np.allclose(extended[:, :, psf_index], images.aux_maps["psf_edge_likelihood"]))
+        evidence_index = RGB_AUX_EXTENDED_CHANNELS.index("aux_edge_evidence")
+        self.assertTrue(np.allclose(extended[:, :, evidence_index], images.aux_maps["edge_evidence"]))
 
     def test_channel_masks_zero_expected_groups(self) -> None:
         tensor = np.ones((6, 2, 3), dtype=np.float32)

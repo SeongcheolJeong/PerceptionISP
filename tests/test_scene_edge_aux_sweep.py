@@ -34,6 +34,7 @@ class SceneEdgeAuxSweepTest(unittest.TestCase):
         self.assertIn(summary["status"], {"pass", "warning"})
         self.assertEqual(summary["case_count"], 1)
         self.assertIn("edge_confidence", summary["aggregate"])
+        self.assertIn("edge_evidence", summary["aggregate"])
         self.assertIn("sqrt_norm_conf_strength", summary["aggregate"])
         self.assertIn(summary["best_candidate"]["name"], summary["aggregate"])
         self.assertTrue(all(row["status"] in {"pass", "fail"} for row in summary["checks"]))
