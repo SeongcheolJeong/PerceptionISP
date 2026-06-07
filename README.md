@@ -898,6 +898,30 @@ ranks highest for the glare score. Treat this as CFA-dependent signal
 feasibility evidence, not as a detector result or a product sensor
 recommendation.
 
+To validate the difficult-edge confidence use case directly, run the synthetic
+edge-confidence suite:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.edge_confidence_suite \
+  --width 160 \
+  --height 96 \
+  --cfa RGGB \
+  --output-dir reports/perception_edge_confidence_suite_synthetic
+```
+
+The current edge-confidence report is:
+
+```text
+reports/perception_edge_confidence_suite_synthetic/index.html
+```
+
+It checks that low light, glare saturation, and low-MTF blur lower the
+PerceptionISP edge/confidence evidence in the expected direction. Current
+synthetic deltas are directional: low light lowers mean edge confidence by
+`-0.1531`, glare lowers mean edge confidence by `-0.1381`, and low MTF lowers
+strong-edge confidence by `-0.4119`. This is front-end confidence evidence for
+hard edge cases, not detector-performance evidence.
+
 Make that task-level decision reproducible with the task gate:
 
 ```bash

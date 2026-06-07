@@ -45,13 +45,17 @@ include these rows under a fixed detector and training recipe:
 10. CFA-dependent stress sweeps should be kept separate from detector claims:
     they can justify which sensor-native signals are worth studying, but they
     do not establish downstream task performance by themselves.
+11. Difficult-edge confidence tests should verify that edge confidence,
+    demosaic confidence, focus confidence, and visibility degrade under
+    low light, glare saturation, and low-MTF blur before those signals are
+    treated as useful detector inputs.
 
 The current project now covers rows 1-4 at the software-reference level on
 KITTI-derived evidence, exercises row 8 through auxiliary-map tensor export,
 training, and direct dense evaluation, covers row 9 with a synthetic front-end
-mechanism report, and covers row 10 with a synthetic CFA stress sweep. It does
-not yet cover claim-quality RAW-domain pretraining or large adverse-condition
-RAW datasets.
+mechanism report, covers row 10 with a synthetic CFA stress sweep, and covers
+row 11 with a synthetic edge-confidence suite. It does not yet cover
+claim-quality RAW-domain pretraining or large adverse-condition RAW datasets.
 
 ## Dataset Direction
 

@@ -305,6 +305,29 @@ check. It still does not prove detector performance, and it should not be used
 as a product sensor recommendation without real sensor data and downstream
 task metrics.
 
+### Edge Confidence Suite
+
+The current difficult-edge confidence report is:
+
+```text
+reports/perception_edge_confidence_suite_synthetic/index.html
+```
+
+It uses the PerceptionISP front end on paired synthetic stress cases and checks
+whether edge confidence, demosaic confidence, focus confidence, and visibility
+move in the expected direction under conditions where perception should be less
+trusting of edges:
+
+| Check | Key current deltas | Result |
+| --- | --- | --- |
+| Low light | mean edge confidence `-0.1531`, strong-edge confidence `-0.1394`, visibility `-0.2392` | pass |
+| Glare saturation | mean edge confidence `-0.1381`, demosaic confidence `-0.1200`, over-exposure fraction `+0.3288` | pass |
+| Low MTF | mean edge confidence `-0.3251`, strong-edge confidence `-0.4119`, focus confidence `-0.1482` | pass |
+
+This is useful feasibility evidence for the claim that PerceptionISP can expose
+edge reliability to a downstream model. It is not a substitute for showing that
+a detector actually improves after consuming those maps.
+
 ### KITTI Train-Subset to Val Calibration
 
 To separate calibration fitting from the validation report more strictly, a
