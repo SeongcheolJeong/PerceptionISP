@@ -1013,6 +1013,7 @@ PYTHONPATH=src \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-casebook reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-aux-ablation reports/perception_cfa_lenspsf_aux_ablation_kitti_val128_native_bayer_v1 \
   --casebook reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
@@ -1043,6 +1044,12 @@ front-end/aux feasibility support; broad HumanISP superiority remains blocked.
 The dashboard also includes the native-CFA audit as a guardrail: the current
 native_bayer_v1 val128 bundle has 12 native rows, 1536 samples, remap fraction
 `0.0`, and true-CFA fraction `1.0` for `RGGB`, `GRBG`, `BGGR`, and `GBRG`.
+It also includes the matched score-label versus score-label-aux CFA/LensPSF
+ablation. That ablation is intentionally conservative: aux recovers a little
+recall in 12/12 native CFA/LensPSF conditions, but it does not reduce FP beyond
+score/label calibration in those conditions (`auxFPWins=0/12`, mean
+`dR50=+0.0034`, mean `dFP50=+0.0540`). Use this as a recall/FP operating-point
+finding, not as an incremental aux FP-superiority claim.
 Treat it as condition-level CFA/LensPSF evidence only; broad HumanISP
 superiority and task-level recall improvement remain blocked by the held-out
 gates.
@@ -1413,6 +1420,7 @@ PYTHONPATH=src \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-casebook reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-aux-ablation reports/perception_cfa_lenspsf_aux_ablation_kitti_val128_native_bayer_v1 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
@@ -1481,6 +1489,7 @@ reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1/index
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_aux_ablation_kitti_val128_native_bayer_v1/index.html
 reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
@@ -1515,7 +1524,13 @@ native-CFA audit has 12 native rows, 1536 samples, and 0 remapped rows. The
 native CFA/LensPSF casebook selects 26 review cases with 24 FP-reduction
 successes and 2 recall-loss counterexamples; the 1496-image HumanISP-relative
 casebook selects 32 review images and keeps both wins and counterexamples
-visible. It lists five next evidence targets: adverse-condition/task-specific
+visible. The matched CFA/LensPSF score-label versus score-label-aux ablation
+shows the current aux path is a recall/FP tradeoff at this operating point:
+aux recall wins 12/12 conditions, aux FP wins 0/12, mean `dR50=+0.0034`, and
+mean `dFP50=+0.0540`. This does not invalidate the narrow FP-reducer claim, but
+it blocks a stronger "aux independently reduces FP beyond score/label
+calibration" claim until thresholds or RGB+Aux training are improved. It lists
+five next evidence targets: adverse-condition/task-specific
 CFA/LensPSF proposal slices, adverse/native RAW dataset expansion, RGB+Aux DNN
 fine-tune gate, high-information real-scene expansion, and richer
 TP-loss/adverse-condition visual review. The previous aux-edge, source

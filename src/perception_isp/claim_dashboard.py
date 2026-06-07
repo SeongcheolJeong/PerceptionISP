@@ -29,6 +29,7 @@ CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
 CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
 CFA_LENSPSF_NATIVE_AUDIT_SUMMARY = "cfa_lenspsf_native_audit_summary.json"
 CFA_LENSPSF_CASEBOOK_SUMMARY = "cfa_lenspsf_casebook_summary.json"
+CFA_LENSPSF_AUX_ABLATION_SUMMARY = "cfa_lenspsf_aux_ablation_summary.json"
 CASEBOOK_SUMMARY = "casebook_summary.json"
 LARGE_CFA_LENSPSF_SAMPLE_THRESHOLD = 1000
 
@@ -51,6 +52,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir.")
     parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir.")
     parser.add_argument("--cfa-lenspsf-casebook", default=None, help="CFA/LensPSF visual casebook summary path/dir.")
+    parser.add_argument("--cfa-lenspsf-aux-ablation", default=None, help="CFA/LensPSF score-label vs score-label-aux ablation summary path/dir.")
     parser.add_argument("--casebook", default=None, help="Success/failure casebook summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
@@ -73,6 +75,7 @@ def main(argv: Any = None) -> int:
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
         cfa_lenspsf_casebook=args.cfa_lenspsf_casebook,
+        cfa_lenspsf_aux_ablation=args.cfa_lenspsf_aux_ablation,
         casebook=args.casebook,
         comparison_rollup_specs=args.comparison_rollup,
     )
@@ -111,6 +114,7 @@ def build_claim_dashboard(
     cfa_lenspsf_proposal_audit: str | Path | None = None,
     cfa_lenspsf_native_audit: str | Path | None = None,
     cfa_lenspsf_casebook: str | Path | None = None,
+    cfa_lenspsf_aux_ablation: str | Path | None = None,
     casebook: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
@@ -146,6 +150,11 @@ def build_claim_dashboard(
         if cfa_lenspsf_casebook is not None
         else None
     )
+    cfa_lenspsf_aux_ablation_data = (
+        _load_cfa_lenspsf_aux_ablation(cfa_lenspsf_aux_ablation)
+        if cfa_lenspsf_aux_ablation is not None
+        else None
+    )
     casebook_data = _load_casebook(casebook) if casebook is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
     decisions = _claim_decisions(
@@ -165,6 +174,7 @@ def build_claim_dashboard(
         cfa_lenspsf_proposal,
         cfa_lenspsf_native,
         cfa_lenspsf_casebook_data,
+        cfa_lenspsf_aux_ablation_data,
         casebook_data,
     )
     evidence_map = _build_evidence_map(
@@ -184,6 +194,7 @@ def build_claim_dashboard(
         cfa_lenspsf_proposal,
         cfa_lenspsf_native,
         cfa_lenspsf_casebook_data,
+        cfa_lenspsf_aux_ablation_data,
         casebook_data,
     )
     return {
@@ -203,6 +214,7 @@ def build_claim_dashboard(
         "cfa_lenspsf_proposal_audit": cfa_lenspsf_proposal,
         "cfa_lenspsf_native_audit": cfa_lenspsf_native,
         "cfa_lenspsf_casebook": cfa_lenspsf_casebook_data,
+        "cfa_lenspsf_aux_ablation": cfa_lenspsf_aux_ablation_data,
         "casebook": casebook_data,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
@@ -945,6 +957,68 @@ def _load_cfa_lenspsf_casebook(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_cfa_lenspsf_aux_ablation(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, CFA_LENSPSF_AUX_ABLATION_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "no_aux_input": str(data.get("no_aux_input", "")),
+        "aux_input": str(data.get("aux_input", "")),
+        "aggregate": {
+            "condition_count": int(aggregate.get("condition_count", 0)),
+            "sample_count": int(aggregate.get("sample_count", 0)),
+            "aux_precision_win_count": int(aggregate.get("aux_precision_win_count", 0)),
+            "aux_recall_win_count": int(aggregate.get("aux_recall_win_count", 0)),
+            "aux_recall_loss_count": int(aggregate.get("aux_recall_loss_count", 0)),
+            "aux_small_recall_win_count": int(aggregate.get("aux_small_recall_win_count", 0)),
+            "aux_fp_win_count": int(aggregate.get("aux_fp_win_count", 0)),
+            "mean_aux_minus_no_aux_precision@0.50": _maybe_float(aggregate.get("mean_aux_minus_no_aux_precision@0.50")),
+            "mean_aux_minus_no_aux_recall@0.50": _maybe_float(aggregate.get("mean_aux_minus_no_aux_recall@0.50")),
+            "mean_aux_minus_no_aux_small_recall@0.50": _maybe_float(aggregate.get("mean_aux_minus_no_aux_small_recall@0.50")),
+            "mean_aux_minus_no_aux_fp@0.50": _maybe_float(aggregate.get("mean_aux_minus_no_aux_fp@0.50")),
+        },
+        "cfa_groups": _load_aux_ablation_groups(data.get("cfa_groups", ())),
+        "psf_groups": _load_aux_ablation_groups(data.get("psf_groups", ())),
+        "checks": checks,
+        "failed_checks": failed,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_aux_ablation_groups(groups: Any) -> list[Dict[str, Any]]:
+    output: list[Dict[str, Any]] = []
+    for row in groups if isinstance(groups, Sequence) and not isinstance(groups, (str, bytes)) else ():
+        if not isinstance(row, Mapping):
+            continue
+        output.append(
+            {
+                "group": row.get("group"),
+                "condition_count": int(row.get("condition_count", 0)),
+                "sample_count": int(row.get("sample_count", 0)),
+                "aux_precision_win_count": int(row.get("aux_precision_win_count", 0)),
+                "aux_recall_win_count": int(row.get("aux_recall_win_count", 0)),
+                "aux_fp_win_count": int(row.get("aux_fp_win_count", 0)),
+                "mean_aux_minus_no_aux_precision@0.50": _maybe_float(row.get("mean_aux_minus_no_aux_precision@0.50")),
+                "mean_aux_minus_no_aux_recall@0.50": _maybe_float(row.get("mean_aux_minus_no_aux_recall@0.50")),
+                "mean_aux_minus_no_aux_small_recall@0.50": _maybe_float(row.get("mean_aux_minus_no_aux_small_recall@0.50")),
+                "mean_aux_minus_no_aux_fp@0.50": _maybe_float(row.get("mean_aux_minus_no_aux_fp@0.50")),
+            }
+        )
+    return output
+
+
 def _load_casebook(spec: str | Path) -> Dict[str, Any]:
     label, path = _split_named_path(spec)
     summary_path = _summary_path(path, CASEBOOK_SUMMARY)
@@ -1199,6 +1273,7 @@ def _build_evidence_map(
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
     cfa_lenspsf_casebook: Mapping[str, Any] | None,
+    cfa_lenspsf_aux_ablation: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
 ) -> Dict[str, Any]:
     current: list[Dict[str, Any]] = []
@@ -1381,6 +1456,26 @@ def _build_evidence_map(
             }
         )
 
+    if cfa_lenspsf_aux_ablation is not None:
+        aggregate = cfa_lenspsf_aux_ablation.get("aggregate", {}) if isinstance(cfa_lenspsf_aux_ablation.get("aggregate"), Mapping) else {}
+        aux_fp_wins = int(aggregate.get("aux_fp_win_count", 0))
+        condition_count = int(cfa_lenspsf_aux_ablation.get("condition_count", 0))
+        current.append(
+            {
+                "area": "CFA/LensPSF score-label aux ablation",
+                "status": "diagnostic" if bool(cfa_lenspsf_aux_ablation.get("pass")) else "not_supported",
+                "claim_strength": str(cfa_lenspsf_aux_ablation.get("claim_status", "")),
+                "evidence": _cfa_lenspsf_aux_ablation_evidence(cfa_lenspsf_aux_ablation),
+                "claim_boundary": (
+                    "Incremental calibration ablation only. "
+                    "Do not claim aux improves FP beyond score/label calibration unless aux FP wins on a clear condition majority."
+                    if aux_fp_wins <= condition_count / 2.0
+                    else "Incremental calibration ablation; still not a trained RGB+Aux DNN detector result."
+                ),
+                "next_evidence": "Retune the aux operating point or train RGB+Aux detector input so recall gains do not come with FP regression.",
+            }
+        )
+
     if scene_edge_confidence is not None:
         current.append(
             {
@@ -1454,6 +1549,7 @@ def _build_evidence_map(
             cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
             cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
             cfa_lenspsf_casebook=cfa_lenspsf_casebook,
+            cfa_lenspsf_aux_ablation=cfa_lenspsf_aux_ablation,
             casebook=casebook,
             training=training,
         ),
@@ -1650,6 +1746,20 @@ def _cfa_lenspsf_casebook_evidence(casebook: Mapping[str, Any]) -> str:
     )
 
 
+def _cfa_lenspsf_aux_ablation_evidence(ablation: Mapping[str, Any]) -> str:
+    aggregate = ablation.get("aggregate", {}) if isinstance(ablation.get("aggregate"), Mapping) else {}
+    return (
+        f"conditions={int(ablation.get('condition_count', 0))}/{int(ablation.get('expected_condition_count', 0))}; "
+        f"samples={int(aggregate.get('sample_count', 0))}; "
+        f"claim={ablation.get('claim_status', '')}; "
+        f"auxRecallWins={int(aggregate.get('aux_recall_win_count', 0))}; "
+        f"auxFPWins={int(aggregate.get('aux_fp_win_count', 0))}; "
+        f"mean dP={_fmt(aggregate.get('mean_aux_minus_no_aux_precision@0.50'), signed=True)}; "
+        f"mean dR={_fmt(aggregate.get('mean_aux_minus_no_aux_recall@0.50'), signed=True)}; "
+        f"mean dFP={_fmt(aggregate.get('mean_aux_minus_no_aux_fp@0.50'), signed=True)}"
+    )
+
+
 def _casebook_evidence(casebook: Mapping[str, Any]) -> str:
     categories = casebook.get("categories", {}) if isinstance(casebook.get("categories"), Mapping) else {}
     parts = [
@@ -1766,6 +1876,7 @@ def _future_evidence_rows(
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
     cfa_lenspsf_casebook: Mapping[str, Any] | None,
+    cfa_lenspsf_aux_ablation: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
@@ -1781,8 +1892,17 @@ def _future_evidence_rows(
         )
         >= LARGE_CFA_LENSPSF_SAMPLE_THRESHOLD
     )
+    aux_claim_status = str(cfa_lenspsf_aux_ablation.get("claim_status", "")) if cfa_lenspsf_aux_ablation is not None else ""
+    if aux_claim_status == "aux_recall_fp_tradeoff":
+        aux_gate_gap = "Incremental aux ablation exists but shows a recall/FP tradeoff; retune thresholds or train RGB+Aux before claiming aux FP superiority."
+    elif aux_claim_status == "aux_incremental_fp_supported":
+        aux_gate_gap = "Incremental aux ablation supports FP improvement; next step is trained RGB+Aux detector confirmation."
+    elif cfa_lenspsf_aux_ablation is not None:
+        aux_gate_gap = "Incremental aux ablation exists, but its claim status is inconclusive."
+    else:
+        aux_gate_gap = "No native CFA/LensPSF incremental aux ablation exists yet."
     if cfa_lenspsf_native_audit is not None and cfa_lenspsf_proposal_audit is not None and large_cfa_lenspsf_samples:
-        scene_aux_gap = "Large native CFA/LensPSF proposal bridge exists; next step is adverse-condition/task-specific slices and a true aux ablation or trained detector gate."
+        scene_aux_gap = "Large native CFA/LensPSF proposal bridge exists. " + aux_gate_gap
     elif cfa_lenspsf_native_audit is not None:
         scene_aux_gap = "Native/remap CFA separation exists; next step is larger scale native_bayer_v1 reruns with same-sample scene-edge proposal correlation."
     elif cfa_lenspsf_proposal_audit is not None:
@@ -1831,7 +1951,7 @@ def _future_evidence_rows(
             "priority": "P1",
             "evidence": "RGB+Aux DNN fine-tune gate",
             "why": "Needed before claiming the aux tensor improves a learned detector rather than only proposal calibration.",
-            "current_gap": f"Current DNN training status is {training_status}.",
+            "current_gap": f"Current DNN training status is {training_status}. {aux_gate_gap}",
             "implementation_path": "Fine-tune matched RGB-only and RGB+Aux models on the same split, then evaluate a held-out claim gate.",
         },
         {
@@ -1905,6 +2025,7 @@ def _claim_decisions(
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
     cfa_lenspsf_casebook: Mapping[str, Any] | None,
+    cfa_lenspsf_aux_ablation: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
@@ -2051,6 +2172,39 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in cfa_lenspsf_casebook.get("failed_checks", ())) or "configured CFA/LensPSF casebook checks"
             decisions.append({"status": "not_supported", "claim": f"CFA/LensPSF visual casebook failed for {failed}; do not use it as condition review evidence yet."})
+    if cfa_lenspsf_aux_ablation is not None:
+        aggregate = cfa_lenspsf_aux_ablation.get("aggregate", {}) if isinstance(cfa_lenspsf_aux_ablation.get("aggregate"), Mapping) else {}
+        condition_count = int(cfa_lenspsf_aux_ablation.get("condition_count", 0))
+        if bool(cfa_lenspsf_aux_ablation.get("pass")):
+            if str(cfa_lenspsf_aux_ablation.get("claim_status", "")) == "aux_incremental_fp_supported":
+                decisions.append(
+                    {
+                        "status": "diagnostic",
+                        "claim": (
+                            "CFA/LensPSF aux ablation supports incremental aux FP reduction over score-label calibration: "
+                            f"aux FP wins {int(aggregate.get('aux_fp_win_count', 0))}/{condition_count}, "
+                            f"aux recall wins {int(aggregate.get('aux_recall_win_count', 0))}/{condition_count}, "
+                            f"mean dFP {_fmt(aggregate.get('mean_aux_minus_no_aux_fp@0.50'), signed=True)}."
+                        ),
+                    }
+                )
+            else:
+                decisions.append(
+                    {
+                        "status": "diagnostic",
+                        "claim": (
+                            "CFA/LensPSF aux ablation shows a recall/FP tradeoff rather than incremental aux FP superiority: "
+                            f"aux recall wins {int(aggregate.get('aux_recall_win_count', 0))}/{condition_count}, "
+                            f"aux FP wins {int(aggregate.get('aux_fp_win_count', 0))}/{condition_count}, "
+                            f"mean dR {_fmt(aggregate.get('mean_aux_minus_no_aux_recall@0.50'), signed=True)}, "
+                            f"mean dFP {_fmt(aggregate.get('mean_aux_minus_no_aux_fp@0.50'), signed=True)}. "
+                            "Do not claim aux improves FP beyond score/label calibration from this sweep."
+                        ),
+                    }
+                )
+        else:
+            failed = ", ".join(str(value) for value in cfa_lenspsf_aux_ablation.get("failed_checks", ())) or "configured CFA/LensPSF aux ablation checks"
+            decisions.append({"status": "not_supported", "claim": f"CFA/LensPSF aux ablation failed for {failed}; do not use it as incremental aux evidence yet."})
     if aux_contribution_audit is not None:
         if bool(aux_contribution_audit.get("pass")):
             decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
@@ -2366,6 +2520,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(cfa_lenspsf_casebook, Mapping)
         else "<p>No CFA/LensPSF visual casebook summary was provided.</p>"
     )
+    cfa_lenspsf_aux_ablation = dashboard.get("cfa_lenspsf_aux_ablation")
+    cfa_lenspsf_aux_ablation_html = (
+        _cfa_lenspsf_aux_ablation_html(cfa_lenspsf_aux_ablation, destination)
+        if isinstance(cfa_lenspsf_aux_ablation, Mapping)
+        else "<p>No CFA/LensPSF score-label aux ablation summary was provided.</p>"
+    )
     scene_edge = dashboard.get("scene_edge_confidence")
     scene_edge_html = _scene_edge_html(scene_edge, destination) if isinstance(scene_edge, Mapping) else "<p>No scene edge-confidence summary was provided.</p>"
     scene_information = dashboard.get("scene_information_stress")
@@ -2439,6 +2599,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {cfa_lenspsf_native_html}
   <h2>CFA/LensPSF Visual Casebook</h2>
   {cfa_lenspsf_casebook_html}
+  <h2>CFA/LensPSF Score-Label Aux Ablation</h2>
+  {cfa_lenspsf_aux_ablation_html}
   <h2>Scene Edge Confidence</h2>
   {scene_edge_html}
   <h2>Scene Information Stress</h2>
@@ -3171,6 +3333,64 @@ def _cfa_lenspsf_casebook_showcase_row(row: Mapping[str, Any], destination: Path
         f"<td>{sample}</td>"
         f"<td>{int(row.get('tp_delta@0.50', 0))}</td>"
         f"<td>{int(row.get('fp_delta@0.50', 0))}</td>"
+        "</tr>"
+    )
+
+
+def _cfa_lenspsf_aux_ablation_html(ablation: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(ablation.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in ablation.get("failed_checks", ())) or "none"
+    aggregate = ablation.get("aggregate", {}) if isinstance(ablation.get("aggregate"), Mapping) else {}
+    check_rows = "".join(
+        f"<tr><td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('status', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td></tr>"
+        for row in ablation.get("checks", ())
+        if isinstance(row, Mapping)
+    )
+    if not check_rows:
+        check_rows = '<tr><td colspan="3">No aux ablation checks were available.</td></tr>'
+    cfa_rows = "".join(_cfa_lenspsf_aux_ablation_group_row(row) for row in ablation.get("cfa_groups", ()))
+    if not cfa_rows:
+        cfa_rows = '<tr><td colspan="7">No CFA group rows were available.</td></tr>'
+    psf_rows = "".join(_cfa_lenspsf_aux_ablation_group_row(row) for row in ablation.get("psf_groups", ()))
+    if not psf_rows:
+        psf_rows = '<tr><td colspan="7">No PSF group rows were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(ablation.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(ablation.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(ablation.get('interpretation', '')))} "
+        f"{html_lib.escape(str(ablation.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Conditions</th><th>Samples</th><th>Aux Recall Wins</th><th>Aux FP Wins</th><th>Mean dR50</th><th>Mean dFP50</th><th>Failed</th></tr></thead><tbody>"
+        f"<tr><td>{_report_link(ablation, destination)}</td>"
+        f"<td>{int(ablation.get('condition_count', 0))}/{int(ablation.get('expected_condition_count', 0))}</td>"
+        f"<td>{int(aggregate.get('sample_count', 0))}</td>"
+        f"<td>{int(aggregate.get('aux_recall_win_count', 0))}</td>"
+        f"<td>{int(aggregate.get('aux_fp_win_count', 0))}</td>"
+        f"<td>{_task_delta_cell(aggregate.get('mean_aux_minus_no_aux_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(aggregate.get('mean_aux_minus_no_aux_fp@0.50'), lower_is_better=True)}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<h3>Aux Ablation Checks</h3>"
+        f"<table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>"
+        "<h3>Aux Ablation By CFA</h3>"
+        "<table><thead><tr><th>Group</th><th>Conditions</th><th>dP50</th><th>dR50</th><th>dSmallR50</th><th>dFP50</th><th>Aux FP Wins</th></tr></thead>"
+        f"<tbody>{cfa_rows}</tbody></table>"
+        "<h3>Aux Ablation By LensPSF</h3>"
+        "<table><thead><tr><th>Group</th><th>Conditions</th><th>dP50</th><th>dR50</th><th>dSmallR50</th><th>dFP50</th><th>Aux FP Wins</th></tr></thead>"
+        f"<tbody>{psf_rows}</tbody></table>"
+    )
+
+
+def _cfa_lenspsf_aux_ablation_group_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('group', '')))}</code></td>"
+        f"<td>{int(row.get('condition_count', 0))}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_aux_minus_no_aux_precision@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_aux_minus_no_aux_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_aux_minus_no_aux_small_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('mean_aux_minus_no_aux_fp@0.50'), lower_is_better=True)}</td>"
+        f"<td>{int(row.get('aux_fp_win_count', 0))}</td>"
         "</tr>"
     )
 

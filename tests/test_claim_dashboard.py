@@ -31,6 +31,7 @@ class ClaimDashboardTest(unittest.TestCase):
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
             cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
+            cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             casebook = _write_casebook(root / "casebook")
             comparison = _write_comparison_rollup(root / "rollup")
 
@@ -50,6 +51,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
                 cfa_lenspsf_casebook=cfa_lenspsf_casebook,
+                cfa_lenspsf_aux_ablation=cfa_lenspsf_aux_ablation,
                 casebook=casebook,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
@@ -84,6 +86,10 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["cfa_lenspsf_native_audit"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_casebook"]["pass"])
             self.assertEqual(dashboard["cfa_lenspsf_casebook"]["selected_counterexample_count"], 2)
+            self.assertTrue(dashboard["cfa_lenspsf_aux_ablation"]["pass"])
+            self.assertEqual(dashboard["cfa_lenspsf_aux_ablation"]["claim_status"], "aux_recall_fp_tradeoff")
+            self.assertEqual(dashboard["cfa_lenspsf_aux_ablation"]["aggregate"]["aux_recall_win_count"], 2)
+            self.assertEqual(dashboard["cfa_lenspsf_aux_ablation"]["aggregate"]["aux_fp_win_count"], 0)
             self.assertTrue(dashboard["casebook"]["pass"])
             self.assertEqual(
                 dashboard["evidence_map"]["claim_posture"]["recommended_claim"],
@@ -98,6 +104,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA/LensPSF proposal-edge bridge", evidence_areas)
             self.assertIn("CFA/LensPSF native-CFA separation", evidence_areas)
             self.assertIn("CFA/LensPSF visual casebook", evidence_areas)
+            self.assertIn("CFA/LensPSF score-label aux ablation", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -159,6 +166,10 @@ class ClaimDashboardTest(unittest.TestCase):
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
+                "CFA/LensPSF aux ablation shows a recall/FP tradeoff rather than incremental aux FP superiority: aux recall wins 2/2, aux FP wins 0/2, mean dR +0.0030, mean dFP +0.0500. Do not claim aux improves FP beyond score/label calibration from this sweep.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
                 "Visual success/failure casebook is available for qualitative review: selected FP-reduction successes 2, selected counterexamples 3.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
@@ -213,6 +224,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA/LensPSF Proposal Edge Bridge", html)
             self.assertIn("CFA/LensPSF Native-CFA Separation", html)
             self.assertIn("CFA/LensPSF Visual Casebook", html)
+            self.assertIn("CFA/LensPSF Score-Label Aux Ablation", html)
+            self.assertIn("Aux Ablation By CFA", html)
             self.assertIn("Proposal Edge Bridge By Condition", html)
             self.assertIn("CFA/LensPSF Casebook Category Totals", html)
             self.assertIn("Evidence Report", html)
@@ -272,6 +285,7 @@ class ClaimDashboardTest(unittest.TestCase):
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
             cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
+            cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             casebook = _write_casebook(root / "casebook")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -307,6 +321,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(cfa_lenspsf_native),
                         "--cfa-lenspsf-casebook",
                         str(cfa_lenspsf_casebook),
+                        "--cfa-lenspsf-aux-ablation",
+                        str(cfa_lenspsf_aux_ablation),
                         "--casebook",
                         str(casebook),
                         "--output-dir",
@@ -331,6 +347,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_native_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_casebook"]["pass"])
+            self.assertTrue(summary["cfa_lenspsf_aux_ablation"]["pass"])
+            self.assertEqual(summary["cfa_lenspsf_aux_ablation"]["claim_status"], "aux_recall_fp_tradeoff")
             self.assertTrue(summary["casebook"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
@@ -1202,6 +1220,93 @@ def _write_cfa_lenspsf_casebook(path: Path) -> Path:
         "claim_boundary": "unit cfa lenspsf casebook boundary",
     }
     (path / "cfa_lenspsf_casebook_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_aux_ablation(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "claim_status": "aux_recall_fp_tradeoff",
+        "condition_count": 2,
+        "expected_condition_count": 2,
+        "no_aux_input": "perception_calibrated_score_label_fusion_rgb_aux",
+        "aux_input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+        "aggregate": {
+            "condition_count": 2,
+            "sample_count": 32,
+            "aux_precision_win_count": 1,
+            "aux_recall_win_count": 2,
+            "aux_recall_loss_count": 0,
+            "aux_small_recall_win_count": 0,
+            "aux_fp_win_count": 0,
+            "mean_aux_minus_no_aux_precision@0.50": -0.002,
+            "mean_aux_minus_no_aux_recall@0.50": 0.003,
+            "mean_aux_minus_no_aux_small_recall@0.50": 0.0,
+            "mean_aux_minus_no_aux_fp@0.50": 0.05,
+        },
+        "cfa_groups": [
+            {
+                "group": "GRBG",
+                "condition_count": 1,
+                "sample_count": 16,
+                "aux_precision_win_count": 0,
+                "aux_recall_win_count": 1,
+                "aux_fp_win_count": 0,
+                "mean_aux_minus_no_aux_precision@0.50": -0.004,
+                "mean_aux_minus_no_aux_recall@0.50": 0.002,
+                "mean_aux_minus_no_aux_small_recall@0.50": 0.0,
+                "mean_aux_minus_no_aux_fp@0.50": 0.04,
+            },
+            {
+                "group": "RGGB",
+                "condition_count": 1,
+                "sample_count": 16,
+                "aux_precision_win_count": 1,
+                "aux_recall_win_count": 1,
+                "aux_fp_win_count": 0,
+                "mean_aux_minus_no_aux_precision@0.50": 0.002,
+                "mean_aux_minus_no_aux_recall@0.50": 0.004,
+                "mean_aux_minus_no_aux_small_recall@0.50": 0.0,
+                "mean_aux_minus_no_aux_fp@0.50": 0.06,
+            },
+        ],
+        "psf_groups": [
+            {
+                "group": 0.0,
+                "condition_count": 1,
+                "sample_count": 16,
+                "aux_precision_win_count": 0,
+                "aux_recall_win_count": 1,
+                "aux_fp_win_count": 0,
+                "mean_aux_minus_no_aux_precision@0.50": -0.004,
+                "mean_aux_minus_no_aux_recall@0.50": 0.002,
+                "mean_aux_minus_no_aux_small_recall@0.50": 0.0,
+                "mean_aux_minus_no_aux_fp@0.50": 0.04,
+            },
+            {
+                "group": 1.6,
+                "condition_count": 1,
+                "sample_count": 16,
+                "aux_precision_win_count": 1,
+                "aux_recall_win_count": 1,
+                "aux_fp_win_count": 0,
+                "mean_aux_minus_no_aux_precision@0.50": 0.002,
+                "mean_aux_minus_no_aux_recall@0.50": 0.004,
+                "mean_aux_minus_no_aux_small_recall@0.50": 0.0,
+                "mean_aux_minus_no_aux_fp@0.50": 0.06,
+            },
+        ],
+        "checks": [
+            {"id": "matched_conditions_available", "status": "pass", "evidence": "matched=2 expected=2"},
+            {"id": "aux_recall_tradeoff_measured", "status": "pass", "evidence": "aux_recall_wins=2/2"},
+            {"id": "aux_fp_incremental_gain_majority", "status": "warning", "evidence": "aux_fp_wins=0/2"},
+        ],
+        "interpretation": "unit aux ablation",
+        "claim_boundary": "unit aux ablation boundary",
+    }
+    (path / "cfa_lenspsf_aux_ablation_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

@@ -85,6 +85,13 @@ Known limits:
   selected FP-reduction successes plus 2 selected recall-loss counterexamples.
   It is qualitative review evidence, not a metric gate or trained RGB+aux DNN
   proof.
+- `cfa_lenspsf_aux_ablation` compares matched score-label-only and
+  score-label-aux calibrated sweeps over the same native CFA/LensPSF condition
+  grid. The current KITTI val128 native ablation covers 12 conditions and 1536
+  samples. Aux recall wins 12/12 conditions, but aux FP wins 0/12 conditions
+  (`mean dR50=+0.0034`, `mean dFP50=+0.0540`), so the current result is a
+  recall/FP operating-point tradeoff rather than an incremental aux
+  FP-superiority proof.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor
