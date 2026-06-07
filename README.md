@@ -1213,6 +1213,7 @@ PYTHONPATH=src \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --object-boundary-edge reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1 \
+  --object-boundary-detection-bridge reports/perception_object_boundary_detection_bridge_kitti_val128_score_label_aux_t001_vs_human_v1 \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
@@ -1509,6 +1510,35 @@ KITTI provides boxes, not segmentation contours; this report is a diagnostic
 object-box boundary proxy, not true object edge accuracy and not detector
 performance proof.
 
+To bridge those object-boundary edge signals to downstream detector behavior,
+join the same KITTI object rows with a HumanISP-vs-PerceptionISP comparison
+report:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.object_boundary_detection_bridge \
+  --object-boundary-edge reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1 \
+  --comparison-report reports/perception_calibrated_fusion_kitti_train512_score_label_aux_t001_to_val1496 \
+  --baseline-input human_rgb \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
+  --output-dir reports/perception_object_boundary_detection_bridge_kitti_val128_score_label_aux_t001_vs_human_v1
+```
+
+The current bridge report is:
+
+```text
+reports/perception_object_boundary_detection_bridge_kitti_val128_score_label_aux_t001_vs_human_v1/index.html
+```
+
+It matches 614 KITTI GT objects to detections at IoU `0.50`. HumanISP baseline
+recall proxy is `0.4739`; the calibrated PerceptionISP target recall proxy is
+`0.4707`, so this report must not be used as a recall-superiority claim. Its
+value is diagnostic: objects detected by the target have stronger boundary edge
+evidence than missed objects, with aux edge-confidence target-detected AUC
+`0.6587` and HumanISP RGB edge AUC `0.7760`. Target-only objects are `3` and
+baseline-only objects are `5`. This is TP/miss explanation evidence, not a
+false-positive detector-box boundary audit, trained RGB+aux DNN proof, or broad
+detector superiority result.
+
 To compare edge evidence on a higher-information real scene, run the scene-edge
 confidence suite:
 
@@ -1682,6 +1712,7 @@ PYTHONPATH=src \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --object-boundary-edge reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1 \
+  --object-boundary-detection-bridge reports/perception_object_boundary_detection_bridge_kitti_val128_score_label_aux_t001_vs_human_v1 \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
@@ -1710,9 +1741,9 @@ path, and native CFA/LensPSF detector/native-audit evidence with no bridge
 remapping. Missing rows are blockers for broad HumanISP or RAW/sensor-native
 superiority claims. Recommended diagnostic rows, such as the CFA stress sweep,
 edge-confidence suite, object edge-fidelity suite, scene edge-confidence suite,
-scene-information stress suite, aux contribution audit, and CFA/LensPSF
-proposal bridge/visual casebook, help interpret sensor-native signals but do not
-create a detector-performance claim.
+scene-information stress suite, aux contribution audit, KITTI object-boundary
+detection bridge, and CFA/LensPSF proposal bridge/visual casebook, help
+interpret sensor-native signals but do not create a detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -1758,6 +1789,7 @@ reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_object_boundary_edge_kitti_val128_evalsplit_detector_log_v1/index.html
+reports/perception_object_boundary_detection_bridge_kitti_val128_score_label_aux_t001_vs_human_v1/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1/index.html
@@ -1789,11 +1821,16 @@ that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 The same dashboard's `Performance Evidence Map` now includes diagnostic
 CFA/LensPSF detector condition sweep, native-CFA separation, proposal-edge bridge,
-object-box-boundary edge proxy, and visual casebook rows, plus the 1496-image
-visual success/failure casebook row. The object-box proxy uses 128 KITTI `val`
-eval-split samples and 614 boxes; aux edge-confidence is slightly above HumanISP
-on mean proxy F1 (`+0.0014`) with a `0.5554` win rate, but this is not a
-segmentation-contour or detector metric. The native_bayer_v1 proposal
+object-box-boundary edge proxy, object-boundary detection bridge, and visual
+casebook rows, plus the 1496-image visual success/failure casebook row. The
+object-box proxy uses 128 KITTI `val` eval-split samples and 614 boxes; aux
+edge-confidence is slightly above HumanISP on mean proxy F1 (`+0.0014`) with a
+`0.5554` win rate, but this is not a segmentation-contour or detector metric.
+The object-boundary detection bridge joins those 614 objects to detector TP/miss
+status: target recall proxy is slightly lower than HumanISP (`0.4707` vs
+`0.4739`, delta `-0.0033`), while aux edge-confidence still separates
+target-detected from missed objects with AUC `0.6587`. Use it as explanation
+evidence, not as detector-superiority proof. The native_bayer_v1 proposal
 bridge removes 334 FP and 3 TP proposals across the val128 condition sweep;
 source scene-edge evidence is directionally positive in 12/12 conditions, while
 aux-edge evidence is positive in 12/12. Mean source scene-edge delta/AUC is

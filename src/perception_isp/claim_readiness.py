@@ -45,6 +45,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir used as diagnostic difficult-edge evidence.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir used as diagnostic CFA/LensPSF edge evidence.")
     parser.add_argument("--object-boundary-edge", default=None, help="Object-box-boundary edge summary path/dir used as diagnostic KITTI box-boundary evidence.")
+    parser.add_argument("--object-boundary-detection-bridge", default=None, help="Object-box-boundary edge to detector TP/miss bridge summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir used as high-information scene edge evidence. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
@@ -80,6 +81,7 @@ def main(argv: Any = None) -> int:
         edge_confidence_suite=args.edge_confidence_suite,
         edge_fidelity_suite=args.edge_fidelity_suite,
         object_boundary_edge=args.object_boundary_edge,
+        object_boundary_detection_bridge=args.object_boundary_detection_bridge,
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
@@ -119,6 +121,7 @@ def run_claim_readiness(
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
     object_boundary_edge: str | Path | None = None,
+    object_boundary_detection_bridge: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
@@ -264,6 +267,7 @@ def run_claim_readiness(
         edge_confidence_suite=edge_confidence_suite,
         edge_fidelity_suite=edge_fidelity_suite,
         object_boundary_edge=object_boundary_edge,
+        object_boundary_detection_bridge=object_boundary_detection_bridge,
         scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
@@ -347,6 +351,7 @@ def run_claim_readiness(
         "edge_confidence_suite": _edge_confidence_suite_summary(edge_confidence_suite),
         "edge_fidelity_suite": _edge_fidelity_suite_summary(edge_fidelity_suite),
         "object_boundary_edge": _object_boundary_edge_summary(object_boundary_edge),
+        "object_boundary_detection_bridge": _object_boundary_detection_bridge_summary(object_boundary_detection_bridge),
         "scene_edge_confidence": _scene_edge_confidence_summary(scene_edge_confidence),
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
@@ -528,6 +533,39 @@ def _object_boundary_edge_summary(path: str | Path | None) -> Dict[str, Any]:
         "aux_edge_confidence_boundary_f1_mean": _optional_float(aggregate.get("aux_edge_confidence_boundary_f1_mean")),
         "aux_confidence_minus_human_boundary_f1_mean": _optional_float(aggregate.get("aux_confidence_minus_human_boundary_f1_mean")),
         "aux_confidence_minus_human_boundary_f1_win_rate": _optional_float(aggregate.get("aux_confidence_minus_human_boundary_f1_win_rate")),
+    }
+
+
+def _object_boundary_detection_bridge_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "object_boundary_detection_bridge_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"object-boundary detection bridge summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": bool(data.get("pass")) and not failed,
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "failed_checks": failed,
+        "check_count": len(checks),
+        "sample_count": int(data.get("sample_count", 0)),
+        "object_count": int(data.get("object_count", 0)),
+        "baseline_input": data.get("baseline_input"),
+        "target_input": data.get("target_input"),
+        "baseline_recall_proxy": _optional_float(aggregate.get("baseline_recall_proxy")),
+        "target_recall_proxy": _optional_float(aggregate.get("target_recall_proxy")),
+        "target_minus_baseline_recall_proxy": _optional_float(aggregate.get("target_minus_baseline_recall_proxy")),
+        "target_only_detected_count": int(aggregate.get("target_only_detected_count", 0)),
+        "baseline_only_detected_count": int(aggregate.get("baseline_only_detected_count", 0)),
     }
 
 
@@ -996,6 +1034,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "edge_confidence_suite": summary.get("edge_confidence_suite"),
         "edge_fidelity_suite": summary.get("edge_fidelity_suite"),
         "object_boundary_edge": summary.get("object_boundary_edge"),
+        "object_boundary_detection_bridge": summary.get("object_boundary_detection_bridge"),
         "scene_edge_confidence": summary.get("scene_edge_confidence"),
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),

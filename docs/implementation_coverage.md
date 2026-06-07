@@ -21,7 +21,7 @@ boundary used by the benchmark protocol and claim gates.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, KITTI object-box-boundary edge proxy, scene-information stress suite, aux contribution audit, adverse native RAW slice, adverse task slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, RGB+Aux-vs-RGB-only DNN gate, RGB+Aux DNN confidence sweep, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, KITTI object-box-boundary edge proxy, KITTI object-boundary detection bridge, scene-information stress suite, aux contribution audit, adverse native RAW slice, adverse task slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, RGB+Aux-vs-RGB-only DNN gate, RGB+Aux DNN confidence sweep, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -77,6 +77,13 @@ Known limits:
   object boxes. KITTI boxes are not segmentation contours, so this is diagnostic
   box-boundary evidence rather than true object contour accuracy or
   detector-performance evidence.
+- The KITTI object-boundary detection bridge joins those GT boxes to
+  HumanISP/PerceptionISP detection TP/miss status. It is useful explanation
+  evidence because target-detected objects have stronger edge support than
+  missed objects, but the current target recall proxy is slightly below HumanISP
+  (`0.4707` vs `0.4739`). Treat it as TP/miss diagnostic evidence, not detector
+  superiority, false-positive detector-box boundary proof, or trained RGB+aux
+  DNN evidence.
 - `eval_cli` now supports `--psf-sigma`, which injects a constant
   `psf_sigma_map` into RAW calibration and records it in run config, sample
   metadata, and RAW provenance. `cfa_lenspsf_detector_sweep` uses that path to

@@ -70,6 +70,7 @@ class ClaimDashboardTest(unittest.TestCase):
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
+            object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -96,6 +97,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
                 object_boundary_edge=object_boundary,
+                object_boundary_detection_bridge=object_boundary_bridge,
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
@@ -127,6 +129,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["edge_fidelity_suite"]["pass"])
             self.assertTrue(dashboard["object_boundary_edge"]["pass"])
             self.assertEqual(dashboard["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
+            self.assertTrue(dashboard["object_boundary_detection_bridge"]["pass"])
+            self.assertEqual(dashboard["object_boundary_detection_bridge"]["claim_status"], "object_boundary_detection_bridge_diagnostic")
             self.assertTrue(dashboard["scene_edge_confidence"]["pass"])
             self.assertEqual(dashboard["scene_edge_confidence"]["report_count"], 2)
             self.assertEqual(dashboard["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
@@ -178,6 +182,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("RGB+Aux DNN fine-tune gate", evidence_areas)
             self.assertIn("RGB+Aux DNN operating-point sweep", evidence_areas)
             self.assertIn("KITTI object-box boundary edge proxy", evidence_areas)
+            self.assertIn("KITTI object-boundary detection bridge", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -214,6 +219,14 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn(
                 "Object-box-boundary edge proxy report passed; HumanISP RGB, PerceptionISP RGB, aux edge-strength, and aux edge-confidence are compared around GT box boundaries, but this is not segmentation-contour or detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertTrue(
+                any(
+                    item["claim"].startswith("Object-boundary detection bridge passed as diagnostic evidence")
+                    and item["status"] == "diagnostic"
+                    and "aux edge-confidence target-detected AUC" in item["claim"]
+                    for item in dashboard["decisions"]
+                )
             )
 
             self.assertIn(
@@ -327,6 +340,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Object Edge Fidelity", html)
             self.assertIn("Object Box Boundary Edge Proxy", html)
             self.assertIn("object_boundary_edge_diagnostic", html)
+            self.assertIn("Object Boundary Detection Bridge", html)
+            self.assertIn("object_boundary_detection_bridge_diagnostic", html)
             self.assertIn("Scene Edge Confidence", html)
             self.assertIn("CFA/LensPSF Proposal Edge Bridge", html)
             self.assertIn("CFA/LensPSF Native-CFA Separation", html)
@@ -387,6 +402,7 @@ class ClaimDashboardTest(unittest.TestCase):
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
+            object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -423,6 +439,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(edge_fidelity),
                         "--object-boundary-edge",
                         str(object_boundary),
+                        "--object-boundary-detection-bridge",
+                        str(object_boundary_bridge),
                         "--scene-edge-confidence",
                         str(scene_edge),
                         "--scene-edge-confidence",
@@ -467,6 +485,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             self.assertTrue(summary["object_boundary_edge"]["pass"])
             self.assertEqual(summary["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
+            self.assertTrue(summary["object_boundary_detection_bridge"]["pass"])
+            self.assertEqual(summary["object_boundary_detection_bridge"]["claim_status"], "object_boundary_detection_bridge_diagnostic")
             self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(summary["scene_information_stress"]["pass"])
@@ -1101,6 +1121,93 @@ def _write_object_boundary_edge(path: Path) -> Path:
                 ],
                 "interpretation": "unit object-boundary edge proxy",
                 "claim_boundary": "unit box-boundary proxy; not segmentation-contour or detector-performance evidence",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_object_boundary_detection_bridge(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "object_boundary_detection_bridge_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "pass": True,
+                "claim_status": "object_boundary_detection_bridge_diagnostic",
+                "sample_count": 4,
+                "object_count": 6,
+                "baseline_input": "human_rgb",
+                "target_input": "perception_score_aux",
+                "checks": [
+                    {"id": "object_boundary_rows_matched_to_comparison_samples", "status": "pass"},
+                    {"id": "baseline_and_target_inputs_present", "status": "pass"},
+                    {"id": "object_boundary_bridge_features_finite", "status": "pass"},
+                    {"id": "target_detection_correlation_computable", "status": "pass"},
+                    {"id": "baseline_detection_correlation_computable", "status": "pass"},
+                ],
+                "aggregate": {
+                    "baseline_recall_proxy": 0.48,
+                    "target_recall_proxy": 0.50,
+                    "target_minus_baseline_recall_proxy": 0.02,
+                    "target_only_detected_count": 2,
+                    "baseline_only_detected_count": 1,
+                    "missed_by_both_count": 2,
+                },
+                "group_breakdown": [
+                    {
+                        "status": "target_only_detected",
+                        "object_count": 2,
+                        "target_recall_proxy": 1.0,
+                        "human_rgb_edge_boundary_f1_mean": 0.03,
+                        "perception_rgb_edge_boundary_f1_mean": 0.03,
+                        "aux_edge_strength_boundary_f1_mean": 0.04,
+                        "aux_edge_confidence_boundary_f1_mean": 0.05,
+                        "aux_confidence_minus_human_boundary_f1_mean": 0.02,
+                    }
+                ],
+                "label_breakdown": [
+                    {
+                        "label": "car",
+                        "object_count": 6,
+                        "target_recall_proxy": 0.5,
+                        "human_rgb_edge_boundary_f1_mean": 0.03,
+                        "perception_rgb_edge_boundary_f1_mean": 0.03,
+                        "aux_edge_strength_boundary_f1_mean": 0.04,
+                        "aux_edge_confidence_boundary_f1_mean": 0.05,
+                        "aux_confidence_minus_human_boundary_f1_mean": 0.02,
+                    }
+                ],
+                "correlations": {
+                    "rows": [
+                        {
+                            "comparison": "target_detected_vs_missed",
+                            "feature": "aux_edge_confidence_boundary_f1",
+                            "positive_count": 3,
+                            "negative_count": 3,
+                            "positive_mean": 0.06,
+                            "negative_mean": 0.03,
+                            "delta": 0.03,
+                            "auc_high_feature_predicts_positive": 0.67,
+                            "point_biserial": 0.25,
+                        },
+                        {
+                            "comparison": "target_detected_vs_missed",
+                            "feature": "human_rgb_edge_boundary_f1",
+                            "positive_count": 3,
+                            "negative_count": 3,
+                            "positive_mean": 0.05,
+                            "negative_mean": 0.02,
+                            "delta": 0.03,
+                            "auc_high_feature_predicts_positive": 0.70,
+                            "point_biserial": 0.30,
+                        },
+                    ]
+                },
+                "interpretation": "unit object-boundary detection bridge",
+                "claim_boundary": "unit TP/miss bridge only",
             }
         )
         + "\n"

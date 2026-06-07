@@ -25,6 +25,7 @@ CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
 EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 OBJECT_BOUNDARY_EDGE_SUMMARY = "object_boundary_edge_summary.json"
+OBJECT_BOUNDARY_DETECTION_BRIDGE_SUMMARY = "object_boundary_detection_bridge_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
@@ -53,6 +54,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir.")
     parser.add_argument("--object-boundary-edge", default=None, help="Object-box-boundary edge evidence summary path/dir.")
+    parser.add_argument("--object-boundary-detection-bridge", default=None, help="Object-box-boundary edge to detector TP/miss bridge summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
@@ -81,6 +83,7 @@ def main(argv: Any = None) -> int:
         edge_confidence_suite=args.edge_confidence_suite,
         edge_fidelity_suite=args.edge_fidelity_suite,
         object_boundary_edge=args.object_boundary_edge,
+        object_boundary_detection_bridge=args.object_boundary_detection_bridge,
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
@@ -125,6 +128,7 @@ def build_claim_dashboard(
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
     object_boundary_edge: str | Path | None = None,
+    object_boundary_detection_bridge: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
@@ -150,6 +154,7 @@ def build_claim_dashboard(
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
     edge_fidelity = _load_edge_fidelity_suite(edge_fidelity_suite) if edge_fidelity_suite is not None else None
     object_boundary = _load_object_boundary_edge(object_boundary_edge) if object_boundary_edge is not None else None
+    object_boundary_bridge = _load_object_boundary_detection_bridge(object_boundary_detection_bridge) if object_boundary_detection_bridge is not None else None
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
@@ -195,6 +200,7 @@ def build_claim_dashboard(
         edge_confidence,
         edge_fidelity,
         object_boundary,
+        object_boundary_bridge,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -220,6 +226,7 @@ def build_claim_dashboard(
         edge_confidence,
         edge_fidelity,
         object_boundary,
+        object_boundary_bridge,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -245,6 +252,7 @@ def build_claim_dashboard(
         "edge_confidence_suite": edge_confidence,
         "edge_fidelity_suite": edge_fidelity,
         "object_boundary_edge": object_boundary,
+        "object_boundary_detection_bridge": object_boundary_bridge,
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
@@ -655,6 +663,36 @@ def _load_object_boundary_edge(spec: str | Path) -> Dict[str, Any]:
         "aggregate": aggregate,
         "label_breakdown": [row for row in data.get("label_breakdown", ()) if isinstance(row, Mapping)],
         "area_breakdown": [row for row in data.get("area_breakdown", ()) if isinstance(row, Mapping)],
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_object_boundary_detection_bridge(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, OBJECT_BOUNDARY_DETECTION_BRIDGE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    correlations = data.get("correlations", {}) if isinstance(data.get("correlations"), Mapping) else {}
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": bool(data.get("pass")) and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "sample_count": int(data.get("sample_count", 0)),
+        "object_count": int(data.get("object_count", 0)),
+        "baseline_input": str(data.get("baseline_input", "")),
+        "target_input": str(data.get("target_input", "")),
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "aggregate": aggregate,
+        "group_breakdown": [row for row in data.get("group_breakdown", ()) if isinstance(row, Mapping)],
+        "label_breakdown": [row for row in data.get("label_breakdown", ()) if isinstance(row, Mapping)],
+        "correlations": correlations,
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1544,6 +1582,7 @@ def _build_evidence_map(
     edge_confidence_suite: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
     object_boundary_edge: Mapping[str, Any] | None,
+    object_boundary_detection_bridge: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -1682,6 +1721,18 @@ def _build_evidence_map(
                 "evidence": _object_boundary_edge_evidence(object_boundary_edge),
                 "claim_boundary": "Box-boundary edge proxy only; KITTI boxes are not segmentation contours and this is not detector accuracy.",
                 "next_evidence": "Use segmentation/object contour GT or correlate boundary-edge metrics with TP/FP confidence on the same samples.",
+            }
+        )
+
+    if object_boundary_detection_bridge is not None:
+        current.append(
+            {
+                "area": "KITTI object-boundary detection bridge",
+                "status": "diagnostic" if bool(object_boundary_detection_bridge.get("pass")) else "not_supported",
+                "claim_strength": str(object_boundary_detection_bridge.get("claim_status", "object_boundary_detection_bridge_diagnostic")),
+                "evidence": _object_boundary_detection_bridge_evidence(object_boundary_detection_bridge),
+                "claim_boundary": "GT object TP/miss bridge only; not a false-positive detector-box boundary audit or trained-DNN evidence.",
+                "next_evidence": "Add detector-box boundary metrics for FP proposals and repeat on larger held-out/native adverse splits.",
             }
         )
 
@@ -2169,6 +2220,41 @@ def _object_boundary_edge_evidence(object_boundary: Mapping[str, Any]) -> str:
     )
 
 
+def _object_boundary_detection_bridge_evidence(bridge: Mapping[str, Any]) -> str:
+    aggregate = bridge.get("aggregate", {}) if isinstance(bridge.get("aggregate"), Mapping) else {}
+    aux_conf = _bridge_correlation(
+        bridge,
+        comparison="target_detected_vs_missed",
+        feature="aux_edge_confidence_boundary_f1",
+    )
+    human = _bridge_correlation(
+        bridge,
+        comparison="target_detected_vs_missed",
+        feature="human_rgb_edge_boundary_f1",
+    )
+    return (
+        f"samples={int(bridge.get('sample_count', 0))}; objects={int(bridge.get('object_count', 0))}; "
+        f"{bridge.get('baseline_input', '')}->{bridge.get('target_input', '')}; "
+        f"baselineRecallProxy={_fmt(aggregate.get('baseline_recall_proxy'))}; "
+        f"targetRecallProxy={_fmt(aggregate.get('target_recall_proxy'))}; "
+        f"dRecallProxy={_fmt(aggregate.get('target_minus_baseline_recall_proxy'), signed=True)}; "
+        f"targetOnly={int(aggregate.get('target_only_detected_count', 0))}; "
+        f"baselineOnly={int(aggregate.get('baseline_only_detected_count', 0))}; "
+        f"auxConf target-detected AUC={_fmt((aux_conf or {}).get('auc_high_feature_predicts_positive'))}; "
+        f"humanEdge target-detected AUC={_fmt((human or {}).get('auc_high_feature_predicts_positive'))}"
+    )
+
+
+def _bridge_correlation(bridge: Mapping[str, Any], *, comparison: str, feature: str) -> Mapping[str, Any] | None:
+    correlations = bridge.get("correlations", {}) if isinstance(bridge.get("correlations"), Mapping) else {}
+    for row in correlations.get("rows", ()):
+        if not isinstance(row, Mapping):
+            continue
+        if str(row.get("comparison", "")) == comparison and str(row.get("feature", "")) == feature:
+            return row
+    return None
+
+
 def _scene_edge_evidence(scene_edge: Mapping[str, Any]) -> str:
     cfas = ", ".join(str(value) for value in scene_edge.get("cfa_patterns", ())) or "none"
     psf = ", ".join(_fmt(value) for value in scene_edge.get("psf_sigmas", ()) if value is not None) or "none"
@@ -2555,6 +2641,7 @@ def _claim_decisions(
     edge_confidence_suite: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
     object_boundary_edge: Mapping[str, Any] | None,
+    object_boundary_detection_bridge: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -2669,6 +2756,30 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in object_boundary_edge.get("failed_checks", ())) or "configured object-box-boundary checks"
             decisions.append({"status": "not_supported", "claim": f"Object-box-boundary edge proxy report failed for {failed}; do not use it as object-edge feasibility evidence yet."})
+    if object_boundary_detection_bridge is not None:
+        if bool(object_boundary_detection_bridge.get("pass")):
+            aggregate = object_boundary_detection_bridge.get("aggregate", {}) if isinstance(object_boundary_detection_bridge.get("aggregate"), Mapping) else {}
+            aux_conf = _bridge_correlation(
+                object_boundary_detection_bridge,
+                comparison="target_detected_vs_missed",
+                feature="aux_edge_confidence_boundary_f1",
+            )
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "Object-boundary detection bridge passed as diagnostic evidence: "
+                        f"objects {int(object_boundary_detection_bridge.get('object_count', 0))}, "
+                        f"target recall proxy {_fmt(aggregate.get('target_recall_proxy'))} vs baseline {_fmt(aggregate.get('baseline_recall_proxy'))}, "
+                        f"dRecallProxy {_fmt(aggregate.get('target_minus_baseline_recall_proxy'), signed=True)}, "
+                        f"aux edge-confidence target-detected AUC {_fmt((aux_conf or {}).get('auc_high_feature_predicts_positive'))}. "
+                        "Use this as TP/miss explanation evidence, not detector superiority or FP-boundary proof."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in object_boundary_detection_bridge.get("failed_checks", ())) or "configured object-boundary detection checks"
+            decisions.append({"status": "not_supported", "claim": f"Object-boundary detection bridge failed for {failed}; do not use it as TP/miss bridge evidence yet."})
     if scene_edge_confidence is not None:
         if bool(scene_edge_confidence.get("pass")):
             decisions.append(
@@ -3176,6 +3287,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(object_boundary, Mapping)
         else "<p>No object-box-boundary edge summary was provided.</p>"
     )
+    object_boundary_bridge = dashboard.get("object_boundary_detection_bridge")
+    object_boundary_bridge_html = (
+        _object_boundary_detection_bridge_html(object_boundary_bridge, destination)
+        if isinstance(object_boundary_bridge, Mapping)
+        else "<p>No object-boundary detection bridge summary was provided.</p>"
+    )
     cfa_lenspsf_detector = dashboard.get("cfa_lenspsf_detector_sweep")
     cfa_lenspsf_detector_html = (
         _cfa_lenspsf_detector_html(cfa_lenspsf_detector, destination)
@@ -3281,6 +3398,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {edge_fidelity_html}
   <h2>Object Box Boundary Edge Proxy</h2>
   {object_boundary_html}
+  <h2>Object Boundary Detection Bridge</h2>
+  {object_boundary_bridge_html}
   <h2>CFA/LensPSF Detector Sweep</h2>
   {cfa_lenspsf_detector_html}
   <h2>CFA/LensPSF Proposal Edge Bridge</h2>
@@ -4073,6 +4192,57 @@ def _object_boundary_edge_html(object_boundary: Mapping[str, Any], destination: 
     )
 
 
+def _object_boundary_detection_bridge_html(bridge: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(bridge.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in bridge.get("failed_checks", ())) or "none"
+    aggregate = bridge.get("aggregate", {}) if isinstance(bridge.get("aggregate"), Mapping) else {}
+    aux_conf = _bridge_correlation(bridge, comparison="target_detected_vs_missed", feature="aux_edge_confidence_boundary_f1")
+    human_edge = _bridge_correlation(bridge, comparison="target_detected_vs_missed", feature="human_rgb_edge_boundary_f1")
+    group_rows = "".join(_object_boundary_detection_group_row(row, key="status") for row in bridge.get("group_breakdown", ()) if isinstance(row, Mapping))
+    if not group_rows:
+        group_rows = '<tr><td colspan="8">No detection outcome groups were available.</td></tr>'
+    label_rows = "".join(_object_boundary_detection_group_row(row, key="label") for row in bridge.get("label_breakdown", ()) if isinstance(row, Mapping))
+    if not label_rows:
+        label_rows = '<tr><td colspan="8">No label groups were available.</td></tr>'
+    correlation_rows = "".join(
+        _object_boundary_detection_correlation_row(row)
+        for row in (bridge.get("correlations", {}) if isinstance(bridge.get("correlations"), Mapping) else {}).get("rows", ())[:12]
+        if isinstance(row, Mapping)
+    )
+    if not correlation_rows:
+        correlation_rows = '<tr><td colspan="8">No bridge correlation rows were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(bridge.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(bridge.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(bridge.get('interpretation', '')))} "
+        f"{html_lib.escape(str(bridge.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Samples</th><th>Objects</th><th>Baseline</th><th>Target</th><th>Baseline Recall Proxy</th><th>Target Recall Proxy</th><th>dRecall Proxy</th><th>Target Only</th><th>Baseline Only</th><th>AuxConf AUC</th><th>HumanEdge AUC</th><th>Failed</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(bridge, destination)}</td>"
+        f"<td>{int(bridge.get('sample_count', 0))}</td>"
+        f"<td>{int(bridge.get('object_count', 0))}</td>"
+        f"<td><code>{html_lib.escape(str(bridge.get('baseline_input', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(bridge.get('target_input', '')))}</code></td>"
+        f"<td>{_fmt(aggregate.get('baseline_recall_proxy'))}</td>"
+        f"<td>{_fmt(aggregate.get('target_recall_proxy'))}</td>"
+        f"<td>{_fmt(aggregate.get('target_minus_baseline_recall_proxy'), signed=True)}</td>"
+        f"<td>{int(aggregate.get('target_only_detected_count', 0))}</td>"
+        f"<td>{int(aggregate.get('baseline_only_detected_count', 0))}</td>"
+        f"<td>{_fmt((aux_conf or {}).get('auc_high_feature_predicts_positive'))}</td>"
+        f"<td>{_fmt((human_edge or {}).get('auc_high_feature_predicts_positive'))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr></tbody></table>"
+        "<h3>Detection Outcome Groups</h3>"
+        "<table><thead><tr><th>Group</th><th>Objects</th><th>Target Recall Proxy</th><th>Human F1</th><th>Perception F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th><th>Aux Confidence dF1</th></tr></thead>"
+        f"<tbody>{group_rows}</tbody></table>"
+        "<h3>Object Labels</h3>"
+        "<table><thead><tr><th>Label</th><th>Objects</th><th>Target Recall Proxy</th><th>Human F1</th><th>Perception F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th><th>Aux Confidence dF1</th></tr></thead>"
+        f"<tbody>{label_rows}</tbody></table>"
+        "<h3>Top Correlations</h3>"
+        "<table><thead><tr><th>Comparison</th><th>Feature</th><th>Positive/Negative</th><th>Positive Mean</th><th>Negative Mean</th><th>Delta</th><th>AUC</th><th>Biserial</th></tr></thead>"
+        f"<tbody>{correlation_rows}</tbody></table>"
+    )
+
+
 def _cfa_lenspsf_detector_html(sweep: Mapping[str, Any], destination: Path) -> str:
     status_class = "supported" if bool(sweep.get("pass")) else "not_supported"
     failed = ", ".join(str(value) for value in sweep.get("failed_checks", ())) or "none"
@@ -4467,6 +4637,36 @@ def _object_boundary_group_row(row: Mapping[str, Any], *, key: str) -> str:
         f"<td>{_fmt(row.get('perception_rgb_minus_human_boundary_f1_mean'), signed=True)}</td>"
         f"<td>{_fmt(row.get('aux_strength_minus_human_boundary_f1_mean'), signed=True)}</td>"
         f"<td>{_fmt(aux_confidence_delta, signed=True)}</td>"
+        "</tr>"
+    )
+
+
+def _object_boundary_detection_group_row(row: Mapping[str, Any], *, key: str) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get(key, '')))}</code></td>"
+        f"<td>{int(row.get('object_count', 0))}</td>"
+        f"<td>{_fmt(row.get('target_recall_proxy'))}</td>"
+        f"<td>{_fmt(row.get('human_rgb_edge_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('perception_rgb_edge_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('aux_edge_strength_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('aux_edge_confidence_boundary_f1_mean'))}</td>"
+        f"<td>{_fmt(row.get('aux_confidence_minus_human_boundary_f1_mean'), signed=True)}</td>"
+        "</tr>"
+    )
+
+
+def _object_boundary_detection_correlation_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('comparison', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('feature', '')))}</code></td>"
+        f"<td>{int(row.get('positive_count', 0))}/{int(row.get('negative_count', 0))}</td>"
+        f"<td>{_fmt(row.get('positive_mean'))}</td>"
+        f"<td>{_fmt(row.get('negative_mean'))}</td>"
+        f"<td>{_fmt(row.get('delta'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('auc_high_feature_predicts_positive'))}</td>"
+        f"<td>{_fmt(row.get('point_biserial'), signed=True)}</td>"
         "</tr>"
     )
 
