@@ -30,7 +30,7 @@ TRACKED_METRICS = (
 
 
 def main(argv: Any = None) -> int:
-    parser = argparse.ArgumentParser(description="Audit a large held-out CameraE2E native RAW comparison report.")
+    parser = argparse.ArgumentParser(description="Audit a large held-out native RAW/CFA comparison report.")
     parser.add_argument("comparison_report", help="comparison_summary.json path or report directory.")
     parser.add_argument("--baseline-input", default=DEFAULT_BASELINE_INPUT)
     parser.add_argument("--target-input", default=DEFAULT_TARGET_INPUT)
@@ -99,7 +99,7 @@ def build_native_heldout_benchmark_audit(
         "metric_summary": metric_summary,
         "checks": checks,
         "interpretation": (
-            "This audit verifies whether a large held-out comparison report is backed by CameraE2E native RAW/CFA rows "
+            "This audit verifies whether a large held-out comparison report is backed by native RAW/CFA rows "
             "without bridge remapping, then records HumanISP-vs-PerceptionISP detector deltas."
         ),
         "claim_boundary": (
@@ -135,14 +135,18 @@ def _provenance_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     source_target_match_count = 0
     native_resolution_match_count = 0
     native_resolution_at_least_count = 0
+    native_raw_source_accepted_count = 0
     for sample in samples:
         metadata = sample.get("metadata", {}) if isinstance(sample.get("metadata"), Mapping) else {}
         raw = metadata.get("raw_provenance", {}) if isinstance(metadata.get("raw_provenance"), Mapping) else {}
         source_cfa = str(raw.get("source_cfa_pattern", metadata.get("cfa_pattern", ""))).upper()
         target_cfa = str(raw.get("target_cfa_pattern", metadata.get("cfa_pattern", ""))).upper()
         requested_cfa = str(raw.get("requested_cfa_pattern", metadata.get("requested_cfa_pattern", ""))).upper()
-        source_shape = tuple(raw.get("source_shape", ()) or ())
+        source_shape = tuple(raw.get("source_shape", raw.get("raw_input_shape", ())) or ())
         target_shape = tuple(raw.get("target_shape", ()) or ())
+        true_cfa = bool(raw.get("true_sensor_cfa_mosaic", False))
+        remapped = bool(raw.get("pattern_remapped", False))
+        cfa_match = bool(source_cfa and target_cfa and source_cfa == target_cfa)
         _bump(counters["source_cfa_patterns"], source_cfa)
         _bump(counters["target_cfa_patterns"], target_cfa)
         _bump(counters["requested_cfa_patterns"], requested_cfa)
@@ -151,15 +155,18 @@ def _provenance_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         _bump(counters["source_shapes"], source_shape)
         _bump(counters["target_shapes"], target_shape)
         camerae2e_count += int(bool(raw.get("camerae2e_used", False)))
-        true_cfa_count += int(bool(raw.get("true_sensor_cfa_mosaic", False)))
-        remapped_count += int(bool(raw.get("pattern_remapped", False)))
-        source_target_match_count += int(bool(source_cfa and target_cfa and source_cfa == target_cfa))
+        true_cfa_count += int(true_cfa)
+        remapped_count += int(remapped)
+        source_target_match_count += int(cfa_match)
         native_resolution_match_count += int(bool(raw.get("native_resolution_matches_target", False)))
         native_resolution_at_least_count += int(bool(raw.get("native_resolution_at_least_target", False)))
+        native_raw_source_accepted_count += int(true_cfa and not remapped and cfa_match)
     return {
         "sample_count": count,
         "camerae2e_used_count": camerae2e_count,
         "camerae2e_used_fraction": _fraction(camerae2e_count, count),
+        "native_raw_source_accepted_count": native_raw_source_accepted_count,
+        "native_raw_source_accepted_fraction": _fraction(native_raw_source_accepted_count, count),
         "true_sensor_cfa_mosaic_count": true_cfa_count,
         "true_sensor_cfa_mosaic_fraction": _fraction(true_cfa_count, count),
         "pattern_remapped_count": remapped_count,
@@ -202,7 +209,7 @@ def _metric_summary(comparison: Mapping[str, Any], *, baseline_input: str, targe
 def _claim_status(metric_summary: Mapping[str, Any], provenance: Mapping[str, Any], *, sample_count: int, min_samples: int) -> str:
     native_ok = (
         sample_count >= int(min_samples)
-        and _maybe_float(provenance.get("camerae2e_used_fraction")) == 1.0
+        and _maybe_float(provenance.get("native_raw_source_accepted_fraction")) == 1.0
         and _maybe_float(provenance.get("true_sensor_cfa_mosaic_fraction")) == 1.0
         and int(provenance.get("pattern_remapped_count", 0)) == 0
         and _maybe_float(provenance.get("source_target_cfa_match_fraction")) == 1.0
@@ -235,9 +242,12 @@ def _checks(
             "evidence": f"samples={sample_count} min={min_samples}",
         },
         {
-            "id": "camerae2e_used_for_all_samples",
-            "status": "pass" if _maybe_float(provenance.get("camerae2e_used_fraction")) == 1.0 else "fail",
-            "evidence": f"camerae2e={int(provenance.get('camerae2e_used_count', 0))}/{sample_count}",
+            "id": "native_raw_source_for_all_samples",
+            "status": "pass" if _maybe_float(provenance.get("native_raw_source_accepted_fraction")) == 1.0 else "fail",
+            "evidence": (
+                f"native_raw_source={int(provenance.get('native_raw_source_accepted_count', 0))}/{sample_count}; "
+                f"camerae2e={int(provenance.get('camerae2e_used_count', 0))}/{sample_count}"
+            ),
         },
         {
             "id": "true_sensor_cfa_mosaic_for_all_samples",
@@ -296,7 +306,8 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <p>Status: <code class="{html_lib.escape(str(summary.get('status', '')))}">{html_lib.escape(str(summary.get('status', '')))}</code>; claim status: <code>{html_lib.escape(str(summary.get('claim_status', '')))}</code>; samples={int(summary.get('sample_count', 0))}.</p>
   <h2>Native Provenance</h2>
   <table><tbody>
-    <tr><th>CameraE2E</th><td>{int(provenance.get('camerae2e_used_count', 0))}/{int(summary.get('sample_count', 0))}</td><th>True CFA Mosaic</th><td>{int(provenance.get('true_sensor_cfa_mosaic_count', 0))}/{int(summary.get('sample_count', 0))}</td><th>Remapped</th><td>{int(provenance.get('pattern_remapped_count', 0))}</td></tr>
+    <tr><th>Native RAW Source</th><td>{int(provenance.get('native_raw_source_accepted_count', 0))}/{int(summary.get('sample_count', 0))}</td><th>True CFA Mosaic</th><td>{int(provenance.get('true_sensor_cfa_mosaic_count', 0))}/{int(summary.get('sample_count', 0))}</td><th>CameraE2E</th><td>{int(provenance.get('camerae2e_used_count', 0))}/{int(summary.get('sample_count', 0))}</td></tr>
+    <tr><th>Remapped</th><td>{int(provenance.get('pattern_remapped_count', 0))}</td><th>Source/target CFA match</th><td>{int(provenance.get('source_target_cfa_match_count', 0))}/{int(summary.get('sample_count', 0))}</td><th></th><td></td></tr>
     <tr><th>Source CFA</th><td>{html_lib.escape(str(provenance.get('source_cfa_patterns', {})))}</td><th>Target CFA</th><td>{html_lib.escape(str(provenance.get('target_cfa_patterns', {})))}</td><th>Shapes</th><td>{html_lib.escape(str(provenance.get('target_shapes', {})))}</td></tr>
     <tr><th>Bridge</th><td>{html_lib.escape(str(provenance.get('bridges', {})))}</td><th>Raw Source</th><td>{html_lib.escape(str(provenance.get('raw_source_keys', {})))}</td><th>Native Resolution Match</th><td>{_fmt(provenance.get('native_resolution_matches_target_fraction'))}</td></tr>
   </tbody></table>

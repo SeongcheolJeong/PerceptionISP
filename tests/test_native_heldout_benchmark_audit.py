@@ -32,6 +32,7 @@ class NativeHeldoutBenchmarkAuditTest(unittest.TestCase):
         self.assertEqual(summary["sample_count"], 4)
         provenance = summary["provenance"]
         self.assertEqual(provenance["camerae2e_used_fraction"], 1.0)
+        self.assertEqual(provenance["native_raw_source_accepted_fraction"], 1.0)
         self.assertEqual(provenance["true_sensor_cfa_mosaic_fraction"], 1.0)
         self.assertEqual(provenance["pattern_remapped_count"], 0)
         self.assertEqual(provenance["source_cfa_patterns"], {"GRBG": 4})
@@ -39,6 +40,25 @@ class NativeHeldoutBenchmarkAuditTest(unittest.TestCase):
         self.assertGreater(deltas["precision@0.50_mean"], 0.0)
         self.assertLess(deltas["recall@0.50_mean"], 0.0)
         self.assertLess(deltas["fp@0.50_mean"], 0.0)
+
+    def test_build_audit_accepts_real_nef_native_raw_report(self) -> None:
+        report = _comparison_report(sample_count=4, remapped=False, camerae2e_used=False, bridge="pascalraw_native_nef", raw_source_key="PASCALRAW/original/raw/*.nef")
+
+        summary = build_native_heldout_benchmark_audit(
+            report,
+            baseline_input="human_rgb",
+            target_input="perception_target",
+            min_samples=4,
+        )
+
+        self.assertEqual(summary["status"], "pass")
+        self.assertTrue(summary["pass"])
+        provenance = summary["provenance"]
+        self.assertEqual(provenance["camerae2e_used_fraction"], 0.0)
+        self.assertEqual(provenance["native_raw_source_accepted_fraction"], 1.0)
+        self.assertEqual(provenance["bridges"], {"pascalraw_native_nef": 4})
+        checks = {row["id"]: row["status"] for row in summary["checks"]}
+        self.assertEqual(checks["native_raw_source_for_all_samples"], "pass")
 
     def test_build_audit_rejects_remapped_or_too_small_reports(self) -> None:
         report = _comparison_report(sample_count=3, remapped=True)
@@ -97,7 +117,14 @@ class NativeHeldoutBenchmarkAuditTest(unittest.TestCase):
             self.assertEqual(printed["claim_status"], "large_native_fp_reducer_with_recall_tradeoff")
 
 
-def _comparison_report(*, sample_count: int, remapped: bool) -> dict:
+def _comparison_report(
+    *,
+    sample_count: int,
+    remapped: bool,
+    camerae2e_used: bool = True,
+    bridge: str = "native_bayer_v1",
+    raw_source_key: str = "camerae2e_scene",
+) -> dict:
     return {
         "aggregate": {
             "human_rgb": {
@@ -128,14 +155,14 @@ def _comparison_report(*, sample_count: int, remapped: bool) -> dict:
                 "sample_id": f"sample_{index}",
                 "metadata": {
                     "raw_provenance": {
-                        "camerae2e_used": True,
+                        "camerae2e_used": camerae2e_used,
                         "true_sensor_cfa_mosaic": True,
                         "pattern_remapped": remapped,
                         "source_cfa_pattern": "GRBG",
                         "target_cfa_pattern": "RGGB" if remapped else "GRBG",
                         "requested_cfa_pattern": "RGGB" if remapped else "GRBG",
-                        "bridge": "remap_bridge" if remapped else "native_bayer_v1",
-                        "raw_source_key": "camerae2e_scene",
+                        "bridge": "remap_bridge" if remapped else bridge,
+                        "raw_source_key": raw_source_key,
                         "source_shape": [375, 1242],
                         "target_shape": [375, 1242],
                         "native_resolution_matches_target": True,
