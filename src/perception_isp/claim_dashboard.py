@@ -120,6 +120,20 @@ def build_claim_dashboard(
         scene_information,
         aux_contribution,
     )
+    evidence_map = _build_evidence_map(
+        claims,
+        training,
+        task,
+        task_gate_data,
+        protocol,
+        mechanism,
+        cfa_stress,
+        edge_confidence,
+        edge_fidelity,
+        scene_edge,
+        scene_information,
+        aux_contribution,
+    )
     return {
         "claims": claims,
         "training": training,
@@ -135,6 +149,7 @@ def build_claim_dashboard(
         "aux_contribution_audit": aux_contribution,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
+        "evidence_map": evidence_map,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
     }
 
@@ -715,6 +730,410 @@ def _task_metrics_interpretation(status: str, *, baseline_input: str, target_inp
     return "Task metrics are diagnostic evidence only."
 
 
+def _build_evidence_map(
+    claims: Sequence[Mapping[str, Any]],
+    training: Mapping[str, Any] | None,
+    task_metrics: Mapping[str, Any] | None,
+    task_gate: Mapping[str, Any] | None,
+    protocol_coverage: Mapping[str, Any] | None,
+    mechanism_validation: Mapping[str, Any] | None,
+    cfa_stress_sweep: Mapping[str, Any] | None,
+    edge_confidence_suite: Mapping[str, Any] | None,
+    edge_fidelity_suite: Mapping[str, Any] | None,
+    scene_edge_confidence: Mapping[str, Any] | None,
+    scene_information_stress: Mapping[str, Any] | None,
+    aux_contribution_audit: Mapping[str, Any] | None,
+) -> Dict[str, Any]:
+    current: list[Dict[str, Any]] = []
+    broad = _first_claim(claims, "broad_superiority")
+    if broad is not None:
+        current.append(
+            {
+                "area": "Broad HumanISP superiority",
+                "status": "supported" if bool(broad.get("pass")) else "not_supported",
+                "claim_strength": "claim_ready" if bool(broad.get("pass")) else "blocked_by_gate",
+                "evidence": _claim_metric_evidence(broad),
+                "claim_boundary": (
+                    "Can be claimed only if precision, recall, small-object recall, FP, sample scale, and CI gates pass together."
+                    if bool(broad.get("pass"))
+                    else "Do not claim broad HumanISP superiority; at least one configured broad metric gate failed."
+                ),
+                "next_evidence": "Improve recall/small-object recall without losing the FP gain, then rerun the held-out broad claim gate.",
+            }
+        )
+
+    fp_claim = _first_claim(claims, "fp_reducer")
+    if fp_claim is not None:
+        baseline = _baseline_claim_name(str(fp_claim.get("baseline_input", "")))
+        current.append(
+            {
+                "area": "Recall-budgeted FP reduction",
+                "status": "supported" if bool(fp_claim.get("pass")) else "not_supported",
+                "claim_strength": "claim_ready" if bool(fp_claim.get("pass")) else "blocked_by_gate",
+                "evidence": _claim_metric_evidence(fp_claim),
+                "claim_boundary": f"Use this as a narrow FP-reduction claim versus {baseline}, not as a full detector superiority claim.",
+                "next_evidence": "Add condition/class slices that preserve recall while showing the same FP reduction direction.",
+            }
+        )
+
+    if task_gate is not None or task_metrics is not None:
+        task_source = task_gate if task_gate is not None else task_metrics
+        status = "supported" if task_gate is not None and bool(task_gate.get("pass")) else "not_supported"
+        current.append(
+            {
+                "area": "Task-level recall claim",
+                "status": status,
+                "claim_strength": "claim_ready" if status == "supported" else "not_claim_ready",
+                "evidence": _task_evidence(task_metrics, task_gate),
+                "claim_boundary": "Task-level claims need the configured task gate to pass for priority groups.",
+                "next_evidence": "Tune or train the perception path for VRU/person/small-object recall, then rerun the task gate.",
+                "source": str(task_source.get("name", "")) if isinstance(task_source, Mapping) else "",
+            }
+        )
+
+    if protocol_coverage is not None:
+        coverage_status = str(protocol_coverage.get("coverage_status") or "")
+        protocol_status = "supported" if coverage_status == "coverage_complete" else "not_supported"
+        current.append(
+            {
+                "area": "Benchmark protocol coverage",
+                "status": protocol_status,
+                "claim_strength": str(protocol_coverage.get("metric_claim_status") or protocol_coverage.get("status", "")),
+                "evidence": _protocol_evidence(protocol_coverage),
+                "claim_boundary": "Coverage can be complete while the metric claim remains narrow; do not expand beyond the metric claim status.",
+                "next_evidence": "Keep all protocol rows covered when adding new CFA/PSF or training evidence.",
+            }
+        )
+
+    if mechanism_validation is not None:
+        current.append(
+            {
+                "area": "Front-end mechanism validation",
+                "status": "supported" if bool(mechanism_validation.get("pass")) else "not_supported",
+                "claim_strength": "front_end_feasibility",
+                "evidence": _mechanism_evidence(mechanism_validation),
+                "claim_boundary": "Shows aux/confidence maps respond to controlled stressors; not detector-performance evidence.",
+                "next_evidence": "Tie the same mechanisms to detector TP/FP changes on matched samples.",
+            }
+        )
+
+    if cfa_stress_sweep is not None:
+        current.append(
+            {
+                "area": "CFA-dependent front-end behavior",
+                "status": "diagnostic" if bool(cfa_stress_sweep.get("pass")) else "not_supported",
+                "claim_strength": "diagnostic",
+                "evidence": _cfa_evidence(cfa_stress_sweep),
+                "claim_boundary": "Use for CFA/condition sensitivity, not for downstream detector superiority.",
+                "next_evidence": "Run the same CFA patterns through CameraE2E, HumanISP, PerceptionISP, and a fixed detector.",
+            }
+        )
+
+    if edge_confidence_suite is not None:
+        current.append(
+            {
+                "area": "Difficult-edge confidence response",
+                "status": "diagnostic" if bool(edge_confidence_suite.get("pass")) else "not_supported",
+                "claim_strength": "diagnostic",
+                "evidence": _edge_confidence_evidence(edge_confidence_suite),
+                "claim_boundary": "Shows confidence changes under low light, glare, and low MTF; not object detection evidence.",
+                "next_evidence": "Measure whether low-confidence edge regions correlate with detector mistakes and aux-based suppression.",
+            }
+        )
+
+    if edge_fidelity_suite is not None:
+        current.append(
+            {
+                "area": "Object edge fidelity by CFA/LensPSF",
+                "status": "diagnostic" if bool(edge_fidelity_suite.get("pass")) else "not_supported",
+                "claim_strength": "diagnostic",
+                "evidence": _edge_fidelity_evidence(edge_fidelity_suite),
+                "claim_boundary": "Front-end edge fidelity evidence only; object-boundary fidelity is not detector accuracy.",
+                "next_evidence": "Convert edge-fidelity deltas into detector confidence/FP/TP deltas per object and CFA.",
+            }
+        )
+
+    if scene_edge_confidence is not None:
+        current.append(
+            {
+                "area": "High-information scene edge similarity",
+                "status": "diagnostic" if bool(scene_edge_confidence.get("pass")) else "not_supported",
+                "claim_strength": "diagnostic",
+                "evidence": _scene_edge_evidence(scene_edge_confidence),
+                "claim_boundary": "Shows scene-edge tracking against a high-information proxy; not object-boundary ground truth or detector accuracy.",
+                "next_evidence": "Use the scene-edge proxy around detector boxes to explain which proposals are kept or removed.",
+            }
+        )
+
+    if scene_information_stress is not None:
+        current.append(
+            {
+                "area": "Scene-to-sensor information loss",
+                "status": "diagnostic" if bool(scene_information_stress.get("pass")) else "not_supported",
+                "claim_strength": "diagnostic",
+                "evidence": _scene_information_evidence(scene_information_stress),
+                "claim_boundary": "Shows what the sensor loses or aliases before ISP; it does not prove recovery of information absent from RAW.",
+                "next_evidence": "Add real high-resolution scenes where the scene oracle has more detail/color information than the sensor RAW.",
+            }
+        )
+
+    if aux_contribution_audit is not None:
+        current.append(
+            {
+                "area": "Aux evidence used downstream",
+                "status": "diagnostic" if bool(aux_contribution_audit.get("pass")) else "not_supported",
+                "claim_strength": "proposal_level_bridge",
+                "evidence": _aux_contribution_evidence(aux_contribution_audit),
+                "claim_boundary": "This is proposal-level scoring/filtering evidence; it is not a trained RGB+Aux DNN detector claim.",
+                "next_evidence": "Train or adapt a DNN that consumes RGB+Aux tensors, then rerun held-out detector gates.",
+            }
+        )
+
+    if training is not None:
+        training_status = str(training.get("status", ""))
+        current.append(
+            {
+                "area": "RGB+Aux DNN training path",
+                "status": "needs_eval" if training_status in {"diagnostic_only", "training_path_only"} else "needs_gate",
+                "claim_strength": training_status,
+                "evidence": _training_evidence(training),
+                "claim_boundary": "Use as implementation/resource evidence until held-out DNN detector metrics pass a gate.",
+                "next_evidence": "Run a controlled RGB-only versus RGB+Aux fine-tune with enough samples for a held-out gate.",
+            }
+        )
+
+    return {
+        "claim_posture": _claim_posture(claims, protocol_coverage),
+        "current_evidence": current,
+        "future_evidence": _future_evidence_rows(
+            scene_edge_confidence=scene_edge_confidence,
+            aux_contribution_audit=aux_contribution_audit,
+            edge_fidelity_suite=edge_fidelity_suite,
+            cfa_stress_sweep=cfa_stress_sweep,
+            training=training,
+        ),
+    }
+
+
+def _first_claim(claims: Sequence[Mapping[str, Any]], profile: str) -> Mapping[str, Any] | None:
+    for claim in claims:
+        if str(claim.get("profile", "")) == profile:
+            return claim
+    return None
+
+
+def _claim_posture(claims: Sequence[Mapping[str, Any]], protocol_coverage: Mapping[str, Any] | None) -> Dict[str, Any]:
+    broad = _first_claim(claims, "broad_superiority")
+    fp_claim = _first_claim(claims, "fp_reducer")
+    protocol_metric = str(protocol_coverage.get("metric_claim_status", "")) if protocol_coverage is not None else ""
+    if fp_claim is not None and bool(fp_claim.get("pass")):
+        recommended = "Use a narrow recall-budgeted FP-reduction claim, with front-end/aux evidence as feasibility support."
+    else:
+        recommended = "Do not make a performance claim yet; use the current evidence as diagnostic feasibility only."
+    if broad is not None and not bool(broad.get("pass")):
+        blocked = "Do not claim broad HumanISP superiority."
+    else:
+        blocked = ""
+    return {
+        "recommended_claim": recommended,
+        "blocked_claim": blocked,
+        "metric_claim_status": protocol_metric,
+    }
+
+
+def _claim_metric_evidence(claim: Mapping[str, Any]) -> str:
+    metrics = claim.get("metrics", {}) if isinstance(claim.get("metrics"), Mapping) else {}
+    parts = [f"samples={int(claim.get('sample_count', 0))}"]
+    for label, metric in (
+        ("dP50", "precision@0.50_mean"),
+        ("dR50", "recall@0.50_mean"),
+        ("dSmallR50", "small_recall@0.50_mean"),
+        ("dFP50", "fp@0.50_mean"),
+    ):
+        row = metrics.get(metric)
+        if not isinstance(row, Mapping) or row.get("delta") is None:
+            continue
+        ci_low = row.get("ci_low")
+        ci_high = row.get("ci_high")
+        ci = "" if ci_low is None or ci_high is None else f" CI[{_fmt(ci_low, signed=True)}, {_fmt(ci_high, signed=True)}]"
+        parts.append(f"{label}={_fmt(row.get('delta'), signed=True)}{ci}")
+    failed = ", ".join(str(value) for value in claim.get("failed_metrics", ())) or "none"
+    parts.append(f"failed={failed}")
+    return "; ".join(parts)
+
+
+def _task_evidence(task_metrics: Mapping[str, Any] | None, task_gate: Mapping[str, Any] | None) -> str:
+    parts: list[str] = []
+    if task_gate is not None:
+        failed = ", ".join(str(value) for value in task_gate.get("failed_groups", ())) or "none"
+        parts.append(
+            f"task gate {task_gate.get('verdict', '')}; evaluated={int(task_gate.get('evaluated_group_count', 0))}; failed={failed}"
+        )
+    if task_metrics is not None:
+        rows = [row for row in task_metrics.get("rows", ()) if isinstance(row, Mapping)]
+        recall_drops = [str(row.get("group", "")) for row in rows if (_signed_metric(row, "delta_recall@0.50") or 0.0) < 0.0]
+        fp_reductions = [str(row.get("group", "")) for row in rows if (_signed_metric(row, "delta_fp@0.50_per_sample") or 0.0) < 0.0]
+        parts.append(
+            f"task metrics status={task_metrics.get('status', '')}; recall_drop_groups={', '.join(recall_drops) or 'none'}; fp_reduction_groups={', '.join(fp_reductions) or 'none'}"
+        )
+    return "; ".join(parts) if parts else "No task evidence was provided."
+
+
+def _protocol_evidence(protocol: Mapping[str, Any]) -> str:
+    missing = list(protocol.get("missing_required", ())) + list(protocol.get("missing_raw_claim", ()))
+    return (
+        f"coverage={protocol.get('coverage_status', '') or protocol.get('status', '')}; "
+        f"metric_claim_status={protocol.get('metric_claim_status', '') or 'unknown'}; "
+        f"missing={', '.join(str(value) for value in missing) or 'none'}"
+    )
+
+
+def _mechanism_evidence(mechanism: Mapping[str, Any]) -> str:
+    cfas = ", ".join(str(value) for value in mechanism.get("cfa_patterns", ())) or "none"
+    failed = ", ".join(str(value) for value in mechanism.get("failed_mechanisms", ())) or "none"
+    return f"status={mechanism.get('status', '')}; mechanisms={int(mechanism.get('mechanism_count', 0))}; CFA={cfas}; failed={failed}"
+
+
+def _cfa_evidence(cfa_stress: Mapping[str, Any]) -> str:
+    top = "; ".join(
+        f"{row.get('condition', '')}:{row.get('cfa_pattern', '')}@{_fmt(row.get('condition_score'))}"
+        for row in cfa_stress.get("top_rows", ())
+        if isinstance(row, Mapping)
+    )
+    return f"cases={int(cfa_stress.get('case_count', 0))}; conditions={int(cfa_stress.get('condition_count', 0))}; top={top or 'none'}"
+
+
+def _edge_confidence_evidence(edge_confidence: Mapping[str, Any]) -> str:
+    deltas = "; ".join(
+        f"{row.get('metric', '')} {row.get('check', '')}={_fmt(row.get('delta'), signed=True)}"
+        for row in edge_confidence.get("key_deltas", ())[:3]
+        if isinstance(row, Mapping)
+    )
+    failed = ", ".join(str(value) for value in edge_confidence.get("failed_checks", ())) or "none"
+    return f"cases={int(edge_confidence.get('case_count', 0))}; checks={int(edge_confidence.get('check_count', 0))}; failed={failed}; {deltas}"
+
+
+def _edge_fidelity_evidence(edge_fidelity: Mapping[str, Any]) -> str:
+    cfas = ", ".join(str(value) for value in edge_fidelity.get("cfa_patterns", ())) or "none"
+    psf = ", ".join(_fmt(value) for value in edge_fidelity.get("psf_sigmas", ()) if value is not None) or "none"
+    top = "; ".join(
+        f"psf={_fmt(row.get('psf_sigma'))} top={row.get('cfa_pattern', '')} auxF1={_fmt(row.get('aux_object_edge_f1'))}"
+        for row in edge_fidelity.get("top_rows", ())
+        if isinstance(row, Mapping)
+    )
+    return f"cases={int(edge_fidelity.get('case_count', 0))}; CFA={cfas}; LensPSF={psf}; {top or 'no top rows'}"
+
+
+def _scene_edge_evidence(scene_edge: Mapping[str, Any]) -> str:
+    cfas = ", ".join(str(value) for value in scene_edge.get("cfa_patterns", ())) or "none"
+    psf = ", ".join(_fmt(value) for value in scene_edge.get("psf_sigmas", ()) if value is not None) or "none"
+    return (
+        f"reports={int(scene_edge.get('report_count', 1))}; cases={int(scene_edge.get('case_count', 0))}; "
+        f"CFA={cfas}; LensPSF={psf}; "
+        f"RGB dF1={_fmt(scene_edge.get('perception_rgb_minus_human_source_edge_f1_mean'), signed=True)}; "
+        f"aux-strength dF1={_fmt(scene_edge.get('perception_aux_strength_minus_human_source_edge_f1_mean'), signed=True)}; "
+        f"RGB win={_fmt(scene_edge.get('perception_rgb_source_edge_f1_win_rate'))}; "
+        f"aux win={_fmt(scene_edge.get('perception_aux_strength_source_edge_f1_win_rate'))}"
+    )
+
+
+def _scene_information_evidence(scene_information: Mapping[str, Any]) -> str:
+    return (
+        f"scene={int(scene_information.get('scene_width', 0))}x{int(scene_information.get('scene_height', 0))}; "
+        f"sensor={int(scene_information.get('sensor_width', 0))}x{int(scene_information.get('sensor_height', 0))}; "
+        f"CFA={scene_information.get('cfa_pattern', '')}; cases={int(scene_information.get('case_count', 0))}; "
+        f"checks={int(scene_information.get('check_count', 0))}"
+    )
+
+
+def _aux_contribution_evidence(aux_contribution: Mapping[str, Any]) -> str:
+    fp_delta = _preferred_aux_fp_delta(aux_contribution.get("comparisons", ()))
+    bridge = aux_contribution.get("sample_bridge")
+    bridge_text = ""
+    if isinstance(bridge, Mapping):
+        support_deltas = bridge.get("support_deltas", {}) if isinstance(bridge.get("support_deltas"), Mapping) else {}
+        edge_delta = _maybe_float_or_none(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
+        bridge_text = (
+            f"; same-sample removed_fp={int(bridge.get('removed_fp_count', 0))}, removed_tp={int(bridge.get('removed_tp_count', 0))}, "
+            f"fp_delta_count={int(bridge.get('fp_delta_count', 0))}, removed_fp_fraction={_fmt(bridge.get('removed_fp_fraction'))}, "
+            f"removedFP-edge-vs-keptTP={_fmt(edge_delta, signed=True)}"
+        )
+    return (
+        f"aux_features={int(aux_contribution.get('aux_feature_count', 0))}; "
+        f"incremental dFP50={_fmt(fp_delta, signed=True)}{bridge_text}"
+    )
+
+
+def _training_evidence(training: Mapping[str, Any]) -> str:
+    best = training.get("best_train_rate") if isinstance(training.get("best_train_rate"), Mapping) else {}
+    lowest_fp = training.get("lowest_fp_eval") if isinstance(training.get("lowest_fp_eval"), Mapping) else {}
+    best_recall = training.get("best_recall_eval") if isinstance(training.get("best_recall_eval"), Mapping) else {}
+    return (
+        f"status={training.get('status', '')}; runs={int(training.get('run_count', 0))}; "
+        f"best_train={best.get('name', '')} throughput={_fmt(best.get('throughput'))}; "
+        f"best_recall R50={_fmt(best_recall.get('recall@0.50_mean'))}; "
+        f"lowest_fp FP50={_fmt(lowest_fp.get('fp@0.50_mean'))}"
+    )
+
+
+def _future_evidence_rows(
+    *,
+    scene_edge_confidence: Mapping[str, Any] | None,
+    aux_contribution_audit: Mapping[str, Any] | None,
+    edge_fidelity_suite: Mapping[str, Any] | None,
+    cfa_stress_sweep: Mapping[str, Any] | None,
+    training: Mapping[str, Any] | None,
+) -> list[Dict[str, Any]]:
+    scene_aux_gap = (
+        "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
+        if scene_edge_confidence is not None and aux_contribution_audit is not None
+        else "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
+    )
+    cfa_gap = (
+        "CFA/LensPSF front-end diagnostics exist, but detector metrics are not yet swept per CFA/LensPSF condition."
+        if cfa_stress_sweep is not None or edge_fidelity_suite is not None
+        else "Need CFA/LensPSF front-end diagnostics first."
+    )
+    training_status = str(training.get("status", "")) if training is not None else "missing"
+    return [
+        {
+            "priority": "P0",
+            "evidence": "Same-sample edge-to-proposal correlation",
+            "why": "Turns the edge-confidence story into detector-relevant evidence by showing whether weak/ambiguous edge evidence predicts removed FP proposals.",
+            "current_gap": scene_aux_gap,
+            "implementation_path": "Join proposal TP/FP/kept/removed flags with local scene-edge, aux-edge, reliability, and saturation support inside each box.",
+        },
+        {
+            "priority": "P0",
+            "evidence": "CFA/LensPSF detector sweep",
+            "why": "Shows whether the PerceptionISP advantage depends on source CFA pattern and optical blur, rather than only on synthetic front-end metrics.",
+            "current_gap": cfa_gap,
+            "implementation_path": "Run matched RGGB/GRBG/BGGR/GBRG plus PSF cases through CameraE2E, HumanISP, PerceptionISP, and a fixed detector.",
+        },
+        {
+            "priority": "P1",
+            "evidence": "RGB+Aux DNN fine-tune gate",
+            "why": "Needed before claiming the aux tensor improves a learned detector rather than only proposal calibration.",
+            "current_gap": f"Current DNN training status is {training_status}.",
+            "implementation_path": "Fine-tune matched RGB-only and RGB+Aux models on the same split, then evaluate a held-out claim gate.",
+        },
+        {
+            "priority": "P1",
+            "evidence": "High-information real-scene expansion",
+            "why": "The strongest PerceptionISP argument needs scenes with more information than the sensor can directly sample.",
+            "current_gap": "Current high-information scene evidence is useful but still limited in scene diversity.",
+            "implementation_path": "Build a small real-scene set with high-resolution source edges/color detail, then simulate lower-resolution CFA RAW measurements.",
+        },
+        {
+            "priority": "P1",
+            "evidence": "Failure and slice report",
+            "why": "Makes the feasibility claim more credible by showing where PerceptionISP helps, where it is neutral, and where it hurts.",
+            "current_gap": "Dashboard has gates and aggregate slices, but not a curated visual failure/success report.",
+            "implementation_path": "Collect representative FP removals, TP losses, CFA/PSF wins, and counterexamples into a visual casebook.",
+        },
+    ]
+
+
 def _claim_decisions(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
@@ -1033,6 +1452,8 @@ def _dense_eval_brief(row: Mapping[str, Any] | None) -> Dict[str, Any] | None:
 
 def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     decision_rows = "".join(_decision_row(item) for item in dashboard.get("decisions", ()))
+    evidence_map = dashboard.get("evidence_map")
+    evidence_map_html = _evidence_map_html(evidence_map) if isinstance(evidence_map, Mapping) else ""
     claim_rows = "".join(_claim_row(item, destination) for item in dashboard.get("claims", ()))
     training = dashboard.get("training")
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
@@ -1091,6 +1512,7 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     <thead><tr><th>Status</th><th>Claim</th></tr></thead>
     <tbody>{decision_rows}</tbody>
   </table>
+  {evidence_map_html}
   <h2>Claim Gates</h2>
   <table>
     <thead><tr><th>Name</th><th>Report</th><th>Claim</th><th>Profile</th><th>Verdict</th><th>Baseline</th><th>Target</th><th>Samples</th><th>P50 d/CI</th><th>R50 d/CI</th><th>Small R50 d/CI</th><th>FP d/CI</th><th>Failed</th></tr></thead>
@@ -1127,6 +1549,59 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
 </body>
 </html>
 """
+
+
+def _evidence_map_html(evidence_map: Mapping[str, Any]) -> str:
+    posture = evidence_map.get("claim_posture", {}) if isinstance(evidence_map.get("claim_posture"), Mapping) else {}
+    current_rows = "".join(_evidence_current_row(row) for row in evidence_map.get("current_evidence", ()) if isinstance(row, Mapping))
+    if not current_rows:
+        current_rows = '<tr><td colspan="6">No current evidence rows were available.</td></tr>'
+    future_rows = "".join(_evidence_future_row(row) for row in evidence_map.get("future_evidence", ()) if isinstance(row, Mapping))
+    if not future_rows:
+        future_rows = '<tr><td colspan="5">No future evidence rows were available.</td></tr>'
+    return (
+        "<h2>Performance Evidence Map</h2>"
+        "<table>"
+        "<thead><tr><th>Recommended Claim</th><th>Blocked Claim</th><th>Metric Claim Status</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{html_lib.escape(str(posture.get('recommended_claim', '')))}</td>"
+        f"<td>{html_lib.escape(str(posture.get('blocked_claim', '')) or 'none')}</td>"
+        f"<td><code>{html_lib.escape(str(posture.get('metric_claim_status', '')) or 'unknown')}</code></td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Evidence Area</th><th>Status</th><th>Claim Strength</th><th>Current Evidence</th><th>Claim Boundary</th><th>Next Evidence</th></tr></thead>"
+        f"<tbody>{current_rows}</tbody></table>"
+        "<h3>What More Evidence To Build</h3>"
+        "<table>"
+        "<thead><tr><th>Priority</th><th>Evidence</th><th>Why It Matters</th><th>Current Gap</th><th>Implementation Path</th></tr></thead>"
+        f"<tbody>{future_rows}</tbody></table>"
+    )
+
+
+def _evidence_current_row(row: Mapping[str, Any]) -> str:
+    status = str(row.get("status", ""))
+    return (
+        "<tr>"
+        f"<td>{html_lib.escape(str(row.get('area', '')))}</td>"
+        f"<td class=\"{html_lib.escape(status)}\">{html_lib.escape(status)}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('claim_strength', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('claim_boundary', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('next_evidence', '')))}</td>"
+        "</tr>"
+    )
+
+
+def _evidence_future_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('priority', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('why', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('current_gap', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('implementation_path', '')))}</td>"
+        "</tr>"
+    )
 
 
 def _decision_row(item: Mapping[str, Any]) -> str:

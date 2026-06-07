@@ -62,6 +62,24 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
+            self.assertEqual(
+                dashboard["evidence_map"]["claim_posture"]["recommended_claim"],
+                "Use a narrow recall-budgeted FP-reduction claim, with front-end/aux evidence as feasibility support.",
+            )
+            self.assertEqual(dashboard["evidence_map"]["claim_posture"]["blocked_claim"], "Do not claim broad HumanISP superiority.")
+            evidence_areas = [row["area"] for row in dashboard["evidence_map"]["current_evidence"]]
+            self.assertIn("Recall-budgeted FP reduction", evidence_areas)
+            self.assertIn("High-information scene edge similarity", evidence_areas)
+            self.assertIn("Aux evidence used downstream", evidence_areas)
+            self.assertTrue(
+                any(
+                    row["area"] == "Broad HumanISP superiority" and row["status"] == "not_supported"
+                    for row in dashboard["evidence_map"]["current_evidence"]
+                )
+            )
+            future_evidence = [row["evidence"] for row in dashboard["evidence_map"]["future_evidence"]]
+            self.assertIn("Same-sample edge-to-proposal correlation", future_evidence)
+            self.assertIn("CFA/LensPSF detector sweep", future_evidence)
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
                 "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
@@ -124,6 +142,10 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("PerceptionISP Claim Readiness Dashboard", html)
             self.assertIn("Broad HumanISP superiority gate failed", html)
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
+            self.assertIn("Performance Evidence Map", html)
+            self.assertIn("What More Evidence To Build", html)
+            self.assertIn("Do not claim broad HumanISP superiority", html)
+            self.assertIn("Same-sample edge-to-proposal correlation", html)
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)

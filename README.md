@@ -852,7 +852,11 @@ shown as detector-side calibration evidence, not as DNN detector-performance
 evidence. When scene-edge deltas and aux contribution deltas are both positive
 in the expected direction, the dashboard also reports a diagnostic
 front-end/downstream bridge; this is co-observed evidence, not same-sample
-causal correlation.
+causal correlation. The dashboard also includes a `Performance Evidence Map`
+section that summarizes the recommended claim posture, blocked claims, current
+evidence rows, and the next evidence to build. For the current bundle, the
+recommended posture is a narrow recall-budgeted FP-reduction claim with
+front-end/aux feasibility support; broad HumanISP superiority remains blocked.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -1240,6 +1244,10 @@ have lower edge support than kept TP, without treating that as a trained-DNN or
 broad-superiority proof. The condition gate passes the
 `fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
+The same dashboard's `Performance Evidence Map` lists 12 current evidence rows
+and five next evidence targets: same-sample edge-to-proposal correlation,
+CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune gate, high-information
+real-scene expansion, and a failure/slice casebook.
 
 The current 1496-image naive RAW-like baseline is:
 
