@@ -12,6 +12,7 @@ dist/
 *.egg-info/
 
 # Local environments
+.codex-tools/
 .venv/
 venv/
 env/
