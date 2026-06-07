@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["numpy", "pillow"]
 
+[project.optional-dependencies]
+raw = ["rawpy"]
+
 [project.scripts]
 perception-isp = "perception_isp.cli:main"
 perception-isp-eval = "perception_isp.eval_cli:main"

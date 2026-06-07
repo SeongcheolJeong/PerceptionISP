@@ -24,7 +24,7 @@ SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Compare scene-edge confidence from HumanISP RGB and PerceptionISP aux maps.")
-    parser.add_argument("--source", choices=("sample-image", "camerae2e-synthetic", "yolo-dataset", "kitti-dataset"), default="sample-image")
+    parser.add_argument("--source", choices=("sample-image", "camerae2e-synthetic", "yolo-dataset", "kitti-dataset", "sid-sony-raw"), default="sample-image")
     parser.add_argument("--image-path", default="data/sample_images/bus.jpg")
     parser.add_argument("--dataset", default=None)
     parser.add_argument("--split", default="val")
@@ -33,6 +33,9 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--width", type=int, default=320)
     parser.add_argument("--height", type=int, default=240)
     parser.add_argument("--scene-scale", type=float, default=2.0, help="Reference scene scale relative to sensor output for source-edge oracle.")
+    parser.add_argument("--sid-zip", default="data/raw_datasets/sid/downloads/Sony2025.zip")
+    parser.add_argument("--sid-cache-dir", default="data/raw_datasets/sid/extracted_samples")
+    parser.add_argument("--sid-exposure", type=float, default=0.1, help="SID short-exposure seconds to prefer.")
     parser.add_argument("--cfa", action="append", default=None, help="CFA pattern to evaluate. Repeatable; defaults to auto.")
     parser.add_argument("--psf-sigma", action="append", type=float, default=None, help="Lens PSF sigma in sensor pixels. Repeatable; defaults to 0.0.")
     parser.add_argument("--no-camerae2e", action="store_true")
@@ -56,6 +59,9 @@ def main(argv: Any = None) -> int:
         cfa_patterns=tuple(str(value) for value in (args.cfa or ("auto",))),
         psf_sigmas=tuple(float(value) for value in (args.psf_sigma or (0.0,))),
         use_camerae2e=not bool(args.no_camerae2e),
+        sid_zip=str(args.sid_zip),
+        sid_cache_dir=str(args.sid_cache_dir),
+        sid_exposure=float(args.sid_exposure),
     )
     config = PerceptionISPConfig(
         tone_mapping=str(args.tone_mapping),
@@ -99,6 +105,9 @@ def load_scene_edge_sample_grid(
     cfa_patterns: Sequence[str] = ("auto",),
     psf_sigmas: Sequence[float] = (0.0,),
     use_camerae2e: bool = True,
+    sid_zip: str | Path = "data/raw_datasets/sid/downloads/Sony2025.zip",
+    sid_cache_dir: str | Path = "data/raw_datasets/sid/extracted_samples",
+    sid_exposure: float | None = 0.1,
 ) -> Tuple[EvaluationSample, ...]:
     samples: list[EvaluationSample] = []
     for cfa_pattern in tuple(str(value) for value in cfa_patterns):
@@ -114,6 +123,9 @@ def load_scene_edge_sample_grid(
             scene_scale=scene_scale,
             cfa_pattern=cfa_pattern,
             use_camerae2e=use_camerae2e,
+            sid_zip=sid_zip,
+            sid_cache_dir=sid_cache_dir,
+            sid_exposure=sid_exposure,
         )
         for sample in base_samples:
             for sigma in tuple(float(value) for value in psf_sigmas):
@@ -134,6 +146,9 @@ def load_scene_edge_samples(
     scene_scale: float = 1.0,
     cfa_pattern: str = "auto",
     use_camerae2e: bool = True,
+    sid_zip: str | Path = "data/raw_datasets/sid/downloads/Sony2025.zip",
+    sid_cache_dir: str | Path = "data/raw_datasets/sid/extracted_samples",
+    sid_exposure: float | None = 0.1,
 ) -> Tuple[EvaluationSample, ...]:
     normalized = str(source)
     if normalized == "sample-image":
@@ -174,6 +189,21 @@ def load_scene_edge_samples(
             height=height,
             cfa_pattern=cfa_pattern,
             use_camerae2e=use_camerae2e,
+        )
+    if normalized == "sid-sony-raw":
+        from .sid_dataset import load_sid_sony_scene_edge_samples
+
+        if str(cfa_pattern).lower() not in {"auto", "native"}:
+            raise ValueError("SID Sony RAW source uses its native CFA pattern; pass --cfa auto or omit --cfa")
+        return load_sid_sony_scene_edge_samples(
+            sid_zip,
+            count=count,
+            offset=offset,
+            width=width,
+            height=height,
+            scene_scale=scene_scale,
+            exposure_s=sid_exposure,
+            cache_dir=sid_cache_dir,
         )
     raise ValueError(f"unsupported scene-edge source: {source!r}")
 
