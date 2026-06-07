@@ -107,6 +107,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 any(
                     item["claim"].startswith("Same-sample aux bridge passed")
                     and item["status"] == "diagnostic"
+                    and "edge support delta" in item["claim"]
                     for item in dashboard["decisions"]
                 )
             )
@@ -126,6 +127,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
+            self.assertIn("Removed FP Edge Delta vs Kept TP", html)
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
@@ -728,6 +730,7 @@ def _write_aux_contribution_audit(path: Path) -> Path:
                     "removed_fp_fraction": 1.0,
                     "removed_fp_to_tp_ratio": 2.0,
                     "support_means": {},
+                    "support_deltas": {"removed_fp_minus_kept_tp_edge_support_mean": -0.2},
                     "interpretation": "unit same-sample bridge",
                 },
                 "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},

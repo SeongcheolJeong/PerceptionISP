@@ -634,6 +634,7 @@ def _load_aux_sample_bridge(payload: Any) -> Dict[str, Any] | None:
         "removed_fp_fraction": _maybe_float_or_none(payload.get("removed_fp_fraction")),
         "removed_fp_to_tp_ratio": _maybe_float_or_none(payload.get("removed_fp_to_tp_ratio")),
         "support_means": payload.get("support_means", {}) if isinstance(payload.get("support_means"), Mapping) else {},
+        "support_deltas": payload.get("support_deltas", {}) if isinstance(payload.get("support_deltas"), Mapping) else {},
         "interpretation": str(payload.get("interpretation", "")),
     }
 
@@ -805,6 +806,9 @@ def _claim_decisions(
             decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
             sample_bridge = aux_contribution_audit.get("sample_bridge")
             if isinstance(sample_bridge, Mapping) and int(sample_bridge.get("removed_fp_count", 0)) > int(sample_bridge.get("removed_tp_count", 0)):
+                support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
+                edge_delta = _maybe_float_or_none(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
+                edge_clause = "" if edge_delta is None else f" Removed-FP edge support delta vs kept TP {_fmt(edge_delta, signed=True)}."
                 decisions.append(
                     {
                         "status": "diagnostic",
@@ -812,7 +816,8 @@ def _claim_decisions(
                             "Same-sample aux bridge passed: incremental aux scoring removed "
                             f"{int(sample_bridge.get('removed_fp_count', 0))} FP and "
                             f"{int(sample_bridge.get('removed_tp_count', 0))} TP proposals "
-                            f"with net FP delta {int(sample_bridge.get('fp_delta_count', 0))}. "
+                            f"with net FP delta {int(sample_bridge.get('fp_delta_count', 0))}."
+                            f"{edge_clause} "
                             "This is proposal-level evidence, not a trained DNN detector claim."
                         ),
                     }
@@ -1217,10 +1222,11 @@ def _aux_contribution_row(row: Mapping[str, Any]) -> str:
 
 
 def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
+    support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
     return (
         f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
         "<table>"
-        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th></tr></thead>"
+        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th><th>Removed FP Edge Delta vs Kept TP</th></tr></thead>"
         "<tbody><tr>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('baseline_input', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('target_input', '')))}</code></td>"
@@ -1230,6 +1236,7 @@ def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         f"<td>{int(sample_bridge.get('fp_delta_count', 0))}</td>"
         f"<td>{int(sample_bridge.get('tp_delta_count', 0))}</td>"
         f"<td>{_fmt(sample_bridge.get('removed_fp_fraction'))}</td>"
+        f"<td>{_fmt(support_deltas.get('removed_fp_minus_kept_tp_edge_support_mean'), signed=True)}</td>"
         "</tr></tbody></table>"
     )
 

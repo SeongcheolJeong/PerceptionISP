@@ -436,13 +436,16 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
     counts["removed_fp_fraction"] = counts["removed_fp_count"] / max(float(removed_count), 1.0)
     counts["removed_tp_fraction"] = counts["removed_tp_count"] / max(float(removed_count), 1.0)
     counts["removed_fp_to_tp_ratio"] = counts["removed_fp_count"] / max(float(counts["removed_tp_count"]), 1.0)
+    support_means = {name: _support_mean(rows) for name, rows in support_groups.items()}
+    support_deltas = _support_deltas(support_means)
     return {
         "status": "pass",
         "baseline_input": str(baseline_input),
         "target_input": str(target_input),
         "label_agnostic": label_agnostic,
         **counts,
-        "support_means": {name: _support_mean(rows) for name, rows in support_groups.items()},
+        "support_means": support_means,
+        "support_deltas": support_deltas,
         "examples": examples,
         "interpretation": (
             "This same-sample bridge compares score_label and score_label_aux proposal outputs on matched samples. "
@@ -456,7 +459,9 @@ def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, An
     removed_fp = int(sample_bridge.get("removed_fp_count", 0))
     removed_tp = int(sample_bridge.get("removed_tp_count", 0))
     fp_delta = int(sample_bridge.get("fp_delta_count", 0))
-    return [
+    support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
+    edge_delta = _maybe_float(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
+    checks = [
         {
             "id": "same_sample_aux_bridge_available",
             "description": "Score_label and score_label_aux sample reports should overlap and expose per-detection aux metadata.",
@@ -482,6 +487,23 @@ def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, An
             "criteria": [{"metric": "fp_delta_count", "value": fp_delta, "threshold": 0, "pass": fp_delta < 0}],
         },
     ]
+    if support_deltas:
+        checks.append(
+            {
+                "id": "removed_fp_has_lower_edge_support_than_kept_tp",
+                "description": "Removed false positives should have lower edge support than kept true positives.",
+                "status": "pass" if edge_delta < 0.0 else "fail",
+                "criteria": [
+                    {
+                        "metric": "removed_fp_minus_kept_tp_edge_support_mean",
+                        "value": edge_delta,
+                        "threshold": 0.0,
+                        "pass": edge_delta < 0.0,
+                    }
+                ],
+            }
+        )
+    return checks
 
 
 def _load_comparison_summary(path_value: Any) -> Dict[str, Any] | None:
@@ -583,6 +605,20 @@ def _support_mean(rows: Sequence[Mapping[str, float]]) -> Dict[str, float | int]
         return {"count": 0}
     keys = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
     return {"count": len(rows), **{f"{key}_mean": sum(float(row.get(key, 0.0)) for row in rows) / len(rows) for key in keys}}
+
+
+def _support_deltas(support_means: Mapping[str, Mapping[str, Any]]) -> Dict[str, float]:
+    removed_fp = support_means.get("removed_fp", {})
+    kept_tp = support_means.get("kept_tp", {})
+    if not isinstance(removed_fp, Mapping) or not isinstance(kept_tp, Mapping):
+        return {}
+    if int(removed_fp.get("count", 0)) <= 0 or int(kept_tp.get("count", 0)) <= 0:
+        return {}
+    keys = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
+    return {
+        f"removed_fp_minus_kept_tp_{key}_mean": _maybe_float(removed_fp.get(f"{key}_mean")) - _maybe_float(kept_tp.get(f"{key}_mean"))
+        for key in keys
+    }
 
 
 def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
@@ -710,10 +746,11 @@ def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
     example_rows = "".join(_sample_bridge_example_row(row) for row in sample_bridge.get("examples", ()) if isinstance(row, Mapping))
     if not example_rows:
         example_rows = '<tr><td colspan="7">No removed detection examples were available.</td></tr>'
+    support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
     return (
         f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
         "<table>"
-        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Baseline Det</th><th>Target Det</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th></tr></thead>"
+        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Baseline Det</th><th>Target Det</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Edge Delta vs Kept TP</th></tr></thead>"
         "<tbody><tr>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('baseline_input', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('target_input', '')))}</code></td>"
@@ -724,6 +761,7 @@ def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         f"<td>{int(sample_bridge.get('removed_tp_count', 0))}</td>"
         f"<td>{int(sample_bridge.get('fp_delta_count', 0))}</td>"
         f"<td>{int(sample_bridge.get('tp_delta_count', 0))}</td>"
+        f"<td>{_fmt(support_deltas.get('removed_fp_minus_kept_tp_edge_support_mean'), signed=True)}</td>"
         "</tr></tbody></table>"
         "<table>"
         "<thead><tr><th>Group</th><th>Count</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th><th>Aux Box IoU</th></tr></thead>"

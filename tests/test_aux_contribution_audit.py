@@ -84,8 +84,8 @@ class AuxContributionAuditTest(unittest.TestCase):
                 score_label_aux / "comparison_summary.json",
                 input_name="perception_calibrated_score_label_aux_fusion_rgb_aux",
                 samples=[
-                    _sample("a", [_det("person", 10, 10, 30, 30, 0.91)], [_gt("person", 10, 10, 30, 30)]),
-                    _sample("b", [_det("car", 4, 4, 20, 20, 0.82)], [_gt("car", 4, 4, 20, 20)]),
+                    _sample("a", [_det("person", 10, 10, 30, 30, 0.91, aux=0.60, edge=0.50)], [_gt("person", 10, 10, 30, 30)]),
+                    _sample("b", [_det("car", 4, 4, 20, 20, 0.82, aux=0.60, edge=0.50)], [_gt("car", 4, 4, 20, 20)]),
                 ],
             )
             rollup = _rollup(
@@ -100,13 +100,17 @@ class AuxContributionAuditTest(unittest.TestCase):
             self.assertEqual(bridge["removed_fp_count"], 2)
             self.assertEqual(bridge["removed_tp_count"], 0)
             self.assertEqual(bridge["fp_delta_count"], -2)
+            self.assertLess(bridge["support_deltas"]["removed_fp_minus_kept_tp_edge_support_mean"], 0.0)
             checks = {row["id"]: row for row in summary["checks"]}
             self.assertEqual(checks["same_sample_aux_bridge_available"]["status"], "pass")
             self.assertEqual(checks["incremental_aux_removes_more_fp_than_tp"]["status"], "pass")
             self.assertEqual(checks["incremental_aux_net_fp_reduction_same_sample"]["status"], "pass")
+            self.assertEqual(checks["removed_fp_has_lower_edge_support_than_kept_tp"]["status"], "pass")
 
             html_path = write_aux_contribution_audit(summary, root / "audit")
-            self.assertIn("Same-Sample Bridge", html_path.read_text())
+            html = html_path.read_text()
+            self.assertIn("Same-Sample Bridge", html)
+            self.assertIn("Removed FP Edge Delta vs Kept TP", html)
 
 
 def _rollup(score_label_summary: Path | None = None, score_label_aux_summary: Path | None = None) -> dict:
