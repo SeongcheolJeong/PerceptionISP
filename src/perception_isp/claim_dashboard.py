@@ -19,6 +19,7 @@ TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 TASK_GATE_SUMMARY = "task_gate_summary.json"
 PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
+CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -29,6 +30,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir.")
+    parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -40,6 +42,7 @@ def main(argv: Any = None) -> int:
         task_gate=args.task_gate,
         protocol_coverage=args.protocol_coverage,
         mechanism_validation=args.mechanism_validation,
+        cfa_stress_sweep=args.cfa_stress_sweep,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -67,6 +70,7 @@ def build_claim_dashboard(
     task_gate: str | Path | None = None,
     protocol_coverage: str | Path | None = None,
     mechanism_validation: str | Path | None = None,
+    cfa_stress_sweep: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
@@ -75,8 +79,9 @@ def build_claim_dashboard(
     task_gate_data = _load_task_gate(task_gate) if task_gate is not None else None
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
     mechanism = _load_mechanism_validation(mechanism_validation) if mechanism_validation is not None else None
+    cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism)
+    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism, cfa_stress)
     return {
         "claims": claims,
         "training": training,
@@ -84,6 +89,7 @@ def build_claim_dashboard(
         "task_gate": task_gate_data,
         "protocol_coverage": protocol,
         "mechanism_validation": mechanism,
+        "cfa_stress_sweep": cfa_stress,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
@@ -261,6 +267,41 @@ def _load_mechanism_validation(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_cfa_stress_sweep(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, CFA_STRESS_SWEEP_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    support = data.get("support", {}) if isinstance(data.get("support"), Mapping) else {}
+    rankings = [row for row in data.get("condition_rankings", ()) if isinstance(row, Mapping)]
+    top_rows = []
+    for ranking in rankings:
+        ranked = ranking.get("ranked_cfas", ()) if isinstance(ranking.get("ranked_cfas", ()), Sequence) else ()
+        first = next((row for row in ranked if isinstance(row, Mapping)), None)
+        if first is None:
+            continue
+        top_rows.append(
+            {
+                "condition": str(ranking.get("condition", "")),
+                "cfa_pattern": str(first.get("cfa_pattern", "")),
+                "condition_score": _maybe_float(first.get("condition_score")),
+                "score_definition": str(ranking.get("score_definition", "")),
+            }
+        )
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass",
+        "case_count": int(support.get("case_count", len(data.get("cases", ())))),
+        "condition_count": len(rankings),
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "top_rows": top_rows,
+        "interpretation": str(data.get("interpretation", "")),
+    }
+
+
 def _select_task_target(data: Mapping[str, Any], *, claims: Sequence[Mapping[str, Any]], baseline_input: str) -> str:
     available = {str(value) for value in data.get("inputs", ())}
     for profile in ("fp_reducer", "broad_superiority"):
@@ -344,6 +385,7 @@ def _claim_decisions(
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
     mechanism_validation: Mapping[str, Any] | None,
+    cfa_stress_sweep: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -373,6 +415,11 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in mechanism_validation.get("failed_mechanisms", ())) or "configured mechanism checks"
             decisions.append({"status": "not_supported", "claim": f"PerceptionISP front-end mechanism validation failed for {failed}; do not use aux maps as feasibility evidence yet."})
+    if cfa_stress_sweep is not None:
+        if bool(cfa_stress_sweep.get("pass")):
+            decisions.append({"status": "diagnostic", "claim": "CFA stress sweep is available as diagnostic evidence for condition-dependent front-end signals; it is not detector-performance evidence."})
+        else:
+            decisions.append({"status": "not_supported", "claim": "CFA stress sweep failed or is incomplete; do not use it as CFA feasibility evidence yet."})
     if task_gate is not None:
         profile = str(task_gate.get("profile", "task"))
         if bool(task_gate.get("pass")):
@@ -542,6 +589,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     task_gate_html = _task_gate_html(task_gate, destination) if isinstance(task_gate, Mapping) else "<p>No task gate summary was provided.</p>"
     mechanism = dashboard.get("mechanism_validation")
     mechanism_html = _mechanism_html(mechanism, destination) if isinstance(mechanism, Mapping) else "<p>No mechanism validation summary was provided.</p>"
+    cfa_stress = dashboard.get("cfa_stress_sweep")
+    cfa_stress_html = _cfa_stress_html(cfa_stress, destination) if isinstance(cfa_stress, Mapping) else "<p>No CFA stress sweep summary was provided.</p>"
     protocol = dashboard.get("protocol_coverage")
     protocol_html = _protocol_html(protocol, destination) if isinstance(protocol, Mapping) else "<p>No benchmark protocol coverage summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
@@ -562,6 +611,7 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     .supported {{ color: #047857; font-weight: 700; }}
     .not_supported {{ color: #b91c1c; font-weight: 700; }}
     .needs_gate, .needs_eval {{ color: #a16207; font-weight: 700; }}
+    .diagnostic {{ color: #2563eb; font-weight: 700; }}
     .good_delta {{ color: #047857; }}
     .bad_delta {{ color: #b91c1c; }}
   </style>
@@ -587,6 +637,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {task_gate_html}
   <h2>Mechanism Validation</h2>
   {mechanism_html}
+  <h2>CFA Stress Sweep</h2>
+  {cfa_stress_html}
   <h2>Benchmark Protocol Coverage</h2>
   {protocol_html}
   <h2>Supporting Rollups</h2>
@@ -730,6 +782,40 @@ def _mechanism_html(mechanism: Mapping[str, Any], destination: Path) -> str:
         f"<td>{html_lib.escape(cfas)}</td>"
         f"<td>{html_lib.escape(failed)}</td>"
         "</tr></tbody></table>"
+    )
+
+
+def _cfa_stress_html(cfa_stress: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(cfa_stress.get("pass")) else "not_supported"
+    cfas = ", ".join(str(value) for value in cfa_stress.get("cfa_patterns", ())) or "none"
+    rows = "".join(_cfa_stress_row(row) for row in cfa_stress.get("top_rows", ()))
+    if not rows:
+        rows = '<tr><td colspan="4">No condition rankings were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(cfa_stress.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(cfa_stress.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Cases</th><th>Conditions</th><th>CFA Patterns</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(cfa_stress, destination)}</td>"
+        f"<td>{int(cfa_stress.get('case_count', 0))}</td>"
+        f"<td>{int(cfa_stress.get('condition_count', 0))}</td>"
+        f"<td>{html_lib.escape(cfas)}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Condition</th><th>Top CFA</th><th>Score</th><th>Score Definition</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _cfa_stress_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('condition', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{_fmt(row.get('condition_score'))}</td>"
+        f"<td>{html_lib.escape(str(row.get('score_definition', '')))}</td>"
+        "</tr>"
     )
 
 

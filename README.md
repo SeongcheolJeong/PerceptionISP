@@ -807,6 +807,7 @@ PYTHONPATH=src \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --task-gate reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
+  --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
@@ -819,7 +820,8 @@ keeps the task-level claim narrow: the `recall_improvement` task gate fails for
 VRU/person/cyclist/vehicle/small-object groups, so task recall improvement
 versus HumanISP is not supported even though FP/sample is reduced. Mechanism
 validation is shown as front-end feasibility evidence only, not as detector
-performance evidence.
+performance evidence, and the CFA stress sweep is shown as diagnostic
+condition/CFA evidence only.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -941,6 +943,7 @@ PYTHONPATH=src \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --protocol-comparison-report reports/perception_compare_kitti_val1496_naive_raw_like \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
+  --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
@@ -955,7 +958,9 @@ CI-backed claim gates, task metrics, task gate, condition-specific metrics, a
 condition robustness gate, front-end mechanism validation, naive RAW/minimal
 adaptation, classical lightweight RAW transform, and a task-aware or
 aux-assisted path. Missing rows are blockers for broad HumanISP or
-RAW/sensor-native superiority claims.
+RAW/sensor-native superiority claims. Recommended diagnostic rows, such as the
+CFA stress sweep, help interpret sensor-native signals but do not create a
+detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -972,6 +977,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --condition-metrics reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --condition-gate reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
+  --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -985,6 +991,7 @@ reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human
 reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 reports/perception_mechanism_validation_synthetic/index.html
+reports/perception_cfa_stress_sweep_synthetic/index.html
 ```
 
 It marks `coverage_status=coverage_complete`, including front-end mechanism

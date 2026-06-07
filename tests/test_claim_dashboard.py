@@ -20,6 +20,7 @@ class ClaimDashboardTest(unittest.TestCase):
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
+            cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -28,6 +29,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 task_metrics=task_metrics,
                 protocol_coverage=protocol,
                 mechanism_validation=mechanism,
+                cfa_stress_sweep=cfa_stress,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -39,6 +41,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(dashboard["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
+            self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
                 "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
@@ -46,6 +49,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "PerceptionISP front-end mechanism validation passed; aux/confidence maps respond to controlled sensor stressors.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "CFA stress sweep is available as diagnostic evidence for condition-dependent front-end signals; it is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertTrue(
@@ -63,6 +70,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Recall-budgeted FP-reduction gate passed", html)
             self.assertIn("Task Metrics", html)
             self.assertIn("Mechanism Validation", html)
+            self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
@@ -74,6 +82,7 @@ class ClaimDashboardTest(unittest.TestCase):
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
+            cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -86,6 +95,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(protocol),
                         "--mechanism-validation",
                         str(mechanism),
+                        "--cfa-stress-sweep",
+                        str(cfa_stress),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -97,6 +108,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(summary["mechanism_validation"]["pass"])
+            self.assertTrue(summary["cfa_stress_sweep"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -358,6 +370,35 @@ def _write_mechanism_validation(path: Path) -> Path:
                     {"id": "cfa_variant_support", "status": "pass"},
                 ],
                 "interpretation": "unit mechanism validation",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_cfa_stress_sweep(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "cfa_stress_sweep_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "cfa_patterns": ["RGGB", "RCCB", "RGBIR", "MONO"],
+                "support": {"case_count": 8, "all_finite": True, "all_supported": True, "failed_cases": []},
+                "condition_rankings": [
+                    {
+                        "condition": "low_light",
+                        "score_definition": "unit low light",
+                        "ranked_cfas": [{"rank": 1, "cfa_pattern": "MONO", "condition_score": 0.65}],
+                    },
+                    {
+                        "condition": "glare",
+                        "score_definition": "unit glare",
+                        "ranked_cfas": [{"rank": 1, "cfa_pattern": "RGBIR", "condition_score": 0.60}],
+                    },
+                ],
+                "interpretation": "unit cfa stress sweep",
             }
         )
         + "\n"

@@ -225,10 +225,11 @@ reports/perception_benchmark_protocol_kitti_with_naive_extended/index.html
 It reports `coverage_status=coverage_complete` for evidence coverage, including
 front-end mechanism validation and the recommended
 `extended_sensor_native_tensor` row, while the metric side stays narrow as
-`metric_claim_status=fp_reducer_only`. That means the configured protocol has
-the expected rows, not that the target wins every metric. The protocol now also
-includes a task gate, condition-specific metrics, a condition robustness gate,
-and mechanism validation:
+`metric_claim_status=fp_reducer_only`. The protocol also records the CFA stress
+sweep as recommended diagnostic evidence. That means the configured protocol
+has the expected required rows, not that the target wins every metric. The
+protocol now also includes a task gate, condition-specific metrics, a condition
+robustness gate, mechanism validation, and CFA stress sweep:
 
 ```text
 reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human/index.html
@@ -236,6 +237,7 @@ reports/perception_condition_metrics_kitti_train512_score_label_aux_t001_vs_huma
 reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human/index.html
 reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended/index.html
 reports/perception_mechanism_validation_synthetic/index.html
+reports/perception_cfa_stress_sweep_synthetic/index.html
 ```
 
 The current condition report has 9 slices from explicit/sample-derived
@@ -555,6 +557,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |
 | Front-end mechanism validation | `pass` for low-light, glare, low-MTF, and CFA-support checks; this is signal feasibility evidence, not detector performance evidence |
+| CFA stress sweep | Available as diagnostic evidence; `MONO` ranks highest for low-light/low-MTF synthetic scores and `RGBIR` for glare |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |
 | Protocol metric claim status | `metric_claim_status=fp_reducer_only`; this is not broad superiority |
 
@@ -571,7 +574,9 @@ paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
 detector recipe, CI-backed gates, task metrics, a task gate,
 condition-specific metrics, a condition robustness gate, front-end mechanism
 validation, naive RAW/minimal adaptation, classical lightweight RAW transform,
-and task-aware/aux-assisted paths.
+and task-aware/aux-assisted paths. Recommended diagnostic rows such as the CFA
+stress sweep help interpret sensor-native signals but do not create detector
+performance evidence.
 
 The current naive RAW-like KITTI val baseline is:
 

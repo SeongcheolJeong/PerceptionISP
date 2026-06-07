@@ -19,6 +19,7 @@ class ClaimReadinessTest(unittest.TestCase):
             eval_dir = _write_eval_summary(root / "eval")
             rollup_dir = _write_comparison_rollup(root / "rollup")
             mechanism = _write_mechanism_validation(root / "mechanism")
+            cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -28,6 +29,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 training_summaries=[train_dir, eval_dir],
                 comparison_rollups=[f"Calibration={rollup_dir}"],
                 mechanism_validation=mechanism,
+                cfa_stress_sweep=cfa_stress,
                 output_dir=root / "readiness",
             )
 
@@ -47,6 +49,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("condition_metrics", summary)
             self.assertIn("condition_gate", summary)
             self.assertIn("mechanism_validation", summary)
+            self.assertIn("cfa_stress_sweep", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -69,6 +72,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["task_metrics"]["status"], "candidate_needs_gate")
             self.assertEqual(dashboard_summary["task_gate"]["verdict"], "task_gate_pass")
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -111,6 +115,7 @@ class ClaimReadinessTest(unittest.TestCase):
             train_dir = _write_train_summary(root / "train")
             eval_dir = _write_eval_summary(root / "eval")
             mechanism = _write_mechanism_validation(root / "mechanism")
+            cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -120,6 +125,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 training_summaries=[train_dir, eval_dir],
                 protocol_comparison_reports=[naive_dir],
                 mechanism_validation=mechanism,
+                cfa_stress_sweep=cfa_stress,
                 output_dir=root / "readiness",
             )
 
@@ -132,6 +138,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_complete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
 
 
 def _write_comparison_report(
@@ -287,6 +294,30 @@ def _write_mechanism_validation(path: Path) -> Path:
         ],
     }
     (path / "mechanism_validation_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_stress_sweep(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cfa_patterns": ["RGGB", "RCCB", "RGBIR", "MONO"],
+        "support": {"case_count": 8, "all_finite": True, "all_supported": True, "failed_cases": []},
+        "condition_rankings": [
+            {
+                "condition": "low_light",
+                "score_definition": "unit low light",
+                "ranked_cfas": [{"rank": 1, "cfa_pattern": "MONO", "condition_score": 0.65}],
+            },
+            {
+                "condition": "glare",
+                "score_definition": "unit glare",
+                "ranked_cfas": [{"rank": 1, "cfa_pattern": "RGBIR", "condition_score": 0.60}],
+            },
+        ],
+    }
+    (path / "cfa_stress_sweep_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

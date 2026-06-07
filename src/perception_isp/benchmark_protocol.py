@@ -21,6 +21,7 @@ TASK_GATE_SUMMARY = "task_gate_summary.json"
 CONDITION_METRICS_SUMMARY = "condition_metrics_summary.json"
 CONDITION_GATE_SUMMARY = "condition_gate_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
+CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 
 HUMAN_INPUTS = {"human_rgb"}
 PERCEPTION_INPUTS = {
@@ -51,6 +52,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--condition-metrics", default=None, help="condition_metrics_summary.json path/dir.")
     parser.add_argument("--condition-gate", default=None, help="condition_gate_summary.json path/dir.")
     parser.add_argument("--mechanism-validation", default=None, help="mechanism_validation_summary.json path/dir.")
+    parser.add_argument("--cfa-stress-sweep", default=None, help="cfa_stress_sweep_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
     parser.add_argument("--output-dir", default="reports/perception_benchmark_protocol")
     args = parser.parse_args(argv)
@@ -65,6 +67,7 @@ def main(argv: Any = None) -> int:
         condition_metrics=args.condition_metrics,
         condition_gate=args.condition_gate,
         mechanism_validation=args.mechanism_validation,
+        cfa_stress_sweep=args.cfa_stress_sweep,
         min_samples=int(args.min_samples),
     )
     html_path = write_protocol_coverage(summary, args.output_dir)
@@ -97,6 +100,7 @@ def build_protocol_coverage(
     condition_metrics: str | Path | None = None,
     condition_gate: str | Path | None = None,
     mechanism_validation: str | Path | None = None,
+    cfa_stress_sweep: str | Path | None = None,
     min_samples: int = 1000,
 ) -> Dict[str, Any]:
     evidence = _collect_evidence(
@@ -109,6 +113,7 @@ def build_protocol_coverage(
         condition_metrics=condition_metrics,
         condition_gate=condition_gate,
         mechanism_validation=mechanism_validation,
+        cfa_stress_sweep=cfa_stress_sweep,
     )
     requirements = _requirements(evidence, min_samples=int(min_samples))
     missing_required = [row["id"] for row in requirements if row["scope"] == "claim_required" and row["status"] != "covered"]
@@ -158,6 +163,7 @@ def _collect_evidence(
     condition_metrics: str | Path | None,
     condition_gate: str | Path | None,
     mechanism_validation: str | Path | None,
+    cfa_stress_sweep: str | Path | None,
 ) -> Dict[str, Any]:
     input_names: set[str] = set()
     run_configs: list[Dict[str, Any]] = []
@@ -200,6 +206,7 @@ def _collect_evidence(
     condition = _load_condition_metrics(condition_metrics)
     condition_gate_data = _load_condition_gate(condition_gate)
     mechanism = _load_mechanism_validation(mechanism_validation)
+    cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep)
 
     return {
         "comparison_reports": comparison_paths,
@@ -218,6 +225,7 @@ def _collect_evidence(
         "condition_metrics": condition,
         "condition_gate": condition_gate_data,
         "mechanism_validation": mechanism,
+        "cfa_stress_sweep": cfa_stress,
     }
 
 
@@ -232,6 +240,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     condition_gate = evidence.get("condition_gate", {}) if isinstance(evidence.get("condition_gate"), Mapping) else {}
     mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
+    cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
 
     return [
         _row(
@@ -353,6 +362,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             "rgb_aux_extended_chw" in {str(value) for value in training.get("tensor_keys", ())},
             f"tensor_keys: {', '.join(str(value) for value in training.get('tensor_keys', ())) or 'none'}",
             "The extended tensor should be included when claiming sensor-native side information.",
+        ),
+        _row(
+            "cfa_stress_sweep",
+            "CFA-dependent stress sweep available",
+            "recommended",
+            bool(cfa_stress.get("available")) and bool(cfa_stress.get("pass")),
+            str(cfa_stress.get("summary", "missing")),
+            "A CFA stress sweep helps separate sensor-native signal feasibility from detector-performance claims.",
         ),
     ]
 
@@ -506,6 +523,34 @@ def _load_mechanism_validation(path: str | Path | None) -> Dict[str, Any]:
         "failed_mechanisms": failed,
         "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
         "summary": f"{status}, mechanisms={len(mechanisms)}, failed={len(failed)}, cfa={cfas or 'none'}",
+    }
+
+
+def _load_cfa_stress_sweep(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, CFA_STRESS_SWEEP_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    support = data.get("support", {}) if isinstance(data.get("support"), Mapping) else {}
+    rankings = [row for row in data.get("condition_rankings", ()) if isinstance(row, Mapping)]
+    top = []
+    for ranking in rankings:
+        ranked = ranking.get("ranked_cfas", ()) if isinstance(ranking.get("ranked_cfas", ()), Sequence) else ()
+        first = next((row for row in ranked if isinstance(row, Mapping)), None)
+        if first is not None:
+            top.append(f"{ranking.get('condition')}={first.get('cfa_pattern')}")
+    status = str(data.get("status", ""))
+    case_count = int(support.get("case_count", len(data.get("cases", ()))))
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass",
+        "status": status,
+        "case_count": case_count,
+        "condition_count": len(rankings),
+        "top_cfas": top,
+        "summary": f"{status}, cases={case_count}, top={', '.join(top) or 'none'}",
     }
 
 
@@ -670,6 +715,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     condition = evidence.get("condition_metrics", {}) if isinstance(evidence.get("condition_metrics"), Mapping) else {}
     condition_gate = evidence.get("condition_gate", {}) if isinstance(evidence.get("condition_gate"), Mapping) else {}
     mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
+    cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -710,6 +756,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Condition metrics</th><td>{_optional_link(condition, destination)} {html_lib.escape(str(condition.get('summary', 'missing')))}</td></tr>
       <tr><th>Condition gate</th><td>{_optional_link(condition_gate, destination)} {html_lib.escape(str(condition_gate.get('summary', 'missing')))}</td></tr>
       <tr><th>Mechanism validation</th><td>{_optional_link(mechanism, destination)} {html_lib.escape(str(mechanism.get('summary', 'missing')))}</td></tr>
+      <tr><th>CFA stress sweep</th><td>{_optional_link(cfa_stress, destination)} {html_lib.escape(str(cfa_stress.get('summary', 'missing')))}</td></tr>
     </tbody>
   </table>
   <p>Raw JSON: <code>protocol_coverage_summary.json</code></p>

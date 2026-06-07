@@ -39,6 +39,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Existing comparison rollup path/dir, optionally name=path.")
     parser.add_argument("--protocol-comparison-report", action="append", default=[], help="Additional comparison report used only for benchmark-protocol coverage, for example a naive RAW baseline.")
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir used for RAW/sensor-native claim coverage.")
+    parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir used as diagnostic CFA evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
 
@@ -57,6 +58,7 @@ def main(argv: Any = None) -> int:
         comparison_rollups=args.comparison_rollup,
         protocol_comparison_reports=args.protocol_comparison_report,
         mechanism_validation=args.mechanism_validation,
+        cfa_stress_sweep=args.cfa_stress_sweep,
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -79,6 +81,7 @@ def run_claim_readiness(
     comparison_rollups: Sequence[str | Path] = (),
     protocol_comparison_reports: Sequence[str | Path] = (),
     mechanism_validation: str | Path | None = None,
+    cfa_stress_sweep: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
     destination = Path(output_dir).expanduser()
@@ -182,6 +185,7 @@ def run_claim_readiness(
         condition_metrics=condition_metrics_dir,
         condition_gate=condition_gate_dir,
         mechanism_validation=mechanism_validation,
+        cfa_stress_sweep=cfa_stress_sweep,
         min_samples=int(min_samples),
     )
     protocol_html = write_protocol_coverage(protocol_summary, protocol_dir)
@@ -197,6 +201,7 @@ def run_claim_readiness(
         task_gate=task_gate_dir,
         protocol_coverage=protocol_dir,
         mechanism_validation=mechanism_validation,
+        cfa_stress_sweep=cfa_stress_sweep,
         comparison_rollup_specs=comparison_rollups,
     )
     dashboard_html = write_claim_dashboard(dashboard, dashboard_dir)
@@ -263,6 +268,7 @@ def run_claim_readiness(
             ],
         },
         "mechanism_validation": _mechanism_validation_summary(mechanism_validation),
+        "cfa_stress_sweep": _cfa_stress_sweep_summary(cfa_stress_sweep),
         "benchmark_protocol": {
             "report": str(protocol_html),
             "summary_json": str(protocol_html.parent / "protocol_coverage_summary.json"),
@@ -333,6 +339,28 @@ def _mechanism_validation_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _cfa_stress_sweep_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "cfa_stress_sweep_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"CFA stress sweep summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    support = data.get("support", {}) if isinstance(data.get("support"), Mapping) else {}
+    rankings = [row for row in data.get("condition_rankings", ()) if isinstance(row, Mapping)]
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass",
+        "status": data.get("status"),
+        "case_count": int(support.get("case_count", len(data.get("cases", ())))),
+        "condition_count": len(rankings),
+    }
+
+
 def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "summary_json": summary.get("summary_json"),
@@ -344,6 +372,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "condition_metrics": summary.get("condition_metrics"),
         "condition_gate": summary.get("condition_gate"),
         "mechanism_validation": summary.get("mechanism_validation"),
+        "cfa_stress_sweep": summary.get("cfa_stress_sweep"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],
