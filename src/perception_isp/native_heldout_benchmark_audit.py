@@ -16,6 +16,10 @@ SUMMARY_FILENAME = "native_heldout_benchmark_audit_summary.json"
 COMPARISON_SUMMARY = "comparison_summary.json"
 DEFAULT_BASELINE_INPUT = "human_rgb"
 DEFAULT_TARGET_INPUT = "perception_calibrated_score_label_aux_fusion_rgb_aux_t001"
+DEFAULT_MIN_PRECISION_DELTA = 0.01
+DEFAULT_MIN_FP_REDUCTION = 0.10
+DEFAULT_MAX_RECALL_DROP = 0.01
+THRESHOLD_EPS = 1.0e-12
 TRACKED_METRICS = (
     "precision@0.50_mean",
     "recall@0.50_mean",
@@ -35,6 +39,9 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--baseline-input", default=DEFAULT_BASELINE_INPUT)
     parser.add_argument("--target-input", default=DEFAULT_TARGET_INPUT)
     parser.add_argument("--min-samples", type=int, default=1000)
+    parser.add_argument("--min-precision-delta", type=float, default=DEFAULT_MIN_PRECISION_DELTA)
+    parser.add_argument("--min-fp-reduction", type=float, default=DEFAULT_MIN_FP_REDUCTION)
+    parser.add_argument("--max-recall-drop", type=float, default=DEFAULT_MAX_RECALL_DROP)
     parser.add_argument("--output-dir", default="reports/perception_native_heldout_benchmark_audit")
     args = parser.parse_args(argv)
 
@@ -45,6 +52,9 @@ def main(argv: Any = None) -> int:
         baseline_input=str(args.baseline_input),
         target_input=str(args.target_input),
         min_samples=int(args.min_samples),
+        min_precision_delta=float(args.min_precision_delta),
+        min_fp_reduction=float(args.min_fp_reduction),
+        max_recall_drop=float(args.max_recall_drop),
         source_report_path=summary_path,
     )
     html_path = write_native_heldout_benchmark_audit(summary, args.output_dir)
@@ -72,17 +82,32 @@ def build_native_heldout_benchmark_audit(
     baseline_input: str = DEFAULT_BASELINE_INPUT,
     target_input: str = DEFAULT_TARGET_INPUT,
     min_samples: int = 1000,
+    min_precision_delta: float = DEFAULT_MIN_PRECISION_DELTA,
+    min_fp_reduction: float = DEFAULT_MIN_FP_REDUCTION,
+    max_recall_drop: float = DEFAULT_MAX_RECALL_DROP,
     source_report_path: str | Path | None = None,
 ) -> Dict[str, Any]:
     samples = [row for row in comparison.get("samples", ()) if isinstance(row, Mapping)]
     provenance = _provenance_summary(samples)
     metric_summary = _metric_summary(comparison, baseline_input=baseline_input, target_input=target_input)
-    claim_status = _claim_status(metric_summary, provenance, sample_count=len(samples), min_samples=int(min_samples))
+    thresholds = {
+        "min_precision_delta": float(min_precision_delta),
+        "min_fp_reduction": float(min_fp_reduction),
+        "max_recall_drop": float(max_recall_drop),
+    }
+    claim_status = _claim_status(
+        metric_summary,
+        provenance,
+        sample_count=len(samples),
+        min_samples=int(min_samples),
+        thresholds=thresholds,
+    )
     checks = _checks(
         sample_count=len(samples),
         min_samples=int(min_samples),
         provenance=provenance,
         metric_summary=metric_summary,
+        thresholds=thresholds,
     )
     return {
         "name": "Large held-out native RAW benchmark audit",
@@ -95,12 +120,14 @@ def build_native_heldout_benchmark_audit(
         "target_input": str(target_input),
         "sample_count": len(samples),
         "min_samples": int(min_samples),
+        "thresholds": thresholds,
         "provenance": provenance,
         "metric_summary": metric_summary,
         "checks": checks,
         "interpretation": (
             "This audit verifies whether a large held-out comparison report is backed by native RAW/CFA rows "
-            "without bridge remapping, then records HumanISP-vs-PerceptionISP detector deltas."
+            "without bridge remapping, then records HumanISP-vs-PerceptionISP detector deltas. "
+            "The claim gate requires a minimum precision gain, minimum FP reduction, and bounded recall loss."
         ),
         "claim_boundary": (
             "This proves large held-out native RAW provenance only for the CFA pattern represented by the report. "
@@ -206,7 +233,14 @@ def _metric_summary(comparison: Mapping[str, Any], *, baseline_input: str, targe
     }
 
 
-def _claim_status(metric_summary: Mapping[str, Any], provenance: Mapping[str, Any], *, sample_count: int, min_samples: int) -> str:
+def _claim_status(
+    metric_summary: Mapping[str, Any],
+    provenance: Mapping[str, Any],
+    *,
+    sample_count: int,
+    min_samples: int,
+    thresholds: Mapping[str, Any],
+) -> str:
     native_ok = (
         sample_count >= int(min_samples)
         and _maybe_float(provenance.get("native_raw_source_accepted_fraction")) == 1.0
@@ -218,11 +252,19 @@ def _claim_status(metric_summary: Mapping[str, Any], provenance: Mapping[str, An
     fp_delta = _maybe_float(deltas.get("fp@0.50_mean"))
     recall_delta = _maybe_float(deltas.get("recall@0.50_mean"))
     precision_delta = _maybe_float(deltas.get("precision@0.50_mean"))
+    min_precision_delta = _maybe_float(thresholds.get("min_precision_delta"))
+    min_fp_reduction = _maybe_float(thresholds.get("min_fp_reduction"))
+    max_recall_drop = _maybe_float(thresholds.get("max_recall_drop"))
+    effect_ok = (
+        precision_delta >= min_precision_delta - THRESHOLD_EPS
+        and fp_delta <= -min_fp_reduction + THRESHOLD_EPS
+        and recall_delta >= -max_recall_drop - THRESHOLD_EPS
+    )
     if not native_ok:
         return "native_heldout_benchmark_not_supported"
-    if fp_delta < 0.0 and precision_delta > 0.0 and recall_delta < 0.0:
+    if effect_ok and recall_delta < 0.0:
         return "large_native_fp_reducer_with_recall_tradeoff"
-    if fp_delta < 0.0 and precision_delta > 0.0 and recall_delta >= 0.0:
+    if effect_ok and recall_delta >= 0.0:
         return "large_native_fp_reducer_supported"
     return "large_native_benchmark_diagnostic"
 
@@ -233,8 +275,15 @@ def _checks(
     min_samples: int,
     provenance: Mapping[str, Any],
     metric_summary: Mapping[str, Any],
+    thresholds: Mapping[str, Any],
 ) -> list[Dict[str, Any]]:
     deltas = metric_summary.get("deltas", {}) if isinstance(metric_summary.get("deltas"), Mapping) else {}
+    min_precision_delta = _maybe_float(thresholds.get("min_precision_delta"))
+    min_fp_reduction = _maybe_float(thresholds.get("min_fp_reduction"))
+    max_recall_drop = _maybe_float(thresholds.get("max_recall_drop"))
+    fp_delta = _maybe_float(deltas.get("fp@0.50_mean"))
+    precision_delta = _maybe_float(deltas.get("precision@0.50_mean"))
+    recall_delta = _maybe_float(deltas.get("recall@0.50_mean"))
     return [
         {
             "id": "large_heldout_sample_count",
@@ -271,8 +320,18 @@ def _checks(
         },
         {
             "id": "native_fp_reduction_observed",
-            "status": "pass" if _maybe_float(deltas.get("fp@0.50_mean")) < 0.0 else "fail",
-            "evidence": f"dFP50={_fmt(deltas.get('fp@0.50_mean'), signed=True)}; dP50={_fmt(deltas.get('precision@0.50_mean'), signed=True)}; dR50={_fmt(deltas.get('recall@0.50_mean'), signed=True)}",
+            "status": "pass" if fp_delta <= -min_fp_reduction + THRESHOLD_EPS else "fail",
+            "evidence": f"dFP50={_fmt(fp_delta, signed=True)} threshold<=-{_fmt(min_fp_reduction)}",
+        },
+        {
+            "id": "native_precision_gain_effect_size",
+            "status": "pass" if precision_delta >= min_precision_delta - THRESHOLD_EPS else "fail",
+            "evidence": f"dP50={_fmt(precision_delta, signed=True)} threshold>={_fmt(min_precision_delta, signed=True)}",
+        },
+        {
+            "id": "native_recall_drop_within_budget",
+            "status": "pass" if recall_delta >= -max_recall_drop - THRESHOLD_EPS else "fail",
+            "evidence": f"dR50={_fmt(recall_delta, signed=True)} budget>=-{_fmt(max_recall_drop)}",
         },
     ]
 
@@ -281,6 +340,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     provenance = summary.get("provenance", {}) if isinstance(summary.get("provenance"), Mapping) else {}
     metrics = summary.get("metric_summary", {}) if isinstance(summary.get("metric_summary"), Mapping) else {}
     deltas = metrics.get("deltas", {}) if isinstance(metrics.get("deltas"), Mapping) else {}
+    thresholds = summary.get("thresholds", {}) if isinstance(summary.get("thresholds"), Mapping) else {}
     check_rows = "".join(_check_row(row) for row in summary.get("checks", ()) if isinstance(row, Mapping))
     metric_rows = "".join(_metric_row(metric, metrics) for metric in TRACKED_METRICS)
     return f"""<!doctype html>
@@ -312,6 +372,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     <tr><th>Bridge</th><td>{html_lib.escape(str(provenance.get('bridges', {})))}</td><th>Raw Source</th><td>{html_lib.escape(str(provenance.get('raw_source_keys', {})))}</td><th>Native Resolution Match</th><td>{_fmt(provenance.get('native_resolution_matches_target_fraction'))}</td></tr>
   </tbody></table>
   <h2>Checks</h2>
+  <p>Effect-size gate: min dP50={_fmt(thresholds.get('min_precision_delta'), signed=True)}, min FP50 reduction={_fmt(thresholds.get('min_fp_reduction'))}, max recall drop={_fmt(thresholds.get('max_recall_drop'))}.</p>
   <table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>
   <h2>Metrics</h2>
   <p>Baseline <code>{html_lib.escape(str(metrics.get('baseline_input', '')))}</code> vs target <code>{html_lib.escape(str(metrics.get('target_input', '')))}</code>. dP50={_fmt(deltas.get('precision@0.50_mean'), signed=True)}, dR50={_fmt(deltas.get('recall@0.50_mean'), signed=True)}, dFP50={_fmt(deltas.get('fp@0.50_mean'), signed=True)}.</p>

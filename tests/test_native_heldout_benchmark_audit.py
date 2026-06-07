@@ -60,6 +60,24 @@ class NativeHeldoutBenchmarkAuditTest(unittest.TestCase):
         checks = {row["id"]: row["status"] for row in summary["checks"]}
         self.assertEqual(checks["native_raw_source_for_all_samples"], "pass")
 
+    def test_build_audit_rejects_tiny_effect_size(self) -> None:
+        report = _comparison_report(sample_count=4, remapped=False, precision_delta=0.001, recall_delta=-0.001, fp_delta=-0.001)
+
+        summary = build_native_heldout_benchmark_audit(
+            report,
+            baseline_input="human_rgb",
+            target_input="perception_target",
+            min_samples=4,
+        )
+
+        self.assertEqual(summary["status"], "warning")
+        self.assertFalse(summary["pass"])
+        self.assertEqual(summary["claim_status"], "large_native_benchmark_diagnostic")
+        checks = {row["id"]: row["status"] for row in summary["checks"]}
+        self.assertEqual(checks["native_raw_source_for_all_samples"], "pass")
+        self.assertEqual(checks["native_precision_gain_effect_size"], "fail")
+        self.assertEqual(checks["native_fp_reduction_observed"], "fail")
+
     def test_build_audit_rejects_remapped_or_too_small_reports(self) -> None:
         report = _comparison_report(sample_count=3, remapped=True)
 
@@ -124,6 +142,9 @@ def _comparison_report(
     camerae2e_used: bool = True,
     bridge: str = "native_bayer_v1",
     raw_source_key: str = "camerae2e_scene",
+    precision_delta: float = 0.06,
+    recall_delta: float = -0.01,
+    fp_delta: float = -0.6,
 ) -> dict:
     return {
         "aggregate": {
@@ -139,11 +160,11 @@ def _comparison_report(
                 "fn@0.50_mean": 0.2,
             },
             "perception_target": {
-                "precision@0.50_mean": 0.56,
-                "recall@0.50_mean": 0.79,
+                "precision@0.50_mean": 0.50 + float(precision_delta),
+                "recall@0.50_mean": 0.80 + float(recall_delta),
                 "recall@0.75_mean": 0.61,
                 "small_recall@0.50_mean": 0.205,
-                "fp@0.50_mean": 1.4,
+                "fp@0.50_mean": 2.0 + float(fp_delta),
                 "fp@0.75_mean": 1.9,
                 "det_count_mean": 2.4,
                 "tp@0.50_mean": 0.98,

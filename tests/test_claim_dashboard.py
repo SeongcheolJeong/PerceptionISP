@@ -55,6 +55,24 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("bestRecall none", evidence["evidence"])
             self.assertIn("lowestFPPositive conf=0.9800", evidence["evidence"])
 
+    def test_dashboard_loads_scene_edge_aux_sweep(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sweep = _write_scene_edge_aux_sweep(root / "scene_edge_aux_sweep")
+
+            dashboard = build_claim_dashboard(claim_gate_specs=[], scene_edge_aux_sweep=sweep)
+
+            self.assertTrue(dashboard["scene_edge_aux_sweep"]["pass"])
+            self.assertEqual(dashboard["scene_edge_aux_sweep"]["best_candidate_name"], "edge_evidence")
+            evidence = next(row for row in dashboard["evidence_map"]["current_evidence"] if row["area"] == "Scene-edge aux evidence map")
+            self.assertIn("best=edge_evidence", evidence["evidence"])
+            self.assertTrue(
+                any(
+                    item["claim"].startswith("Scene-edge aux sweep passed: best map edge_evidence")
+                    for item in dashboard["decisions"]
+                )
+            )
+
     def test_dashboard_separates_supported_and_blocked_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1473,6 +1491,47 @@ def _write_scene_edge_confidence(path: Path, *, cfa_pattern: str = "GRBG", psf_s
                 "cfa_patterns": [cfa_pattern],
                 "psf_sigmas": list(psf_sigmas),
                 "interpretation": "unit scene edge confidence",
+                "claim_boundary": "unit diagnostic boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_scene_edge_aux_sweep(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "scene_edge_aux_sweep_summary.json").write_text(
+        json.dumps(
+            {
+                "name": "Scene-edge aux evidence sweep",
+                "status": "pass",
+                "case_count": 16,
+                "candidate_names": ["edge_confidence", "edge_evidence"],
+                "best_candidate": {
+                    "name": "edge_evidence",
+                    "case_count": 16,
+                    "source_edge_f1_mean": 0.69,
+                    "minus_human_source_edge_f1_mean": 0.27,
+                    "source_edge_f1_win_rate": 0.69,
+                    "scene_edge_separation_mean": 0.17,
+                    "min_scene_edge_separation": 0.05,
+                    "negative_scene_edge_separation_count": 0,
+                    "score": 0.31,
+                },
+                "aggregate": {
+                    "edge_evidence": {
+                        "source_edge_f1_mean": 0.69,
+                        "minus_human_source_edge_f1_mean": 0.27,
+                    }
+                },
+                "checks": [
+                    {"id": "aux_sweep_outputs_finite", "status": "pass"},
+                    {"id": "aux_sweep_best_candidate_positive_delta", "status": "pass"},
+                    {"id": "aux_sweep_best_candidate_tracks_source_edges", "status": "pass"},
+                ],
+                "interpretation": "unit aux sweep",
                 "claim_boundary": "unit diagnostic boundary",
             }
         )

@@ -29,6 +29,7 @@ OBJECT_BOUNDARY_DETECTION_BRIDGE_SUMMARY = "object_boundary_detection_bridge_sum
 DETECTOR_BOX_SUPPORT_AUDIT_SUMMARY = "detector_box_support_audit_summary.json"
 NATIVE_HELDOUT_BENCHMARK_AUDIT_SUMMARY = "native_heldout_benchmark_audit_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
+SCENE_EDGE_AUX_SWEEP_SUMMARY = "scene_edge_aux_sweep_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 ADVERSE_NATIVE_SLICE_SUMMARY = "adverse_native_slice_summary.json"
@@ -60,6 +61,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--detector-box-support-audit", default=None, help="Detector-box FP/TP support audit summary path/dir.")
     parser.add_argument("--native-heldout-benchmark-audit", default=None, help="Large held-out native RAW benchmark audit summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
+    parser.add_argument("--scene-edge-aux-sweep", default=None, help="Scene-edge aux evidence sweep summary path/dir.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--adverse-native-slice", default=None, help="Adverse-condition native RAW slice summary path/dir.")
@@ -91,6 +93,7 @@ def main(argv: Any = None) -> int:
         detector_box_support_audit=args.detector_box_support_audit,
         native_heldout_benchmark_audit=args.native_heldout_benchmark_audit,
         scene_edge_confidence=args.scene_edge_confidence,
+        scene_edge_aux_sweep=args.scene_edge_aux_sweep,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         adverse_native_slice=args.adverse_native_slice,
@@ -138,6 +141,7 @@ def build_claim_dashboard(
     detector_box_support_audit: str | Path | None = None,
     native_heldout_benchmark_audit: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
+    scene_edge_aux_sweep: str | Path | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     adverse_native_slice: str | Path | None = None,
@@ -170,6 +174,7 @@ def build_claim_dashboard(
         else None
     )
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
+    scene_edge_aux = _load_scene_edge_aux_sweep(scene_edge_aux_sweep) if scene_edge_aux_sweep is not None else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
     adverse_native = _load_adverse_native_slice(adverse_native_slice) if adverse_native_slice is not None else None
@@ -218,6 +223,7 @@ def build_claim_dashboard(
         detector_box_support,
         native_heldout,
         scene_edge,
+        scene_edge_aux,
         scene_information,
         aux_contribution,
         adverse_native,
@@ -246,6 +252,7 @@ def build_claim_dashboard(
         detector_box_support,
         native_heldout,
         scene_edge,
+        scene_edge_aux,
         scene_information,
         aux_contribution,
         adverse_native,
@@ -274,6 +281,7 @@ def build_claim_dashboard(
         "detector_box_support_audit": detector_box_support,
         "native_heldout_benchmark_audit": native_heldout,
         "scene_edge_confidence": scene_edge,
+        "scene_edge_aux_sweep": scene_edge_aux,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
         "adverse_native_slice": adverse_native,
@@ -752,6 +760,7 @@ def _load_native_heldout_benchmark_audit(spec: str | Path) -> Dict[str, Any]:
     failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
     provenance = data.get("provenance", {}) if isinstance(data.get("provenance"), Mapping) else {}
     metric_summary = data.get("metric_summary", {}) if isinstance(data.get("metric_summary"), Mapping) else {}
+    thresholds = data.get("thresholds", {}) if isinstance(data.get("thresholds"), Mapping) else {}
     return {
         "name": label or _default_name(summary_path),
         "summary_path": str(summary_path),
@@ -767,6 +776,7 @@ def _load_native_heldout_benchmark_audit(spec: str | Path) -> Dict[str, Any]:
         "failed_checks": failed,
         "provenance": dict(provenance),
         "metric_summary": dict(metric_summary),
+        "thresholds": dict(thresholds),
         "source_comparison_summary": str(data.get("source_comparison_summary", "")),
         "source_comparison_html": str(data.get("source_comparison_html", "")),
         "interpretation": str(data.get("interpretation", "")),
@@ -870,6 +880,37 @@ def _load_scene_edge_confidence_one(spec: str | Path) -> Dict[str, Any]:
         "perception_aux_strength_source_edge_f1_win_rate": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_win_rate")),
         "perception_aux_confidence_source_edge_f1_win_rate": _maybe_float(aggregate.get("perception_aux_confidence_source_edge_f1_win_rate")),
         "cases": cases[:12],
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_scene_edge_aux_sweep(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, SCENE_EDGE_AUX_SWEEP_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    best = data.get("best_candidate", {}) if isinstance(data.get("best_candidate"), Mapping) else {}
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "check_count": len(checks),
+        "case_count": int(data.get("case_count", 0)),
+        "candidate_names": [str(value) for value in data.get("candidate_names", ())],
+        "best_candidate": dict(best),
+        "best_candidate_name": str(best.get("name", "")),
+        "best_source_edge_f1_mean": _maybe_float(best.get("source_edge_f1_mean")),
+        "best_minus_human_source_edge_f1_mean": _maybe_float(best.get("minus_human_source_edge_f1_mean")),
+        "best_source_edge_f1_win_rate": _maybe_float(best.get("source_edge_f1_win_rate")),
+        "best_scene_edge_separation_mean": _maybe_float(best.get("scene_edge_separation_mean")),
+        "best_negative_scene_edge_separation_count": int(best.get("negative_scene_edge_separation_count", 0)),
+        "failed_checks": failed,
+        "aggregate": dict(aggregate),
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1673,6 +1714,7 @@ def _build_evidence_map(
     detector_box_support_audit: Mapping[str, Any] | None,
     native_heldout_benchmark_audit: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
+    scene_edge_aux_sweep: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
     adverse_native_slice: Mapping[str, Any] | None,
@@ -1972,6 +2014,18 @@ def _build_evidence_map(
                 "evidence": _scene_edge_evidence(scene_edge_confidence),
                 "claim_boundary": "Shows scene-edge tracking against a high-information proxy; not object-boundary ground truth or detector accuracy.",
                 "next_evidence": "Use the scene-edge proxy around detector boxes to explain which proposals are kept or removed.",
+            }
+        )
+
+    if scene_edge_aux_sweep is not None:
+        current.append(
+            {
+                "area": "Scene-edge aux evidence map",
+                "status": "diagnostic" if bool(scene_edge_aux_sweep.get("pass")) else "not_supported",
+                "claim_strength": "front_end_aux_evidence",
+                "evidence": _scene_edge_aux_sweep_evidence(scene_edge_aux_sweep),
+                "claim_boundary": "Shows which fixed aux edge-evidence map best tracks a high-information scene-edge proxy; not held-out detector-performance evidence.",
+                "next_evidence": "Use the selected aux evidence map in proposal support, RGB+Aux DNN input, and held-out object-boundary gates.",
             }
         )
 
@@ -2446,6 +2500,18 @@ def _scene_edge_evidence(scene_edge: Mapping[str, Any]) -> str:
     )
 
 
+def _scene_edge_aux_sweep_evidence(scene_edge_aux: Mapping[str, Any]) -> str:
+    return (
+        f"cases={int(scene_edge_aux.get('case_count', 0))}; "
+        f"best={scene_edge_aux.get('best_candidate_name', '')}; "
+        f"best F1={_fmt(scene_edge_aux.get('best_source_edge_f1_mean'))}; "
+        f"dF1 vs Human={_fmt(scene_edge_aux.get('best_minus_human_source_edge_f1_mean'), signed=True)}; "
+        f"win={_fmt(scene_edge_aux.get('best_source_edge_f1_win_rate'))}; "
+        f"separation={_fmt(scene_edge_aux.get('best_scene_edge_separation_mean'))}; "
+        f"negative separation={int(scene_edge_aux.get('best_negative_scene_edge_separation_count', 0))}"
+    )
+
+
 def _scene_information_evidence(scene_information: Mapping[str, Any]) -> str:
     return (
         f"scene={int(scene_information.get('scene_width', 0))}x{int(scene_information.get('scene_height', 0))}; "
@@ -2823,6 +2889,7 @@ def _claim_decisions(
     detector_box_support_audit: Mapping[str, Any] | None,
     native_heldout_benchmark_audit: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
+    scene_edge_aux_sweep: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
     adverse_native_slice: Mapping[str, Any] | None,
@@ -3022,6 +3089,23 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in scene_edge_confidence.get("failed_checks", ())) or "configured scene edge-confidence checks"
             decisions.append({"status": "not_supported", "claim": f"Scene edge-confidence suite failed for {failed}; do not use scene-edge confidence as feasibility evidence yet."})
+    if scene_edge_aux_sweep is not None:
+        if bool(scene_edge_aux_sweep.get("pass")):
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "Scene-edge aux sweep passed: "
+                        f"best map {scene_edge_aux_sweep.get('best_candidate_name', '')}, "
+                        f"dF1 vs Human {_fmt(scene_edge_aux_sweep.get('best_minus_human_source_edge_f1_mean'), signed=True)}, "
+                        f"win {_fmt(scene_edge_aux_sweep.get('best_source_edge_f1_win_rate'))}. "
+                        "Use this as front-end aux evidence, not detector-performance evidence."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in scene_edge_aux_sweep.get("failed_checks", ())) or "configured scene-edge aux sweep checks"
+            decisions.append({"status": "not_supported", "claim": f"Scene-edge aux sweep failed for {failed}; do not use aux edge evidence as feasibility support yet."})
     if scene_information_stress is not None:
         if bool(scene_information_stress.get("pass")):
             decisions.append(
