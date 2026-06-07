@@ -45,6 +45,33 @@ class RawDatasetAcquisitionTest(unittest.TestCase):
         self.assertEqual(failed["blocker"], "unit failure")
         self.assertEqual(summary["recommended_first"], "ROD / RAOD:openi_dataset")
 
+    def test_local_state_recommends_aodraw_test_raw_after_annotations(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dataset_root = root / "datasets"
+            download_root = root / "downloads"
+            (dataset_root / "aodraw" / "annotations").mkdir(parents=True)
+            download_root.mkdir()
+            (dataset_root / "aodraw" / "annotations" / "AODRaw_annotations.zip").write_bytes(b"annotations")
+            (download_root / "AODRaw_downsampled_srgb.zip").write_bytes(b"partial")
+
+            summary = build_raw_dataset_acquisition(
+                check_network=False,
+                check_local_state=True,
+                dataset_root=dataset_root,
+                download_roots=(download_root,),
+            )
+
+            self.assertTrue(summary["local_state_checked"])
+            self.assertEqual(summary["recommended_first"], "AODRaw:images_downsampled_raw_test_baidu")
+            self.assertTrue(summary["local_state"]["aodraw_annotations_present"])
+            self.assertEqual(summary["local_state"]["aodraw_test_raw_zip"]["status"], "missing")
+            self.assertEqual(summary["local_state"]["aodraw_srgb_zip"]["status"], "partial")
+            resources = {(row["dataset"], row["resource"]): row for row in summary["resources"]}
+            self.assertEqual(resources[("AODRaw", "annotations_google_drive")]["acquisition_status"], "local_available")
+            self.assertEqual(resources[("AODRaw", "images_downsampled_srgb_baidu")]["acquisition_status"], "local_invalid_retry")
+            self.assertIn("local file is only", resources[("AODRaw", "images_downsampled_srgb_baidu")]["blocker"])
+
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -58,10 +85,11 @@ class RawDatasetAcquisitionTest(unittest.TestCase):
 
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                exit_code = raw_dataset_acquisition_main(["--output-dir", str(root / "cli")])
+                exit_code = raw_dataset_acquisition_main(["--output-dir", str(root / "cli"), "--check-local-state", "--dataset-root", str(root / "datasets")])
             printed = json.loads(stdout.getvalue())
             self.assertEqual(exit_code, 0)
             self.assertFalse(printed["network_checked"])
+            self.assertTrue(printed["local_state_checked"])
             self.assertEqual(printed["recommended_first"], "AODRaw:annotations_google_drive")
             self.assertTrue((root / "cli" / "raw_dataset_acquisition_summary.json").exists())
 

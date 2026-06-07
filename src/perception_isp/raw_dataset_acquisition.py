@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import shutil
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Sequence
 
@@ -179,12 +181,18 @@ def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Audit RAW dataset acquisition links and disk risk.")
     parser.add_argument("--output-dir", default="reports/perception_raw_dataset_acquisition")
     parser.add_argument("--check-network", action="store_true", help="Issue lightweight HTTP HEAD/GET checks.")
+    parser.add_argument("--check-local-state", action="store_true", help="Inspect local dataset/download files before recommending the next action.")
+    parser.add_argument("--dataset-root", default="data/raw_datasets", help="Base raw-dataset directory used by --check-local-state.")
+    parser.add_argument("--download-root", action="append", default=[], help="Directory to scan for manual downloads. Repeatable; defaults to ~/Downloads.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     args = parser.parse_args(argv)
 
     summary = build_raw_dataset_acquisition(
         check_network=bool(args.check_network),
         timeout_seconds=float(args.timeout),
+        check_local_state=bool(args.check_local_state),
+        dataset_root=args.dataset_root,
+        download_roots=tuple(args.download_root) if args.download_root else (Path.home() / "Downloads",),
     )
     html_path = write_raw_dataset_acquisition(summary, args.output_dir)
     print(
@@ -196,6 +204,7 @@ def main(argv: Any = None) -> int:
                     "status": summary["status"],
                     "resource_count": len(summary["resources"]),
                     "network_checked": bool(summary["network_checked"]),
+                    "local_state_checked": bool(summary["local_state_checked"]),
                     "recommended_first": summary["recommended_first"],
                 }
             ),
@@ -208,10 +217,18 @@ def main(argv: Any = None) -> int:
 def build_raw_dataset_acquisition(
     *,
     check_network: bool = False,
+    check_local_state: bool = False,
+    dataset_root: str | Path = "data/raw_datasets",
+    download_roots: Sequence[str | Path] = (Path.home() / "Downloads",),
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     opener: ResourceOpener | None = None,
 ) -> Dict[str, Any]:
     open_resource = opener or _open_resource
+    local_state = (
+        _build_local_state(dataset_root=dataset_root, download_roots=download_roots)
+        if check_local_state
+        else _empty_local_state(dataset_root=dataset_root, download_roots=download_roots)
+    )
     resources = []
     for raw_resource in DATASET_RESOURCES:
         resource = dict(raw_resource)
@@ -219,7 +236,9 @@ def build_raw_dataset_acquisition(
             resource["network"] = dict(open_resource(str(resource["url"]), float(timeout_seconds)))
         else:
             resource["network"] = {"checked": False, "status": "not_checked"}
+        resource["local_status"] = _resource_local_status(resource, local_state)
         resource["acquisition_status"] = _acquisition_status(resource)
+        resource["acquisition_status"] = _apply_local_status(resource["acquisition_status"], resource["local_status"])
         resource["blocker"] = _blocker(resource)
         resources.append(resource)
     dataset_summary = _dataset_summary(resources)
@@ -227,10 +246,12 @@ def build_raw_dataset_acquisition(
         "name": "PerceptionISP RAW dataset acquisition audit",
         "status": "pass",
         "network_checked": bool(check_network),
+        "local_state_checked": bool(check_local_state),
         "checked_at_epoch": time.time() if check_network else None,
+        "local_state": local_state,
         "resources": resources,
         "datasets": dataset_summary,
-        "recommended_first": _recommended_first(resources),
+        "recommended_first": _recommended_first(resources, local_state=local_state if check_local_state else None),
         "download_guardrail": (
             "Do not bulk-download original RAW directories until annotation access, license/access requirements, and disk budget are confirmed. "
             "Prefer annotation-only or small manually selected subsets first."
@@ -323,7 +344,20 @@ def _acquisition_status(resource: Mapping[str, Any]) -> str:
     return "needs_manual_check"
 
 
+def _apply_local_status(acquisition_status: str, local_status: Mapping[str, Any]) -> str:
+    status = str(local_status.get("status", "not_checked"))
+    if status == "present":
+        return "local_available"
+    if status in {"partial", "invalid"}:
+        return "local_invalid_retry"
+    return acquisition_status
+
+
 def _blocker(resource: Mapping[str, Any]) -> str:
+    local = resource.get("local_status", {}) if isinstance(resource.get("local_status"), Mapping) else {}
+    local_status = str(local.get("status", ""))
+    if local_status in {"partial", "invalid"}:
+        return str(local.get("message", "local file is incomplete or invalid; download again"))
     status = str(resource.get("acquisition_status", ""))
     if status == "blocked_by_network":
         network = resource.get("network", {}) if isinstance(resource.get("network"), Mapping) else {}
@@ -349,12 +383,23 @@ def _dataset_summary(resources: Sequence[Mapping[str, Any]]) -> list[Dict[str, A
                 "manual_access_count": sum(1 for row in dataset_resources if row.get("acquisition_status") == "manual_access_likely"),
                 "large_download_count": sum(1 for row in dataset_resources if row.get("acquisition_status") == "defer_large_download"),
                 "blocked_count": sum(1 for row in dataset_resources if row.get("acquisition_status") == "blocked_by_network"),
+                "local_available_count": sum(1 for row in dataset_resources if row.get("acquisition_status") == "local_available"),
+                "local_invalid_count": sum(1 for row in dataset_resources if row.get("acquisition_status") == "local_invalid_retry"),
             }
         )
     return rows
 
 
-def _recommended_first(resources: Sequence[Mapping[str, Any]]) -> str:
+def _recommended_first(resources: Sequence[Mapping[str, Any]], *, local_state: Mapping[str, Any] | None = None) -> str:
+    if local_state is not None:
+        if bool(local_state.get("aodraw_annotations_present")):
+            test_raw = local_state.get("aodraw_test_raw_zip", {}) if isinstance(local_state.get("aodraw_test_raw_zip"), Mapping) else {}
+            srgb = local_state.get("aodraw_srgb_zip", {}) if isinstance(local_state.get("aodraw_srgb_zip"), Mapping) else {}
+            if str(test_raw.get("status", "missing")) != "present":
+                return "AODRaw:images_downsampled_raw_test_baidu"
+            if str(srgb.get("status", "missing")) != "present":
+                return "AODRaw:images_downsampled_srgb_baidu"
+            return "AODRaw:run_post_download_pipeline"
     for dataset, resource in (
         ("AODRaw", "annotations_google_drive"),
         ("ROD / RAOD", "openi_dataset"),
@@ -375,9 +420,145 @@ def _recommended_first(resources: Sequence[Mapping[str, Any]]) -> str:
     return "none"
 
 
+def _empty_local_state(*, dataset_root: str | Path, download_roots: Sequence[str | Path]) -> Dict[str, Any]:
+    return {
+        "checked": False,
+        "dataset_root": str(Path(dataset_root).expanduser()),
+        "download_roots": [str(Path(item).expanduser()) for item in download_roots],
+    }
+
+
+def _build_local_state(*, dataset_root: str | Path, download_roots: Sequence[str | Path]) -> Dict[str, Any]:
+    root = Path(dataset_root).expanduser()
+    aodraw_root = root / "aodraw" if root.name != "aodraw" else root
+    search_roots = [Path(item).expanduser() for item in download_roots] + [aodraw_root, aodraw_root / "downloads"]
+    annotations = aodraw_root / "annotations" / "AODRaw_annotations.zip"
+    test_raw = _find_download_candidate(search_roots, "AODRaw_test_downsampled_raw.zip", expected_bytes=58936290415)
+    train_raw = _find_download_candidate(search_roots, "AODRaw_train_downsampled_raw.zip", expected_bytes=137186166557)
+    srgb = _find_srgb_candidate(search_roots)
+    disk_probe = root if root.exists() else root.parent
+    while not disk_probe.exists() and disk_probe != disk_probe.parent:
+        disk_probe = disk_probe.parent
+    usage = shutil.disk_usage(disk_probe)
+    return {
+        "checked": True,
+        "dataset_root": str(root),
+        "aodraw_root": str(aodraw_root),
+        "download_roots": [str(path) for path in search_roots],
+        "disk_available_gib": round(float(usage.free) / float(1024**3), 2),
+        "aodraw_annotations_present": bool(annotations.is_file()),
+        "aodraw_annotations_path": str(annotations) if annotations.is_file() else "",
+        "aodraw_test_raw_zip": test_raw,
+        "aodraw_train_raw_zip": train_raw,
+        "aodraw_srgb_zip": srgb,
+        "next_local_action": _local_next_action(annotations_present=annotations.is_file(), test_raw=test_raw, srgb=srgb),
+    }
+
+
+def _find_srgb_candidate(search_roots: Sequence[Path]) -> Dict[str, Any]:
+    names = ("AODRaw_downsampled_srgb.zip", "AODRaw_images_downsampled_srgb.zip", "images_downsampled_srgb.zip")
+    candidates = []
+    for name in names:
+        candidate = _find_download_candidate(search_roots, name, expected_bytes=int(4.3 * 1024**3), validate_zip=True)
+        if candidate.get("status") != "missing":
+            candidates.append(candidate)
+    if not candidates:
+        return _missing_candidate(names[0])
+    severity = {"present": 0, "partial": 1, "invalid": 2, "missing": 3}
+    return sorted(candidates, key=lambda item: severity.get(str(item.get("status")), 9))[0]
+
+
+def _find_download_candidate(
+    search_roots: Sequence[Path],
+    filename: str,
+    *,
+    expected_bytes: int,
+    validate_zip: bool = False,
+) -> Dict[str, Any]:
+    for root in search_roots:
+        path = root / filename
+        if not path.is_file():
+            continue
+        size = int(path.stat().st_size)
+        if size < int(expected_bytes * 0.95):
+            return {
+                "filename": filename,
+                "path": str(path),
+                "status": "partial",
+                "size_bytes": size,
+                "expected_bytes": int(expected_bytes),
+                "message": f"local file is only {round(size / 1024**2, 2)} MiB; expected about {round(expected_bytes / 1024**3, 2)} GiB",
+            }
+        if validate_zip and not zipfile.is_zipfile(path):
+            return {
+                "filename": filename,
+                "path": str(path),
+                "status": "invalid",
+                "size_bytes": size,
+                "expected_bytes": int(expected_bytes),
+                "message": "local file is not a readable zip archive",
+            }
+        return {
+            "filename": filename,
+            "path": str(path),
+            "status": "present",
+            "size_bytes": size,
+            "expected_bytes": int(expected_bytes),
+            "message": "local file is present and size is plausible",
+        }
+    return _missing_candidate(filename, expected_bytes=expected_bytes)
+
+
+def _missing_candidate(filename: str, *, expected_bytes: int | None = None) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {"filename": filename, "path": "", "status": "missing", "message": "not found locally"}
+    if expected_bytes is not None:
+        payload["expected_bytes"] = int(expected_bytes)
+    return payload
+
+
+def _resource_local_status(resource: Mapping[str, Any], local_state: Mapping[str, Any]) -> Dict[str, Any]:
+    if not bool(local_state.get("checked")):
+        return {"checked": False, "status": "not_checked", "message": ""}
+    dataset = str(resource.get("dataset", ""))
+    name = str(resource.get("resource", ""))
+    if dataset != "AODRaw":
+        return {"checked": True, "status": "not_applicable", "message": ""}
+    if name == "annotations_google_drive":
+        present = bool(local_state.get("aodraw_annotations_present"))
+        return {
+            "checked": True,
+            "status": "present" if present else "missing",
+            "path": str(local_state.get("aodraw_annotations_path", "")),
+            "message": "annotation archive is already local" if present else "annotation archive is not local",
+        }
+    key_by_resource = {
+        "images_downsampled_raw_test_baidu": "aodraw_test_raw_zip",
+        "images_downsampled_raw_train_baidu": "aodraw_train_raw_zip",
+        "images_downsampled_srgb_baidu": "aodraw_srgb_zip",
+    }
+    key = key_by_resource.get(name)
+    if key:
+        candidate = dict(local_state.get(key, {}) if isinstance(local_state.get(key), Mapping) else {})
+        candidate["checked"] = True
+        return candidate
+    return {"checked": True, "status": "not_applicable", "message": ""}
+
+
+def _local_next_action(*, annotations_present: bool, test_raw: Mapping[str, Any], srgb: Mapping[str, Any]) -> str:
+    if not annotations_present:
+        return "Download AODRaw_annotations.zip first."
+    if str(test_raw.get("status", "missing")) != "present":
+        return "Download AODRaw_test_downsampled_raw.zip first; current local state is not evaluation-ready."
+    if str(srgb.get("status", "missing")) != "present":
+        return "Download a valid downsampled sRGB zip/directory next for paired checks."
+    return "Run the AODRaw post-download pipeline."
+
+
 def _render_html(summary: Mapping[str, Any]) -> str:
     dataset_rows = "".join(_dataset_row(row) for row in summary.get("datasets", ()) if isinstance(row, Mapping))
     resource_rows = "".join(_resource_row(row) for row in summary.get("resources", ()) if isinstance(row, Mapping))
+    local_state = summary.get("local_state", {}) if isinstance(summary.get("local_state"), Mapping) else {}
+    local_html = _local_state_html(local_state)
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -396,11 +577,12 @@ def _render_html(summary: Mapping[str, Any]) -> str:
 <body>
   <h1>PerceptionISP RAW Dataset Acquisition Audit</h1>
   <div class="note">{html_lib.escape(str(summary.get('download_guardrail', '')))}</div>
-  <p>Status: <code>{html_lib.escape(str(summary.get('status', '')))}</code>; network checked: <code>{html_lib.escape(str(summary.get('network_checked', '')))}</code>; recommended first: <code>{html_lib.escape(str(summary.get('recommended_first', '')))}</code>.</p>
+  <p>Status: <code>{html_lib.escape(str(summary.get('status', '')))}</code>; network checked: <code>{html_lib.escape(str(summary.get('network_checked', '')))}</code>; local checked: <code>{html_lib.escape(str(summary.get('local_state_checked', '')))}</code>; recommended first: <code>{html_lib.escape(str(summary.get('recommended_first', '')))}</code>.</p>
+  {local_html}
   <h2>Dataset Summary</h2>
-  <table><thead><tr><th>Dataset</th><th>Priority</th><th>Resources</th><th>Ready</th><th>Manual</th><th>Large</th><th>Blocked</th></tr></thead><tbody>{dataset_rows}</tbody></table>
+  <table><thead><tr><th>Dataset</th><th>Priority</th><th>Resources</th><th>Ready</th><th>Manual</th><th>Large</th><th>Blocked</th><th>Local</th><th>Invalid</th></tr></thead><tbody>{dataset_rows}</tbody></table>
   <h2>Resources</h2>
-  <table><thead><tr><th>Priority</th><th>Dataset</th><th>Resource</th><th>Kind</th><th>Access</th><th>Disk GB</th><th>Status</th><th>Network</th><th>Blocker</th><th>First Action</th><th>URL</th></tr></thead><tbody>{resource_rows}</tbody></table>
+  <table><thead><tr><th>Priority</th><th>Dataset</th><th>Resource</th><th>Kind</th><th>Access</th><th>Disk GB</th><th>Status</th><th>Local</th><th>Network</th><th>Blocker</th><th>First Action</th><th>URL</th></tr></thead><tbody>{resource_rows}</tbody></table>
   <p>{html_lib.escape(str(summary.get('interpretation', '')))}</p>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code></p>
 </body>
@@ -418,12 +600,15 @@ def _dataset_row(row: Mapping[str, Any]) -> str:
         f"<td>{int(row.get('manual_access_count', 0))}</td>"
         f"<td>{int(row.get('large_download_count', 0))}</td>"
         f"<td>{int(row.get('blocked_count', 0))}</td>"
+        f"<td>{int(row.get('local_available_count', 0))}</td>"
+        f"<td>{int(row.get('local_invalid_count', 0))}</td>"
         "</tr>"
     )
 
 
 def _resource_row(row: Mapping[str, Any]) -> str:
     network = row.get("network", {}) if isinstance(row.get("network"), Mapping) else {}
+    local = row.get("local_status", {}) if isinstance(row.get("local_status"), Mapping) else {}
     url = str(row.get("url", ""))
     disk = row.get("disk_estimate_gb")
     disk_text = "unknown" if disk is None else f"{float(disk):.1f}"
@@ -431,6 +616,10 @@ def _resource_row(row: Mapping[str, Any]) -> str:
     http_status = network.get("http_status")
     if http_status:
         network_text += f" ({http_status})"
+    local_text = str(local.get("status", "not_checked"))
+    local_message = str(local.get("message", ""))
+    if local_message:
+        local_text += f": {local_message}"
     return (
         "<tr>"
         f"<td><code>{html_lib.escape(str(row.get('priority', '')))}</code></td>"
@@ -440,12 +629,48 @@ def _resource_row(row: Mapping[str, Any]) -> str:
         f"<td>{html_lib.escape(str(row.get('expected_access', '')))}</td>"
         f"<td>{html_lib.escape(disk_text)}</td>"
         f"<td><code>{html_lib.escape(str(row.get('acquisition_status', '')))}</code></td>"
+        f"<td>{html_lib.escape(local_text)}</td>"
         f"<td>{html_lib.escape(network_text)}</td>"
         f"<td>{html_lib.escape(str(row.get('blocker', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('first_action', '')))}</td>"
         f"<td><a href=\"{html_lib.escape(url)}\">link</a></td>"
         "</tr>"
     )
+
+
+def _local_state_html(local_state: Mapping[str, Any]) -> str:
+    if not bool(local_state.get("checked")):
+        return ""
+    rows = [
+        ("AODRaw annotations", "present" if bool(local_state.get("aodraw_annotations_present")) else "missing", str(local_state.get("aodraw_annotations_path", ""))),
+        ("AODRaw test RAW zip", _candidate_status(local_state.get("aodraw_test_raw_zip")), _candidate_message(local_state.get("aodraw_test_raw_zip"))),
+        ("AODRaw train RAW zip", _candidate_status(local_state.get("aodraw_train_raw_zip")), _candidate_message(local_state.get("aodraw_train_raw_zip"))),
+        ("AODRaw sRGB zip", _candidate_status(local_state.get("aodraw_srgb_zip")), _candidate_message(local_state.get("aodraw_srgb_zip"))),
+    ]
+    body = "".join(
+        "<tr>"
+        f"<td>{html_lib.escape(label)}</td>"
+        f"<td><code>{html_lib.escape(status)}</code></td>"
+        f"<td>{html_lib.escape(message)}</td>"
+        "</tr>"
+        for label, status, message in rows
+    )
+    return (
+        "<h2>Local State</h2>"
+        f"<p>Next local action: <b>{html_lib.escape(str(local_state.get('next_local_action', '')))}</b> "
+        f"Disk available: <code>{html_lib.escape(str(local_state.get('disk_available_gib', '')))} GiB</code>.</p>"
+        f"<table><thead><tr><th>Item</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{body}</tbody></table>"
+    )
+
+
+def _candidate_status(value: Any) -> str:
+    return str(value.get("status", "")) if isinstance(value, Mapping) else ""
+
+
+def _candidate_message(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    return str(value.get("path") or value.get("message") or "")
 
 
 if __name__ == "__main__":
