@@ -26,6 +26,7 @@ class ClaimReadinessTest(unittest.TestCase):
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
             object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
+            detector_box_support = _write_detector_box_support_audit(root / "detector_box_support")
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
@@ -53,6 +54,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 edge_fidelity_suite=edge_fidelity,
                 object_boundary_edge=object_boundary,
                 object_boundary_detection_bridge=object_boundary_bridge,
+                detector_box_support_audit=detector_box_support,
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
@@ -87,6 +89,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("edge_fidelity_suite", summary)
             self.assertIn("object_boundary_edge", summary)
             self.assertIn("object_boundary_detection_bridge", summary)
+            self.assertIn("detector_box_support_audit", summary)
             self.assertIn("scene_edge_confidence", summary)
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
@@ -133,6 +136,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             self.assertTrue(summary["object_boundary_detection_bridge"]["pass"])
             self.assertEqual(summary["object_boundary_detection_bridge"]["claim_status"], "object_boundary_detection_bridge_diagnostic")
+            self.assertTrue(summary["detector_box_support_audit"]["pass"])
+            self.assertEqual(summary["detector_box_support_audit"]["claim_status"], "detector_box_support_diagnostic")
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -156,6 +161,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["edge_fidelity_suite"]["pass"])
             self.assertTrue(dashboard_summary["object_boundary_edge"]["pass"])
             self.assertTrue(dashboard_summary["object_boundary_detection_bridge"]["pass"])
+            self.assertTrue(dashboard_summary["detector_box_support_audit"]["pass"])
             self.assertTrue(dashboard_summary["scene_edge_confidence"]["pass"])
             self.assertEqual(dashboard_summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
@@ -186,6 +192,7 @@ class ClaimReadinessTest(unittest.TestCase):
             rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
             object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
+            detector_box_support = _write_detector_box_support_audit(root / "detector_box_support")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = readiness_main(
@@ -209,6 +216,8 @@ class ClaimReadinessTest(unittest.TestCase):
                         str(object_boundary),
                         "--object-boundary-detection-bridge",
                         str(object_boundary_bridge),
+                        "--detector-box-support-audit",
+                        str(detector_box_support),
                         "--cfa-lenspsf-aux-ablation",
                         str(cfa_lenspsf_aux_ablation),
                         "--output-dir",
@@ -229,6 +238,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(printed["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             self.assertTrue(printed["object_boundary_detection_bridge"]["pass"])
             self.assertEqual(printed["object_boundary_detection_bridge"]["claim_status"], "object_boundary_detection_bridge_diagnostic")
+            self.assertTrue(printed["detector_box_support_audit"]["pass"])
+            self.assertEqual(printed["detector_box_support_audit"]["claim_status"], "detector_box_support_diagnostic")
             self.assertTrue(printed["adverse_native_slice"]["pass"])
             self.assertTrue(printed["adverse_task_slice"]["pass"])
             self.assertEqual(printed["adverse_task_slice"]["claim_status"], "adverse_task_gate_partially_supported")
@@ -765,6 +776,74 @@ def _write_object_boundary_detection_bridge(path: Path) -> Path:
         "claim_boundary": "unit TP/miss bridge only",
     }
     (path / "object_boundary_detection_bridge_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_detector_box_support_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "pass": True,
+        "claim_status": "detector_box_support_diagnostic",
+        "sample_count": 8,
+        "target_input": "perception_score_aux",
+        "transition_baseline_input": "perception_fusion_rgb_aux",
+        "checks": [
+            {"id": "audit_inputs_have_detector_rows", "status": "pass"},
+            {"id": "target_fp_tp_rows_available", "status": "pass"},
+            {"id": "target_score_separates_fp_from_tp", "status": "pass"},
+            {"id": "target_aux_edge_global_result_recorded", "status": "pass"},
+            {"id": "transition_bridge_available", "status": "pass"},
+            {"id": "transition_removes_more_fp_than_tp", "status": "pass"},
+            {"id": "removed_fp_has_lower_aux_edge_support", "status": "pass"},
+            {"id": "removed_fp_has_lower_source_scene_edge_support", "status": "pass"},
+        ],
+        "target_summary": {
+            "input_name": "perception_score_aux",
+            "detection_count": 20,
+            "tp_count": 12,
+            "fp_count": 8,
+            "precision_proxy": 0.60,
+            "correlations": {
+                "rows": [
+                    {"feature": "score", "delta_fp_minus_tp": -0.40, "auc_low_feature_predicts_fp": 0.85, "lower_feature_predicts_fp": True},
+                    {"feature": "edge_support", "delta_fp_minus_tp": 0.02, "auc_low_feature_predicts_fp": 0.44, "lower_feature_predicts_fp": False},
+                ]
+            },
+        },
+        "input_summaries": [],
+        "transition_bridge": {
+            "compared_sample_count": 8,
+            "baseline_detection_count": 22,
+            "target_detection_count": 20,
+            "removed_fp_count": 4,
+            "removed_tp_count": 0,
+            "fp_delta_count": -4,
+            "tp_delta_count": 0,
+            "proposal_correlation": {
+                "rows": [
+                    {
+                        "comparison": "removed_fp_vs_kept_tp",
+                        "feature": "edge_support",
+                        "delta": -0.05,
+                        "auc_low_feature_predicts_positive": 0.62,
+                        "lower_feature_predicts_positive": True,
+                    },
+                    {
+                        "comparison": "removed_fp_vs_kept_tp",
+                        "feature": "scene_edge_support",
+                        "delta": -0.03,
+                        "auc_low_feature_predicts_positive": 0.66,
+                        "lower_feature_predicts_positive": True,
+                    },
+                ]
+            },
+        },
+        "interpretation": "unit detector-box support audit",
+        "claim_boundary": "unit support metadata boundary",
+    }
+    (path / "detector_box_support_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

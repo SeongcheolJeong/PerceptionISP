@@ -46,6 +46,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir used as diagnostic CFA/LensPSF edge evidence.")
     parser.add_argument("--object-boundary-edge", default=None, help="Object-box-boundary edge summary path/dir used as diagnostic KITTI box-boundary evidence.")
     parser.add_argument("--object-boundary-detection-bridge", default=None, help="Object-box-boundary edge to detector TP/miss bridge summary path/dir.")
+    parser.add_argument("--detector-box-support-audit", default=None, help="Detector-box FP/TP support audit summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir used as high-information scene edge evidence. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
@@ -82,6 +83,7 @@ def main(argv: Any = None) -> int:
         edge_fidelity_suite=args.edge_fidelity_suite,
         object_boundary_edge=args.object_boundary_edge,
         object_boundary_detection_bridge=args.object_boundary_detection_bridge,
+        detector_box_support_audit=args.detector_box_support_audit,
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
@@ -122,6 +124,7 @@ def run_claim_readiness(
     edge_fidelity_suite: str | Path | None = None,
     object_boundary_edge: str | Path | None = None,
     object_boundary_detection_bridge: str | Path | None = None,
+    detector_box_support_audit: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
@@ -268,6 +271,7 @@ def run_claim_readiness(
         edge_fidelity_suite=edge_fidelity_suite,
         object_boundary_edge=object_boundary_edge,
         object_boundary_detection_bridge=object_boundary_detection_bridge,
+        detector_box_support_audit=detector_box_support_audit,
         scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
@@ -352,6 +356,7 @@ def run_claim_readiness(
         "edge_fidelity_suite": _edge_fidelity_suite_summary(edge_fidelity_suite),
         "object_boundary_edge": _object_boundary_edge_summary(object_boundary_edge),
         "object_boundary_detection_bridge": _object_boundary_detection_bridge_summary(object_boundary_detection_bridge),
+        "detector_box_support_audit": _detector_box_support_audit_summary(detector_box_support_audit),
         "scene_edge_confidence": _scene_edge_confidence_summary(scene_edge_confidence),
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
@@ -567,6 +572,61 @@ def _object_boundary_detection_bridge_summary(path: str | Path | None) -> Dict[s
         "target_only_detected_count": int(aggregate.get("target_only_detected_count", 0)),
         "baseline_only_detected_count": int(aggregate.get("baseline_only_detected_count", 0)),
     }
+
+
+def _detector_box_support_audit_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "detector_box_support_audit_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"detector-box support audit summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) != "pass"]
+    target = data.get("target_summary", {}) if isinstance(data.get("target_summary"), Mapping) else {}
+    target_corr = target.get("correlations", {}) if isinstance(target.get("correlations"), Mapping) else {}
+    bridge = data.get("transition_bridge", {}) if isinstance(data.get("transition_bridge"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": bool(data.get("pass")) and not failed,
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "failed_checks": failed,
+        "check_count": len(checks),
+        "sample_count": int(data.get("sample_count", 0)),
+        "target_input": data.get("target_input"),
+        "target_detection_count": int(target.get("detection_count", 0)),
+        "target_tp_count": int(target.get("tp_count", 0)),
+        "target_fp_count": int(target.get("fp_count", 0)),
+        "target_score_auc_low_fp": _detector_box_summary_auc(target_corr, "score"),
+        "target_edge_auc_low_fp": _detector_box_summary_auc(target_corr, "edge_support"),
+        "target_edge_delta_fp_minus_tp": _detector_box_summary_delta(target_corr, "edge_support"),
+        "removed_fp_count": int(bridge.get("removed_fp_count", 0)),
+        "removed_tp_count": int(bridge.get("removed_tp_count", 0)),
+        "fp_delta_count": int(bridge.get("fp_delta_count", 0)),
+        "tp_delta_count": int(bridge.get("tp_delta_count", 0)),
+    }
+
+
+def _detector_box_summary_auc(correlations: Mapping[str, Any], feature: str) -> float | None:
+    row = _detector_box_summary_correlation(correlations, feature)
+    return _optional_float(row.get("auc_low_feature_predicts_fp")) if row is not None else None
+
+
+def _detector_box_summary_delta(correlations: Mapping[str, Any], feature: str) -> float | None:
+    row = _detector_box_summary_correlation(correlations, feature)
+    return _optional_float(row.get("delta_fp_minus_tp")) if row is not None else None
+
+
+def _detector_box_summary_correlation(correlations: Mapping[str, Any], feature: str) -> Mapping[str, Any] | None:
+    for row in correlations.get("rows", ()):
+        if isinstance(row, Mapping) and str(row.get("feature", "")) == str(feature):
+            return row
+    return None
 
 
 def _scene_edge_confidence_summary(path: str | Path | Sequence[str | Path] | None) -> Dict[str, Any]:
@@ -1035,6 +1095,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "edge_fidelity_suite": summary.get("edge_fidelity_suite"),
         "object_boundary_edge": summary.get("object_boundary_edge"),
         "object_boundary_detection_bridge": summary.get("object_boundary_detection_bridge"),
+        "detector_box_support_audit": summary.get("detector_box_support_audit"),
         "scene_edge_confidence": summary.get("scene_edge_confidence"),
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),

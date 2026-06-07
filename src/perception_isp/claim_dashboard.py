@@ -26,6 +26,7 @@ EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
 EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 OBJECT_BOUNDARY_EDGE_SUMMARY = "object_boundary_edge_summary.json"
 OBJECT_BOUNDARY_DETECTION_BRIDGE_SUMMARY = "object_boundary_detection_bridge_summary.json"
+DETECTOR_BOX_SUPPORT_AUDIT_SUMMARY = "detector_box_support_audit_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
@@ -55,6 +56,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir.")
     parser.add_argument("--object-boundary-edge", default=None, help="Object-box-boundary edge evidence summary path/dir.")
     parser.add_argument("--object-boundary-detection-bridge", default=None, help="Object-box-boundary edge to detector TP/miss bridge summary path/dir.")
+    parser.add_argument("--detector-box-support-audit", default=None, help="Detector-box FP/TP support audit summary path/dir.")
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
@@ -84,6 +86,7 @@ def main(argv: Any = None) -> int:
         edge_fidelity_suite=args.edge_fidelity_suite,
         object_boundary_edge=args.object_boundary_edge,
         object_boundary_detection_bridge=args.object_boundary_detection_bridge,
+        detector_box_support_audit=args.detector_box_support_audit,
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
@@ -129,6 +132,7 @@ def build_claim_dashboard(
     edge_fidelity_suite: str | Path | None = None,
     object_boundary_edge: str | Path | None = None,
     object_boundary_detection_bridge: str | Path | None = None,
+    detector_box_support_audit: str | Path | None = None,
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
@@ -155,6 +159,7 @@ def build_claim_dashboard(
     edge_fidelity = _load_edge_fidelity_suite(edge_fidelity_suite) if edge_fidelity_suite is not None else None
     object_boundary = _load_object_boundary_edge(object_boundary_edge) if object_boundary_edge is not None else None
     object_boundary_bridge = _load_object_boundary_detection_bridge(object_boundary_detection_bridge) if object_boundary_detection_bridge is not None else None
+    detector_box_support = _load_detector_box_support_audit(detector_box_support_audit) if detector_box_support_audit is not None else None
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
@@ -201,6 +206,7 @@ def build_claim_dashboard(
         edge_fidelity,
         object_boundary,
         object_boundary_bridge,
+        detector_box_support,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -227,6 +233,7 @@ def build_claim_dashboard(
         edge_fidelity,
         object_boundary,
         object_boundary_bridge,
+        detector_box_support,
         scene_edge,
         scene_information,
         aux_contribution,
@@ -253,6 +260,7 @@ def build_claim_dashboard(
         "edge_fidelity_suite": edge_fidelity,
         "object_boundary_edge": object_boundary,
         "object_boundary_detection_bridge": object_boundary_bridge,
+        "detector_box_support_audit": detector_box_support,
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
@@ -693,6 +701,32 @@ def _load_object_boundary_detection_bridge(spec: str | Path) -> Dict[str, Any]:
         "group_breakdown": [row for row in data.get("group_breakdown", ()) if isinstance(row, Mapping)],
         "label_breakdown": [row for row in data.get("label_breakdown", ()) if isinstance(row, Mapping)],
         "correlations": correlations,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_detector_box_support_audit(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, DETECTOR_BOX_SUPPORT_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": bool(data.get("pass")) and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "sample_count": int(data.get("sample_count", 0)),
+        "target_input": str(data.get("target_input", "")),
+        "transition_baseline_input": str(data.get("transition_baseline_input", "")),
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "input_summaries": [row for row in data.get("input_summaries", ()) if isinstance(row, Mapping)],
+        "target_summary": data.get("target_summary", {}) if isinstance(data.get("target_summary"), Mapping) else {},
+        "transition_bridge": data.get("transition_bridge", {}) if isinstance(data.get("transition_bridge"), Mapping) else {},
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1583,6 +1617,7 @@ def _build_evidence_map(
     edge_fidelity_suite: Mapping[str, Any] | None,
     object_boundary_edge: Mapping[str, Any] | None,
     object_boundary_detection_bridge: Mapping[str, Any] | None,
+    detector_box_support_audit: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -1733,6 +1768,18 @@ def _build_evidence_map(
                 "evidence": _object_boundary_detection_bridge_evidence(object_boundary_detection_bridge),
                 "claim_boundary": "GT object TP/miss bridge only; not a false-positive detector-box boundary audit or trained-DNN evidence.",
                 "next_evidence": "Add detector-box boundary metrics for FP proposals and repeat on larger held-out/native adverse splits.",
+            }
+        )
+
+    if detector_box_support_audit is not None:
+        current.append(
+            {
+                "area": "Detector-box FP/TP support audit",
+                "status": "diagnostic" if bool(detector_box_support_audit.get("pass")) else "not_supported",
+                "claim_strength": str(detector_box_support_audit.get("claim_status", "detector_box_support_diagnostic")),
+                "evidence": _detector_box_support_evidence(detector_box_support_audit),
+                "claim_boundary": "Detector-box support metadata only; not true contour-boundary accuracy, not a global edge-only FP classifier, and not trained-DNN evidence.",
+                "next_evidence": "Recompute true box-boundary edge maps for FP proposals or train/evaluate an RGB+Aux detector on larger held-out/adverse splits.",
             }
         )
 
@@ -2255,6 +2302,48 @@ def _bridge_correlation(bridge: Mapping[str, Any], *, comparison: str, feature: 
     return None
 
 
+def _detector_box_support_evidence(audit: Mapping[str, Any]) -> str:
+    target = audit.get("target_summary", {}) if isinstance(audit.get("target_summary"), Mapping) else {}
+    correlations = target.get("correlations", {}) if isinstance(target.get("correlations"), Mapping) else {}
+    target_score = _detector_box_correlation(correlations, "score")
+    target_edge = _detector_box_correlation(correlations, "edge_support")
+    bridge = audit.get("transition_bridge", {}) if isinstance(audit.get("transition_bridge"), Mapping) else {}
+    bridge_edge = _detector_box_bridge_correlation(bridge, "edge_support")
+    bridge_scene = _detector_box_bridge_correlation(bridge, "scene_edge_support")
+    return (
+        f"samples={int(audit.get('sample_count', 0))}; "
+        f"target={audit.get('target_input', '')}; "
+        f"targetDet={int(target.get('detection_count', 0))}; targetTP={int(target.get('tp_count', 0))}; targetFP={int(target.get('fp_count', 0))}; "
+        f"targetScoreAUC(lowFP)={_fmt((target_score or {}).get('auc_low_feature_predicts_fp'))}; "
+        f"targetEdge dFPminusTP={_fmt((target_edge or {}).get('delta_fp_minus_tp'), signed=True)} AUC={_fmt((target_edge or {}).get('auc_low_feature_predicts_fp'))}; "
+        f"removedFP={int(bridge.get('removed_fp_count', 0))}; removedTP={int(bridge.get('removed_tp_count', 0))}; "
+        f"removedEdge d={_fmt((bridge_edge or {}).get('delta_fp_minus_tp'), signed=True)} AUC={_fmt((bridge_edge or {}).get('auc_low_feature_predicts_fp'))}; "
+        f"removedScene d={_fmt((bridge_scene or {}).get('delta_fp_minus_tp'), signed=True)} AUC={_fmt((bridge_scene or {}).get('auc_low_feature_predicts_fp'))}"
+    )
+
+
+def _detector_box_correlation(correlations: Mapping[str, Any], feature: str) -> Mapping[str, Any] | None:
+    for row in correlations.get("rows", ()):
+        if isinstance(row, Mapping) and str(row.get("feature", "")) == str(feature):
+            return row
+    return None
+
+
+def _detector_box_bridge_correlation(bridge: Mapping[str, Any], feature: str) -> Mapping[str, Any] | None:
+    proposal = bridge.get("proposal_correlation", {}) if isinstance(bridge.get("proposal_correlation"), Mapping) else {}
+    for row in proposal.get("rows", ()):
+        if not isinstance(row, Mapping):
+            continue
+        if str(row.get("comparison", "")) == "removed_fp_vs_kept_tp" and str(row.get("feature", "")) == str(feature):
+            return {
+                "feature": feature,
+                "delta_fp_minus_tp": _maybe_float(row.get("delta")),
+                "auc_low_feature_predicts_fp": _maybe_float(row.get("auc_low_feature_predicts_positive")),
+                "lower_feature_predicts_fp": bool(row.get("lower_feature_predicts_positive")),
+            }
+    return None
+
+
 def _scene_edge_evidence(scene_edge: Mapping[str, Any]) -> str:
     cfas = ", ".join(str(value) for value in scene_edge.get("cfa_patterns", ())) or "none"
     psf = ", ".join(_fmt(value) for value in scene_edge.get("psf_sigmas", ()) if value is not None) or "none"
@@ -2642,6 +2731,7 @@ def _claim_decisions(
     edge_fidelity_suite: Mapping[str, Any] | None,
     object_boundary_edge: Mapping[str, Any] | None,
     object_boundary_detection_bridge: Mapping[str, Any] | None,
+    detector_box_support_audit: Mapping[str, Any] | None,
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
@@ -2780,6 +2870,30 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in object_boundary_detection_bridge.get("failed_checks", ())) or "configured object-boundary detection checks"
             decisions.append({"status": "not_supported", "claim": f"Object-boundary detection bridge failed for {failed}; do not use it as TP/miss bridge evidence yet."})
+    if detector_box_support_audit is not None:
+        if bool(detector_box_support_audit.get("pass")):
+            target = detector_box_support_audit.get("target_summary", {}) if isinstance(detector_box_support_audit.get("target_summary"), Mapping) else {}
+            target_corr = target.get("correlations", {}) if isinstance(target.get("correlations"), Mapping) else {}
+            target_edge = _detector_box_correlation(target_corr, "edge_support")
+            target_score = _detector_box_correlation(target_corr, "score")
+            bridge = detector_box_support_audit.get("transition_bridge", {}) if isinstance(detector_box_support_audit.get("transition_bridge"), Mapping) else {}
+            bridge_edge = _detector_box_bridge_correlation(bridge, "edge_support")
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "Detector-box support audit passed as diagnostic evidence: "
+                        f"target FP/TP score AUC {_fmt((target_score or {}).get('auc_low_feature_predicts_fp'))}, "
+                        f"target global edge-support AUC {_fmt((target_edge or {}).get('auc_low_feature_predicts_fp'))}, "
+                        f"removed FP {int(bridge.get('removed_fp_count', 0))} vs removed TP {int(bridge.get('removed_tp_count', 0))}, "
+                        f"removed-FP edge AUC {_fmt((bridge_edge or {}).get('auc_low_feature_predicts_fp'))}. "
+                        "This supports proposal-calibration explanation and explicitly blocks an edge-only global FP classifier claim."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in detector_box_support_audit.get("failed_checks", ())) or "configured detector-box support checks"
+            decisions.append({"status": "not_supported", "claim": f"Detector-box support audit failed for {failed}; do not use it as FP/TP support evidence yet."})
     if scene_edge_confidence is not None:
         if bool(scene_edge_confidence.get("pass")):
             decisions.append(
@@ -3293,6 +3407,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(object_boundary_bridge, Mapping)
         else "<p>No object-boundary detection bridge summary was provided.</p>"
     )
+    detector_box_support = dashboard.get("detector_box_support_audit")
+    detector_box_support_html = (
+        _detector_box_support_html(detector_box_support, destination)
+        if isinstance(detector_box_support, Mapping)
+        else "<p>No detector-box support audit summary was provided.</p>"
+    )
     cfa_lenspsf_detector = dashboard.get("cfa_lenspsf_detector_sweep")
     cfa_lenspsf_detector_html = (
         _cfa_lenspsf_detector_html(cfa_lenspsf_detector, destination)
@@ -3400,6 +3520,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {object_boundary_html}
   <h2>Object Boundary Detection Bridge</h2>
   {object_boundary_bridge_html}
+  <h2>Detector Box Support Audit</h2>
+  {detector_box_support_html}
   <h2>CFA/LensPSF Detector Sweep</h2>
   {cfa_lenspsf_detector_html}
   <h2>CFA/LensPSF Proposal Edge Bridge</h2>
@@ -4240,6 +4362,61 @@ def _object_boundary_detection_bridge_html(bridge: Mapping[str, Any], destinatio
         "<h3>Top Correlations</h3>"
         "<table><thead><tr><th>Comparison</th><th>Feature</th><th>Positive/Negative</th><th>Positive Mean</th><th>Negative Mean</th><th>Delta</th><th>AUC</th><th>Biserial</th></tr></thead>"
         f"<tbody>{correlation_rows}</tbody></table>"
+    )
+
+
+def _detector_box_support_html(audit: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(audit.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in audit.get("failed_checks", ())) or "none"
+    target = audit.get("target_summary", {}) if isinstance(audit.get("target_summary"), Mapping) else {}
+    target_corr = target.get("correlations", {}) if isinstance(target.get("correlations"), Mapping) else {}
+    target_score = _detector_box_correlation(target_corr, "score")
+    target_edge = _detector_box_correlation(target_corr, "edge_support")
+    bridge = audit.get("transition_bridge", {}) if isinstance(audit.get("transition_bridge"), Mapping) else {}
+    bridge_edge = _detector_box_bridge_correlation(bridge, "edge_support")
+    bridge_scene = _detector_box_bridge_correlation(bridge, "scene_edge_support")
+    input_rows = "".join(_detector_box_input_row(row) for row in audit.get("input_summaries", ()) if isinstance(row, Mapping))
+    if not input_rows:
+        input_rows = '<tr><td colspan="8">No detector input summaries were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(audit.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(audit.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(audit.get('interpretation', '')))} "
+        f"{html_lib.escape(str(audit.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Samples</th><th>Target</th><th>Target Det/TP/FP</th><th>Target Score AUC</th><th>Target Edge d/AUC</th><th>Removed FP/TP</th><th>Removed Edge d/AUC</th><th>Removed Scene d/AUC</th><th>Failed</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(audit, destination)}</td>"
+        f"<td>{int(audit.get('sample_count', 0))}</td>"
+        f"<td><code>{html_lib.escape(str(audit.get('target_input', '')))}</code></td>"
+        f"<td>{int(target.get('detection_count', 0))}/{int(target.get('tp_count', 0))}/{int(target.get('fp_count', 0))}</td>"
+        f"<td>{_fmt((target_score or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        f"<td>{_fmt((target_edge or {}).get('delta_fp_minus_tp'), signed=True)} / {_fmt((target_edge or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        f"<td>{int(bridge.get('removed_fp_count', 0))}/{int(bridge.get('removed_tp_count', 0))}</td>"
+        f"<td>{_fmt((bridge_edge or {}).get('delta_fp_minus_tp'), signed=True)} / {_fmt((bridge_edge or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        f"<td>{_fmt((bridge_scene or {}).get('delta_fp_minus_tp'), signed=True)} / {_fmt((bridge_scene or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr></tbody></table>"
+        "<h3>Input FP/TP Support</h3>"
+        "<table><thead><tr><th>Input</th><th>Detections</th><th>TP</th><th>FP</th><th>Precision Proxy</th><th>Score d/AUC</th><th>Edge d/AUC</th><th>Scene d/AUC</th></tr></thead>"
+        f"<tbody>{input_rows}</tbody></table>"
+    )
+
+
+def _detector_box_input_row(row: Mapping[str, Any]) -> str:
+    correlations = row.get("correlations", {}) if isinstance(row.get("correlations"), Mapping) else {}
+    score = _detector_box_correlation(correlations, "score")
+    edge = _detector_box_correlation(correlations, "edge_support")
+    scene = _detector_box_correlation(correlations, "scene_edge_support")
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('input_name', '')))}</code></td>"
+        f"<td>{int(row.get('detection_count', 0))}</td>"
+        f"<td>{int(row.get('tp_count', 0))}</td>"
+        f"<td>{int(row.get('fp_count', 0))}</td>"
+        f"<td>{_fmt(row.get('precision_proxy'))}</td>"
+        f"<td>{_fmt((score or {}).get('delta_fp_minus_tp'), signed=True)} / {_fmt((score or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        f"<td>{_fmt((edge or {}).get('delta_fp_minus_tp'), signed=True)} / {_fmt((edge or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        f"<td>{_fmt((scene or {}).get('delta_fp_minus_tp'), signed=True)} / {_fmt((scene or {}).get('auc_low_feature_predicts_fp'))}</td>"
+        "</tr>"
     )
 
 
