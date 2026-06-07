@@ -101,6 +101,33 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertTrue((root / "summary.json").exists())
             self.assertTrue((root / "index.html").exists())
 
+    def test_export_aux_dataset_minimal_writes_only_gate_tensors(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=1, width=64, height=48)
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = export_aux_dataset(
+                samples,
+                tmp,
+                include_extended=False,
+                include_preview=False,
+                compress=False,
+            )
+            root = Path(tmp)
+            rows = [json.loads(line) for line in (root / "manifest.jsonl").read_text().splitlines() if line.strip()]
+            tensor_path = root / rows[0]["tensor_path"]
+            with np.load(tensor_path) as payload:
+                keys = set(payload.files)
+                self.assertIn("rgb_aux_chw", keys)
+                self.assertIn("rgb_aux_hwc", keys)
+                self.assertNotIn("rgb_aux_extended_chw", keys)
+                self.assertNotIn("perception_rgb_hwc", keys)
+            self.assertEqual(summary["extended_channels"], [])
+            self.assertEqual(summary["export_options"]["include_extended"], False)
+            self.assertEqual(summary["export_options"]["include_preview"], False)
+            self.assertEqual(summary["export_options"]["compress"], False)
+            self.assertEqual(summary["tensor_layouts"], ["rgb_aux_hwc", "rgb_aux_chw"])
+            self.assertEqual(rows[0]["extended_channels"], [])
+            self.assertNotIn("extended_tensor_stats", rows[0])
+
     def test_load_samples_for_yolo_dataset_forwards_cache_and_progress_options(self) -> None:
         with mock.patch("perception_isp.yolo_dataset.load_yolo_detection_samples", return_value=()) as loader:
             samples = _load_samples(

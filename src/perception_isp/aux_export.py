@@ -43,6 +43,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--denoise-strength", type=float, default=0.18)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"])
     parser.add_argument("--demosaic-artifact-suppression", type=float, default=0.35)
+    parser.add_argument("--minimal", action="store_true", help="Export only 6-channel RGB+aux tensors needed for fast gate training/eval.")
+    parser.add_argument("--no-compress", action="store_true", help="Use faster uncompressed NPZ writes instead of np.savez_compressed.")
     parser.add_argument("--output-dir", default="exports/perception_rgb_aux_dataset")
     args = parser.parse_args(argv)
 
@@ -69,6 +71,9 @@ def main(argv: Any = None) -> int:
         samples,
         args.output_dir,
         config=config,
+        include_extended=not bool(args.minimal),
+        include_preview=not bool(args.minimal),
+        compress=not bool(args.no_compress),
         run_config={
             "source": args.source,
             "dataset": args.dataset,
@@ -85,6 +90,8 @@ def main(argv: Any = None) -> int:
             "denoise_strength": float(args.denoise_strength),
             "demosaic_method": str(args.demosaic_method),
             "demosaic_artifact_suppression": float(args.demosaic_artifact_suppression),
+            "minimal": bool(args.minimal),
+            "compress": not bool(args.no_compress),
         },
     )
     print(json.dumps(json_ready(summary), indent=2))
@@ -96,6 +103,9 @@ def export_aux_dataset(
     output_dir: str | Path,
     *,
     config: PerceptionISPConfig | None = None,
+    include_extended: bool = True,
+    include_preview: bool = True,
+    compress: bool = True,
     run_config: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     start_time = time.perf_counter()
@@ -110,8 +120,6 @@ def export_aux_dataset(
         images = build_pipeline_images(sample, config=config)
         rgb_aux_hwc = build_rgb_aux_tensor(images, layout="hwc")
         rgb_aux_chw = build_rgb_aux_tensor(images, layout="chw")
-        rgb_aux_extended_hwc = build_rgb_aux_extended_tensor(images, layout="hwc")
-        rgb_aux_extended_chw = build_rgb_aux_extended_tensor(images, layout="chw")
         height, width = rgb_aux_hwc.shape[:2]
         safe_id = _safe_id(sample.sample_id, index)
         tensor_name = f"{index:05d}_{safe_id}.npz"
@@ -121,19 +129,21 @@ def export_aux_dataset(
 
         boxes_xyxy = boxes_xyxy_array(sample.ground_truth)
         boxes_xyxy_norm = normalized_boxes_xyxy_array(sample.ground_truth, width=width, height=height)
-        np.savez_compressed(
-            tensor_path,
-            rgb_aux_hwc=rgb_aux_hwc,
-            rgb_aux_chw=rgb_aux_chw,
-            rgb_aux_extended_hwc=rgb_aux_extended_hwc,
-            rgb_aux_extended_chw=rgb_aux_extended_chw,
-            perception_rgb_hwc=np.asarray(images.perception_rgb, dtype=np.float32),
-            perception_aux_hwc=np.asarray(images.perception_aux_rgb, dtype=np.float32),
-            boxes_xyxy=boxes_xyxy,
-            boxes_xyxy_normalized=boxes_xyxy_norm,
-            channel_names=np.asarray(RGB_AUX_CHANNELS),
-            extended_channel_names=np.asarray(RGB_AUX_EXTENDED_CHANNELS),
-        )
+        tensor_payload = {
+            "rgb_aux_hwc": rgb_aux_hwc,
+            "rgb_aux_chw": rgb_aux_chw,
+            "boxes_xyxy": boxes_xyxy,
+            "boxes_xyxy_normalized": boxes_xyxy_norm,
+            "channel_names": np.asarray(RGB_AUX_CHANNELS),
+        }
+        if include_extended:
+            tensor_payload["rgb_aux_extended_hwc"] = build_rgb_aux_extended_tensor(images, layout="hwc")
+            tensor_payload["rgb_aux_extended_chw"] = build_rgb_aux_extended_tensor(images, layout="chw")
+            tensor_payload["extended_channel_names"] = np.asarray(RGB_AUX_EXTENDED_CHANNELS)
+        if include_preview:
+            tensor_payload["perception_rgb_hwc"] = np.asarray(images.perception_rgb, dtype=np.float32)
+            tensor_payload["perception_aux_hwc"] = np.asarray(images.perception_aux_rgb, dtype=np.float32)
+        _save_npz(tensor_path, tensor_payload, compress=compress)
         labels = label_payload(sample.ground_truth)
         labels["boxes_xyxy"] = boxes_xyxy.tolist()
         labels["boxes_xyxy_normalized"] = boxes_xyxy_norm.tolist()
@@ -150,23 +160,38 @@ def export_aux_dataset(
             "width": int(width),
             "height": int(height),
             "channels": list(RGB_AUX_CHANNELS),
-            "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS),
+            "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS) if include_extended else [],
             "box_count": int(len(sample.ground_truth)),
             "tensor_stats": tensor_stats(rgb_aux_chw),
-            "extended_tensor_stats": tensor_stats(rgb_aux_extended_chw, channels=RGB_AUX_EXTENDED_CHANNELS),
             "raw_provenance": raw_provenance,
             "metadata": dict(sample.metadata),
             "isp_processing": dict(images.metadata.get("processing", {})) if isinstance(images.metadata, Mapping) else {},
         }
+        if include_extended:
+            row["extended_tensor_stats"] = tensor_stats(tensor_payload["rgb_aux_extended_chw"], channels=RGB_AUX_EXTENDED_CHANNELS)
         manifest_rows.append(row)
 
     manifest_path = destination / "manifest.jsonl"
     manifest_path.write_text("".join(json.dumps(json_ready(row)) + "\n" for row in manifest_rows))
     elapsed_seconds = max(time.perf_counter() - start_time, 1.0e-9)
-    summary = _summary(manifest_rows, run_config=run_config, elapsed_seconds=elapsed_seconds)
+    summary = _summary(
+        manifest_rows,
+        run_config=run_config,
+        elapsed_seconds=elapsed_seconds,
+        include_extended=include_extended,
+        include_preview=include_preview,
+        compress=compress,
+    )
     (destination / "summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
     (destination / "index.html").write_text(_render_html(summary, manifest_rows))
     return summary
+
+
+def _save_npz(path: Path, payload: Mapping[str, Any], *, compress: bool) -> None:
+    if compress:
+        np.savez_compressed(path, **payload)
+    else:
+        np.savez(path, **payload)
 
 
 def _load_samples(
@@ -228,15 +253,33 @@ def _load_samples(
     )
 
 
-def _summary(rows: Sequence[Mapping[str, Any]], *, run_config: Mapping[str, Any] | None, elapsed_seconds: float) -> Dict[str, Any]:
+def _summary(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    run_config: Mapping[str, Any] | None,
+    elapsed_seconds: float,
+    include_extended: bool = True,
+    include_preview: bool = True,
+    compress: bool = True,
+) -> Dict[str, Any]:
     raw = [row.get("raw_provenance", {}) for row in rows]
     sample_count = int(len(rows))
     seconds = max(float(elapsed_seconds), 1.0e-9)
+    tensor_layouts = ["rgb_aux_hwc", "rgb_aux_chw"]
+    if include_extended:
+        tensor_layouts.extend(["rgb_aux_extended_hwc", "rgb_aux_extended_chw"])
+    if include_preview:
+        tensor_layouts.extend(["perception_rgb_hwc", "perception_aux_hwc"])
     return {
         "sample_count": sample_count,
         "channels": list(RGB_AUX_CHANNELS),
-        "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS),
-        "tensor_layouts": ["rgb_aux_hwc", "rgb_aux_chw", "rgb_aux_extended_hwc", "rgb_aux_extended_chw"],
+        "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS) if include_extended else [],
+        "tensor_layouts": tensor_layouts,
+        "export_options": {
+            "include_extended": bool(include_extended),
+            "include_preview": bool(include_preview),
+            "compress": bool(compress),
+        },
         "manifest": "manifest.jsonl",
         "run_config": dict(run_config or {}),
         "total_boxes": int(sum(int(row.get("box_count", 0)) for row in rows)),
