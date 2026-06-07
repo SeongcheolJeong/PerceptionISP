@@ -839,6 +839,62 @@ delta/AUC is `-0.0138`/`0.5470`. This is a post-hoc proposal bridge for the
 calibrated path, not an incremental aux-only ablation and not a trained RGB+Aux
 DNN result.
 
+Run a simulated adverse-condition native RAW slice before treating nominal KITTI
+results as robust evidence:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.adverse_native_slice \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 32 \
+  --width 640 \
+  --height 192 \
+  --cfa GRBG \
+  --condition nominal \
+  --condition night \
+  --condition fog \
+  --condition glare \
+  --condition low_mtf \
+  --condition hdr \
+  --rgb-detector yolo \
+  --rgb-detector-model yolo11n.pt \
+  --rgb-detector-confidence 0.25 \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --tone-mapping detector_log \
+  --denoise-strength 0.30 \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.20 \
+  --human-tone-mapping log \
+  --human-denoise-strength 0.18 \
+  --human-demosaic-method edge_aware \
+  --human-demosaic-artifact-suppression 0.20 \
+  --raw-cache-dir data/.cache/perception_isp_raw_native_bayer_v1_adverse_base_val32_640x192 \
+  --condition-raw-cache-dir data/.cache/perception_isp_raw_native_bayer_v1_adverse_condition_val32_640x192 \
+  --proposal-calibration-model reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001/proposal_calibration_model.json \
+  --output-dir reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1
+```
+
+The current adverse native RAW slice report is:
+
+```text
+reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1/index.html
+```
+
+It covers nominal, night, fog, glare, low-MTF, and HDR scene transforms at
+`GRBG`, `640 x 192`, 32 KITTI val samples per condition. CameraE2E provenance is
+native for all 192 samples (`true_native=192`, `remapped=0`). Across the five
+adverse conditions, the calibrated PerceptionISP path reduces FP in 5/5
+conditions and preserves recall in 4/5 (`mean dFP50=-0.3500`,
+`mean dR50=-0.0034`). Night, fog, glare, and low-MTF are the useful positive
+slices; HDR is a counterexample/tradeoff because FP still drops but recall and
+precision worsen. This is simulated adverse native RAW evidence, not proof on a
+real night/rain/fog/glare RAW dataset.
+
 Build a visual casebook over the same native CFA/LensPSF sweep when the
 condition-level detector/proposal results need reviewable examples:
 
@@ -1009,6 +1065,7 @@ PYTHONPATH=src \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
+  --adverse-native-slice reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1 \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1 \
@@ -1050,9 +1107,14 @@ recall in 12/12 native CFA/LensPSF conditions, but it does not reduce FP beyond
 score/label calibration in those conditions (`auxFPWins=0/12`, mean
 `dR50=+0.0034`, mean `dFP50=+0.0540`). Use this as a recall/FP operating-point
 finding, not as an incremental aux FP-superiority claim.
-Treat it as condition-level CFA/LensPSF evidence only; broad HumanISP
-superiority and task-level recall improvement remain blocked by the held-out
-gates.
+The dashboard also includes the simulated adverse native RAW slice. In the
+current val32 GRBG slice, adverse FP wins are 5/5, recall is preserved in 4/5,
+and all 192 conditioned samples are CameraE2E native CFA rows with no remap.
+Use it as adverse-condition feasibility evidence; the next step is larger
+held-out scale and real adverse datasets.
+Treat the CFA/LensPSF rows as condition-level evidence and the adverse slice as
+simulated-condition evidence; broad HumanISP superiority and task-level recall
+improvement remain blocked by the held-out gates.
 
 Create a concise claim-evidence summary from the dashboard when preparing a
 report or presentation:
@@ -1416,6 +1478,7 @@ PYTHONPATH=src \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
+  --adverse-native-slice reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1 \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1 \
@@ -1488,6 +1551,7 @@ reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val128_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_native_audit_kitti_val128_native_bayer_v1/index.html
+reports/perception_adverse_native_slice_kitti_val32_grbg_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_aux_ablation_kitti_val128_native_bayer_v1/index.html
 reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
@@ -1521,6 +1585,11 @@ source scene-edge evidence is directionally positive in 12/12 conditions, while
 aux-edge evidence is positive in 12/12. Mean source scene-edge delta/AUC is
 `-0.0188`/`0.5930`, and mean aux-edge delta/AUC is `-0.0138`/`0.5470`. The
 native-CFA audit has 12 native rows, 1536 samples, and 0 remapped rows. The
+simulated adverse native RAW slice covers 6 GRBG conditions and 192 conditioned
+samples with no CameraE2E CFA remap; adverse FP wins are 5/5 and recall is
+preserved in 4/5 adverse conditions, with HDR kept as a visible tradeoff case.
+That is useful adverse-condition feasibility evidence, not real adverse dataset
+proof. The
 native CFA/LensPSF casebook selects 26 review cases with 24 FP-reduction
 successes and 2 recall-loss counterexamples; the 1496-image HumanISP-relative
 casebook selects 32 review images and keeps both wins and counterexamples
@@ -1530,10 +1599,9 @@ aux recall wins 12/12 conditions, aux FP wins 0/12, mean `dR50=+0.0034`, and
 mean `dFP50=+0.0540`. This does not invalidate the narrow FP-reducer claim, but
 it blocks a stronger "aux independently reduces FP beyond score/label
 calibration" claim until thresholds or RGB+Aux training are improved. It lists
-five next evidence targets: adverse-condition/task-specific
-CFA/LensPSF proposal slices, adverse/native RAW dataset expansion, RGB+Aux DNN
-fine-tune gate, high-information real-scene expansion, and richer
-TP-loss/adverse-condition visual review. The previous aux-edge, source
+next evidence targets: larger real adverse/native RAW expansion,
+task-specific gates, RGB+Aux DNN fine-tune gate, high-information real-scene
+expansion, and richer TP-loss/adverse-condition visual review. The previous aux-edge, source
 scene-edge same-sample proposal correlations, val128 CFA/LensPSF detector
 sweep, val128 CFA/LensPSF proposal-edge bridge, and val64 visual casebook are
 now part of the current evidence rows.

@@ -26,9 +26,11 @@ class ClaimReadinessTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            adverse_native = _write_adverse_native_slice(root / "adverse_native")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
             cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
+            cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             casebook = _write_casebook(root / "casebook")
 
             summary = run_claim_readiness(
@@ -45,9 +47,11 @@ class ClaimReadinessTest(unittest.TestCase):
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                adverse_native_slice=adverse_native,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
                 cfa_lenspsf_casebook=cfa_lenspsf_casebook,
+                cfa_lenspsf_aux_ablation=cfa_lenspsf_aux_ablation,
                 casebook=casebook,
                 output_dir=root / "readiness",
             )
@@ -74,9 +78,11 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("scene_edge_confidence", summary)
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
+            self.assertIn("adverse_native_slice", summary)
             self.assertIn("cfa_lenspsf_proposal_audit", summary)
             self.assertIn("cfa_lenspsf_native_audit", summary)
             self.assertIn("cfa_lenspsf_casebook", summary)
+            self.assertIn("cfa_lenspsf_aux_ablation", summary)
             self.assertIn("casebook", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
@@ -85,12 +91,16 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
+            self.assertTrue(summary["adverse_native_slice"]["pass"])
+            self.assertEqual(summary["adverse_native_slice"]["claim_status"], "adverse_fp_reducer_supported")
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertEqual(summary["cfa_lenspsf_proposal_audit"]["removed_fp_count"], 5)
             self.assertTrue(summary["cfa_lenspsf_native_audit"]["pass"])
             self.assertEqual(summary["cfa_lenspsf_native_audit"]["native_run_count"], 1)
             self.assertTrue(summary["cfa_lenspsf_casebook"]["pass"])
             self.assertEqual(summary["cfa_lenspsf_casebook"]["selected_case_count"], 5)
+            self.assertTrue(summary["cfa_lenspsf_aux_ablation"]["pass"])
+            self.assertEqual(summary["cfa_lenspsf_aux_ablation"]["claim_status"], "aux_recall_fp_tradeoff")
             self.assertTrue(summary["casebook"]["pass"])
             self.assertEqual(summary["casebook"]["selected_case_count"], 4)
             self.assertEqual(summary["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
@@ -122,9 +132,11 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
+            self.assertTrue(dashboard_summary["adverse_native_slice"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_native_audit"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_casebook"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_lenspsf_aux_ablation"]["pass"])
             self.assertTrue(dashboard_summary["casebook"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
@@ -134,6 +146,8 @@ class ClaimReadinessTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             report_dir = _write_comparison_report(root / "comparison")
+            adverse_native = _write_adverse_native_slice(root / "adverse_native")
+            cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = readiness_main(
@@ -145,6 +159,10 @@ class ClaimReadinessTest(unittest.TestCase):
                         "16",
                         "--bootstrap-seed",
                         "unit",
+                        "--adverse-native-slice",
+                        str(adverse_native),
+                        "--cfa-lenspsf-aux-ablation",
+                        str(cfa_lenspsf_aux_ablation),
                         "--output-dir",
                         str(root / "readiness"),
                     ]
@@ -157,6 +175,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("task_gate", printed)
             self.assertIn("condition_metrics", printed)
             self.assertIn("condition_gate", printed)
+            self.assertTrue(printed["adverse_native_slice"]["pass"])
+            self.assertEqual(printed["cfa_lenspsf_aux_ablation"]["claim_status"], "aux_recall_fp_tradeoff")
             self.assertIn("benchmark_protocol", printed)
             self.assertTrue((root / "readiness" / "claim_readiness_summary.json").exists())
 
@@ -574,6 +594,62 @@ def _write_aux_contribution_audit(path: Path) -> Path:
     return path
 
 
+def _write_adverse_native_slice(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    conditions = ["nominal", "night", "fog", "glare", "low_mtf", "hdr"]
+    payload = {
+        "status": "pass",
+        "claim_status": "adverse_fp_reducer_supported",
+        "run_count": 6,
+        "expected_run_count": 6,
+        "count": 32,
+        "conditions": conditions,
+        "cfa_pattern": "GRBG",
+        "psf_sigma": 0.0,
+        "use_camerae2e": True,
+        "runs": [
+            {
+                "run_id": f"adverse-{condition}",
+                "raw_condition_summary": {
+                    "true_sensor_cfa_mosaic_count": 32,
+                    "pattern_remapped_count": 0,
+                },
+            }
+            for condition in conditions
+        ],
+        "checks": [
+            {"id": "condition_grid_complete", "status": "pass", "evidence": "runs=6 expected=6"},
+            {"id": "native_camerae2e_raw_used", "status": "pass", "evidence": "true_native=192 remapped=0"},
+            {"id": "adverse_fp_reduction_observed", "status": "pass", "evidence": "fp_wins=5/5"},
+        ],
+        "aggregate": {
+            "sample_count": 192,
+            "adverse_condition_count": 5,
+            "adverse_fp_win_count": 5,
+            "adverse_recall_preserved_count": 4,
+            "adverse_joint_fp_recall_win_count": 4,
+            "mean_adverse_delta_precision@0.50": 0.0477,
+            "mean_adverse_delta_recall@0.50": -0.003,
+            "mean_adverse_delta_small_recall@0.50": -0.0016,
+            "mean_adverse_delta_fp@0.50": -0.35,
+            "primary_rows": [
+                {
+                    "condition": "night",
+                    "run_id": "adverse-night",
+                    "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+                    "delta_precision@0.50": 0.053,
+                    "delta_recall@0.50": 0.0,
+                    "delta_small_recall@0.50": 0.0,
+                    "delta_fp@0.50": -0.469,
+                }
+            ],
+        },
+    }
+    (path / "adverse_native_slice_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
 def _write_cfa_lenspsf_detector_sweep(path: Path) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
@@ -752,6 +828,31 @@ def _write_cfa_lenspsf_casebook(path: Path) -> Path:
         ],
     }
     (path / "cfa_lenspsf_casebook_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_aux_ablation(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "claim_status": "aux_recall_fp_tradeoff",
+        "condition_count": 2,
+        "expected_condition_count": 2,
+        "aggregate": {
+            "sample_count": 32,
+            "aux_recall_win_count": 2,
+            "aux_fp_win_count": 0,
+            "mean_aux_minus_no_aux_recall@0.50": 0.003,
+            "mean_aux_minus_no_aux_fp@0.50": 0.05,
+        },
+        "checks": [
+            {"id": "matched_conditions_available", "status": "pass", "evidence": "matched=2 expected=2"},
+            {"id": "aux_recall_tradeoff_measured", "status": "pass", "evidence": "aux_recall_wins=2/2"},
+            {"id": "aux_fp_incremental_gain_majority", "status": "warning", "evidence": "aux_fp_wins=0/2"},
+        ],
+    }
+    (path / "cfa_lenspsf_aux_ablation_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

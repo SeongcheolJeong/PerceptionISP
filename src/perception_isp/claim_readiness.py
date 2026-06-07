@@ -45,10 +45,12 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir used as high-information scene edge evidence. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
+    parser.add_argument("--adverse-native-slice", default=None, help="Adverse-condition native RAW slice summary path/dir used as simulated adverse evidence.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir used as condition detector evidence.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir used as condition proposal bridge evidence.")
     parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir used as native/remap boundary evidence.")
     parser.add_argument("--cfa-lenspsf-casebook", default=None, help="CFA/LensPSF visual casebook summary path/dir used as condition review evidence.")
+    parser.add_argument("--cfa-lenspsf-aux-ablation", default=None, help="CFA/LensPSF score-label vs score-label-aux ablation summary path/dir.")
     parser.add_argument("--casebook", default=None, help="Success/failure casebook summary path/dir used as qualitative review evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
@@ -74,10 +76,12 @@ def main(argv: Any = None) -> int:
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
+        adverse_native_slice=args.adverse_native_slice,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
         cfa_lenspsf_casebook=args.cfa_lenspsf_casebook,
+        cfa_lenspsf_aux_ablation=args.cfa_lenspsf_aux_ablation,
         casebook=args.casebook,
         output_dir=args.output_dir,
     )
@@ -107,10 +111,12 @@ def run_claim_readiness(
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
+    adverse_native_slice: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
     cfa_lenspsf_native_audit: str | Path | None = None,
     cfa_lenspsf_casebook: str | Path | None = None,
+    cfa_lenspsf_aux_ablation: str | Path | None = None,
     casebook: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
@@ -246,10 +252,12 @@ def run_claim_readiness(
         scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
+        adverse_native_slice=adverse_native_slice,
         cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
         cfa_lenspsf_casebook=cfa_lenspsf_casebook,
+        cfa_lenspsf_aux_ablation=cfa_lenspsf_aux_ablation,
         casebook=casebook,
         comparison_rollup_specs=comparison_rollups,
     )
@@ -323,10 +331,12 @@ def run_claim_readiness(
         "scene_edge_confidence": _scene_edge_confidence_summary(scene_edge_confidence),
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
+        "adverse_native_slice": _adverse_native_slice_summary(adverse_native_slice),
         "cfa_lenspsf_detector_sweep": _cfa_lenspsf_detector_sweep_summary(cfa_lenspsf_detector_sweep),
         "cfa_lenspsf_proposal_audit": _cfa_lenspsf_proposal_audit_summary(cfa_lenspsf_proposal_audit),
         "cfa_lenspsf_native_audit": _cfa_lenspsf_native_audit_summary(cfa_lenspsf_native_audit),
         "cfa_lenspsf_casebook": _cfa_lenspsf_casebook_summary(cfa_lenspsf_casebook),
+        "cfa_lenspsf_aux_ablation": _cfa_lenspsf_aux_ablation_summary(cfa_lenspsf_aux_ablation),
         "casebook": _casebook_summary(casebook),
         "benchmark_protocol": {
             "report": str(protocol_html),
@@ -587,6 +597,48 @@ def _aux_contribution_audit_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _adverse_native_slice_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "adverse_native_slice_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"adverse native RAW slice summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    native_count = 0
+    remapped_count = 0
+    for row in data.get("runs", ()):
+        if not isinstance(row, Mapping):
+            continue
+        raw_summary = row.get("raw_condition_summary", {}) if isinstance(row.get("raw_condition_summary"), Mapping) else {}
+        native_count += int(raw_summary.get("true_sensor_cfa_mosaic_count", 0))
+        remapped_count += int(raw_summary.get("pattern_remapped_count", 0))
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "failed_checks": failed,
+        "run_count": int(data.get("run_count", 0)),
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "sample_count": int(aggregate.get("sample_count", 0)),
+        "adverse_condition_count": int(aggregate.get("adverse_condition_count", 0)),
+        "adverse_fp_win_count": int(aggregate.get("adverse_fp_win_count", 0)),
+        "adverse_recall_preserved_count": int(aggregate.get("adverse_recall_preserved_count", 0)),
+        "mean_adverse_delta_recall@0.50": _optional_float(aggregate.get("mean_adverse_delta_recall@0.50")),
+        "mean_adverse_delta_fp@0.50": _optional_float(aggregate.get("mean_adverse_delta_fp@0.50")),
+        "cfa_pattern": data.get("cfa_pattern"),
+        "native_count": native_count,
+        "remapped_count": remapped_count,
+    }
+
+
 def _cfa_lenspsf_detector_sweep_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -720,6 +772,36 @@ def _cfa_lenspsf_casebook_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _cfa_lenspsf_aux_ablation_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "cfa_lenspsf_aux_ablation_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"CFA/LensPSF aux ablation summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "failed_checks": failed,
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "sample_count": int(aggregate.get("sample_count", 0)),
+        "aux_recall_win_count": int(aggregate.get("aux_recall_win_count", 0)),
+        "aux_fp_win_count": int(aggregate.get("aux_fp_win_count", 0)),
+        "mean_aux_minus_no_aux_recall@0.50": _optional_float(aggregate.get("mean_aux_minus_no_aux_recall@0.50")),
+        "mean_aux_minus_no_aux_fp@0.50": _optional_float(aggregate.get("mean_aux_minus_no_aux_fp@0.50")),
+    }
+
+
 def _casebook_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -765,10 +847,12 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "scene_edge_confidence": summary.get("scene_edge_confidence"),
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
+        "adverse_native_slice": summary.get("adverse_native_slice"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
         "cfa_lenspsf_proposal_audit": summary.get("cfa_lenspsf_proposal_audit"),
         "cfa_lenspsf_native_audit": summary.get("cfa_lenspsf_native_audit"),
         "cfa_lenspsf_casebook": summary.get("cfa_lenspsf_casebook"),
+        "cfa_lenspsf_aux_ablation": summary.get("cfa_lenspsf_aux_ablation"),
         "casebook": summary.get("casebook"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),

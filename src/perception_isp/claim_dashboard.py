@@ -25,6 +25,7 @@ EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
+ADVERSE_NATIVE_SLICE_SUMMARY = "adverse_native_slice_summary.json"
 CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
 CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
 CFA_LENSPSF_NATIVE_AUDIT_SUMMARY = "cfa_lenspsf_native_audit_summary.json"
@@ -48,6 +49,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
+    parser.add_argument("--adverse-native-slice", default=None, help="Adverse-condition native RAW slice summary path/dir.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir.")
     parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir.")
@@ -71,6 +73,7 @@ def main(argv: Any = None) -> int:
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
+        adverse_native_slice=args.adverse_native_slice,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
@@ -110,6 +113,7 @@ def build_claim_dashboard(
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
+    adverse_native_slice: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
     cfa_lenspsf_native_audit: str | Path | None = None,
@@ -130,6 +134,7 @@ def build_claim_dashboard(
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
+    adverse_native = _load_adverse_native_slice(adverse_native_slice) if adverse_native_slice is not None else None
     cfa_lenspsf_detector = (
         _load_cfa_lenspsf_detector_sweep(cfa_lenspsf_detector_sweep)
         if cfa_lenspsf_detector_sweep is not None
@@ -170,6 +175,7 @@ def build_claim_dashboard(
         scene_edge,
         scene_information,
         aux_contribution,
+        adverse_native,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
         cfa_lenspsf_native,
@@ -190,6 +196,7 @@ def build_claim_dashboard(
         scene_edge,
         scene_information,
         aux_contribution,
+        adverse_native,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
         cfa_lenspsf_native,
@@ -210,6 +217,7 @@ def build_claim_dashboard(
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
+        "adverse_native_slice": adverse_native,
         "cfa_lenspsf_detector_sweep": cfa_lenspsf_detector,
         "cfa_lenspsf_proposal_audit": cfa_lenspsf_proposal,
         "cfa_lenspsf_native_audit": cfa_lenspsf_native,
@@ -694,6 +702,70 @@ def _load_aux_contribution_audit(spec: str | Path) -> Dict[str, Any]:
         "aux_features": [str(value) for value in feature_audit.get("aux_features", ())],
         "sample_bridge": sample_bridge,
         "interpretation": str(data.get("interpretation", "")),
+    }
+
+
+def _load_adverse_native_slice(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, ADVERSE_NATIVE_SLICE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    primary_rows = []
+    for row in aggregate.get("primary_rows", ()) if isinstance(aggregate.get("primary_rows", ()), Sequence) else ():
+        if not isinstance(row, Mapping):
+            continue
+        primary_rows.append(
+            {
+                "condition": str(row.get("condition", "")),
+                "run_id": str(row.get("run_id", "")),
+                "input": str(row.get("input", "")),
+                "delta_precision@0.50": _maybe_float(row.get("delta_precision@0.50")),
+                "delta_recall@0.50": _maybe_float(row.get("delta_recall@0.50")),
+                "delta_small_recall@0.50": _maybe_float(row.get("delta_small_recall@0.50")),
+                "delta_fp@0.50": _maybe_float(row.get("delta_fp@0.50")),
+            }
+        )
+    native_count = 0
+    remapped_count = 0
+    for row in data.get("runs", ()):
+        if not isinstance(row, Mapping):
+            continue
+        raw_summary = row.get("raw_condition_summary", {}) if isinstance(row.get("raw_condition_summary"), Mapping) else {}
+        native_count += int(raw_summary.get("true_sensor_cfa_mosaic_count", 0))
+        remapped_count += int(raw_summary.get("pattern_remapped_count", 0))
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "claim_status": str(data.get("claim_status", "")),
+        "run_count": int(data.get("run_count", 0)),
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "count": int(data.get("count", 0)),
+        "sample_count": int(aggregate.get("sample_count", 0)),
+        "adverse_condition_count": int(aggregate.get("adverse_condition_count", 0)),
+        "adverse_fp_win_count": int(aggregate.get("adverse_fp_win_count", 0)),
+        "adverse_recall_preserved_count": int(aggregate.get("adverse_recall_preserved_count", 0)),
+        "adverse_joint_fp_recall_win_count": int(aggregate.get("adverse_joint_fp_recall_win_count", 0)),
+        "mean_adverse_delta_precision@0.50": _maybe_float(aggregate.get("mean_adverse_delta_precision@0.50")),
+        "mean_adverse_delta_recall@0.50": _maybe_float(aggregate.get("mean_adverse_delta_recall@0.50")),
+        "mean_adverse_delta_small_recall@0.50": _maybe_float(aggregate.get("mean_adverse_delta_small_recall@0.50")),
+        "mean_adverse_delta_fp@0.50": _maybe_float(aggregate.get("mean_adverse_delta_fp@0.50")),
+        "conditions": [str(value) for value in data.get("conditions", ())],
+        "cfa_pattern": str(data.get("cfa_pattern", "")),
+        "psf_sigma": _maybe_float(data.get("psf_sigma")),
+        "use_camerae2e": bool(data.get("use_camerae2e", False)),
+        "native_count": int(native_count),
+        "remapped_count": int(remapped_count),
+        "primary_rows": primary_rows,
+        "checks": checks,
+        "failed_checks": failed,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
     }
 
 
@@ -1269,6 +1341,7 @@ def _build_evidence_map(
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
+    adverse_native_slice: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
@@ -1476,6 +1549,22 @@ def _build_evidence_map(
             }
         )
 
+    if adverse_native_slice is not None:
+        claim_status = str(adverse_native_slice.get("claim_status", ""))
+        current.append(
+            {
+                "area": "Adverse native RAW slice",
+                "status": "diagnostic" if bool(adverse_native_slice.get("pass")) else "not_supported",
+                "claim_strength": claim_status or "adverse_condition_diagnostic",
+                "evidence": _adverse_native_slice_evidence(adverse_native_slice),
+                "claim_boundary": (
+                    "Simulated adverse scene transforms before CameraE2E native RAW; "
+                    "not proof on a real adverse RAW dataset or broad HumanISP superiority."
+                ),
+                "next_evidence": "Scale to a larger held-out split and repeat on real night/rain/fog/glare/HDR native RAW or BDD100K-style adverse slices.",
+            }
+        )
+
     if scene_edge_confidence is not None:
         current.append(
             {
@@ -1543,6 +1632,7 @@ def _build_evidence_map(
         "future_evidence": _future_evidence_rows(
             scene_edge_confidence=scene_edge_confidence,
             aux_contribution_audit=aux_contribution_audit,
+            adverse_native_slice=adverse_native_slice,
             edge_fidelity_suite=edge_fidelity_suite,
             cfa_stress_sweep=cfa_stress_sweep,
             cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
@@ -1818,6 +1908,23 @@ def _scene_information_evidence(scene_information: Mapping[str, Any]) -> str:
     )
 
 
+def _adverse_native_slice_evidence(adverse: Mapping[str, Any]) -> str:
+    cfas = str(adverse.get("cfa_pattern", "")) or "none"
+    return (
+        f"conditions={int(adverse.get('run_count', 0))}/{int(adverse.get('expected_run_count', 0))}; "
+        f"samples={int(adverse.get('sample_count', 0))}; CFA={cfas}; PSF={_fmt(adverse.get('psf_sigma'))}; "
+        f"native={int(adverse.get('native_count', 0))}; remapped={int(adverse.get('remapped_count', 0))}; "
+        f"claim={adverse.get('claim_status', '')}; "
+        f"adverseFPWins={int(adverse.get('adverse_fp_win_count', 0))}/{int(adverse.get('adverse_condition_count', 0))}; "
+        f"recallPreserved={int(adverse.get('adverse_recall_preserved_count', 0))}/{int(adverse.get('adverse_condition_count', 0))}; "
+        f"jointWins={int(adverse.get('adverse_joint_fp_recall_win_count', 0))}/{int(adverse.get('adverse_condition_count', 0))}; "
+        f"mean dP={_fmt(adverse.get('mean_adverse_delta_precision@0.50'), signed=True)}; "
+        f"mean dR={_fmt(adverse.get('mean_adverse_delta_recall@0.50'), signed=True)}; "
+        f"mean dSmallR={_fmt(adverse.get('mean_adverse_delta_small_recall@0.50'), signed=True)}; "
+        f"mean dFP={_fmt(adverse.get('mean_adverse_delta_fp@0.50'), signed=True)}"
+    )
+
+
 def _aux_contribution_evidence(aux_contribution: Mapping[str, Any]) -> str:
     fp_delta = _preferred_aux_fp_delta(aux_contribution.get("comparisons", ()))
     bridge = aux_contribution.get("sample_bridge")
@@ -1870,6 +1977,7 @@ def _future_evidence_rows(
     *,
     scene_edge_confidence: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
+    adverse_native_slice: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
@@ -1901,6 +2009,19 @@ def _future_evidence_rows(
         aux_gate_gap = "Incremental aux ablation exists, but its claim status is inconclusive."
     else:
         aux_gate_gap = "No native CFA/LensPSF incremental aux ablation exists yet."
+    if adverse_native_slice is not None and bool(adverse_native_slice.get("pass")):
+        adverse_gap = (
+            "Simulated adverse native RAW slice exists "
+            f"({adverse_native_slice.get('claim_status', '')}, "
+            f"conditions {int(adverse_native_slice.get('run_count', 0))}/{int(adverse_native_slice.get('expected_run_count', 0))}, "
+            f"samples {int(adverse_native_slice.get('sample_count', 0))}); "
+            "next step is larger held-out scale and real adverse datasets."
+        )
+    elif adverse_native_slice is not None:
+        failed = ", ".join(str(value) for value in adverse_native_slice.get("failed_checks", ())) or "configured adverse checks"
+        adverse_gap = f"Adverse native RAW slice exists but is not passing yet: {failed}."
+    else:
+        adverse_gap = "No adverse-condition native RAW slice exists yet."
     if cfa_lenspsf_native_audit is not None and cfa_lenspsf_proposal_audit is not None and large_cfa_lenspsf_samples:
         scene_aux_gap = "Large native CFA/LensPSF proposal bridge exists. " + aux_gate_gap
     elif cfa_lenspsf_native_audit is not None:
@@ -1933,6 +2054,13 @@ def _future_evidence_rows(
     else:
         casebook_gap = "Dashboard has gates and aggregate slices, but not a curated visual failure/success report."
     return [
+        {
+            "priority": "P0",
+            "evidence": "Adverse-condition/native RAW slice",
+            "why": "Night, fog, glare, HDR, and low-MTF slices are where a perception-oriented ISP should show practical value beyond nominal scenes.",
+            "current_gap": adverse_gap,
+            "implementation_path": "Repeat the native CameraE2E RAW protocol on larger simulated adverse splits, then validate the same gates on real adverse-condition datasets.",
+        },
         {
             "priority": "P0",
             "evidence": "Scene-edge proposal correlation across CFA/LensPSF",
@@ -2021,6 +2149,7 @@ def _claim_decisions(
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
+    adverse_native_slice: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
     cfa_lenspsf_native_audit: Mapping[str, Any] | None,
@@ -2100,6 +2229,41 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in scene_information_stress.get("failed_checks", ())) or "configured scene-information checks"
             decisions.append({"status": "not_supported", "claim": f"Scene-information stress suite failed for {failed}; do not use RGB-scene pass-through tests as feasibility evidence."})
+    if adverse_native_slice is not None:
+        if bool(adverse_native_slice.get("pass")):
+            if str(adverse_native_slice.get("claim_status", "")) == "adverse_fp_reducer_supported":
+                decisions.append(
+                    {
+                        "status": "diagnostic",
+                        "claim": (
+                            "Adverse native RAW slice supports simulated-condition FP reduction: "
+                            f"adverse FP wins {int(adverse_native_slice.get('adverse_fp_win_count', 0))}/"
+                            f"{int(adverse_native_slice.get('adverse_condition_count', 0))}, "
+                            f"recall preserved {int(adverse_native_slice.get('adverse_recall_preserved_count', 0))}/"
+                            f"{int(adverse_native_slice.get('adverse_condition_count', 0))}, "
+                            f"mean dR {_fmt(adverse_native_slice.get('mean_adverse_delta_recall@0.50'), signed=True)}, "
+                            f"mean dFP {_fmt(adverse_native_slice.get('mean_adverse_delta_fp@0.50'), signed=True)}. "
+                            "Treat this as simulated native RAW evidence, not proof on real adverse datasets."
+                        ),
+                    }
+                )
+            else:
+                decisions.append(
+                    {
+                        "status": "diagnostic",
+                        "claim": (
+                            "Adverse native RAW slice is available as diagnostic evidence: "
+                            f"claim status {adverse_native_slice.get('claim_status', '')}, "
+                            f"adverse FP wins {int(adverse_native_slice.get('adverse_fp_win_count', 0))}/"
+                            f"{int(adverse_native_slice.get('adverse_condition_count', 0))}, "
+                            f"mean dFP {_fmt(adverse_native_slice.get('mean_adverse_delta_fp@0.50'), signed=True)}. "
+                            "Do not promote it beyond simulated-condition evidence."
+                        ),
+                    }
+                )
+        else:
+            failed = ", ".join(str(value) for value in adverse_native_slice.get("failed_checks", ())) or "configured adverse native RAW checks"
+            decisions.append({"status": "not_supported", "claim": f"Adverse native RAW slice failed for {failed}; do not use it as adverse-condition evidence yet."})
     if cfa_lenspsf_detector_sweep is not None:
         if bool(cfa_lenspsf_detector_sweep.get("pass")):
             decisions.append(
@@ -2482,6 +2646,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
     aux_contribution = dashboard.get("aux_contribution_audit")
     aux_contribution_html = _aux_contribution_html(aux_contribution, destination) if isinstance(aux_contribution, Mapping) else "<p>No aux contribution audit was provided.</p>"
+    adverse_native = dashboard.get("adverse_native_slice")
+    adverse_native_html = (
+        _adverse_native_slice_html(adverse_native, destination)
+        if isinstance(adverse_native, Mapping)
+        else "<p>No adverse native RAW slice summary was provided.</p>"
+    )
     casebook = dashboard.get("casebook")
     casebook_html = _casebook_html(casebook, destination) if isinstance(casebook, Mapping) else "<p>No success/failure casebook was provided.</p>"
     task_metrics = dashboard.get("task_metrics")
@@ -2577,6 +2747,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {training_html}
   <h2>Aux Contribution Audit</h2>
   {aux_contribution_html}
+  <h2>Adverse Native RAW Slice</h2>
+  {adverse_native_html}
   <h2>Success/Failure Casebook</h2>
   {casebook_html}
   <h2>Task Metrics</h2>
@@ -2759,6 +2931,69 @@ def _aux_contribution_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('delta_precision@0.50'), signed=True)}</td>"
         f"<td>{_fmt(row.get('delta_recall@0.50'), signed=True)}</td>"
         f"<td>{_fmt(row.get('delta_fp@0.50'), signed=True)}</td>"
+        "</tr>"
+    )
+
+
+def _adverse_native_slice_html(adverse: Mapping[str, Any], destination: Path) -> str:
+    status_class = "diagnostic" if bool(adverse.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in adverse.get("failed_checks", ())) or "none"
+    conditions = ", ".join(str(value) for value in adverse.get("conditions", ())) or "none"
+    primary_rows = "".join(_adverse_native_slice_primary_row(row) for row in adverse.get("primary_rows", ()))
+    if not primary_rows:
+        primary_rows = '<tr><td colspan="7">No adverse condition rows were available.</td></tr>'
+    check_rows = "".join(
+        f"<tr><td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('status', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td></tr>"
+        for row in adverse.get("checks", ())
+        if isinstance(row, Mapping)
+    )
+    if not check_rows:
+        check_rows = '<tr><td colspan="3">No adverse native RAW checks were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(adverse.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(adverse.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(adverse.get('interpretation', '')))} "
+        f"{html_lib.escape(str(adverse.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Runs</th><th>Samples</th><th>Conditions</th><th>CFA</th><th>PSF</th><th>Native</th><th>Remapped</th><th>CameraE2E</th><th>Failed</th></tr></thead><tbody>"
+        f"<tr><td>{_report_link(adverse, destination)}</td>"
+        f"<td>{int(adverse.get('run_count', 0))}/{int(adverse.get('expected_run_count', 0))}</td>"
+        f"<td>{int(adverse.get('sample_count', 0))}</td>"
+        f"<td>{html_lib.escape(conditions)}</td>"
+        f"<td><code>{html_lib.escape(str(adverse.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{_fmt(adverse.get('psf_sigma'))}</td>"
+        f"<td>{int(adverse.get('native_count', 0))}</td>"
+        f"<td>{int(adverse.get('remapped_count', 0))}</td>"
+        f"<td>{html_lib.escape(str(bool(adverse.get('use_camerae2e', False))))}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<table><thead><tr><th>Adverse FP Wins</th><th>Recall Preserved</th><th>Joint FP/Recall Wins</th><th>Mean dP50</th><th>Mean dR50</th><th>Mean dSmallR50</th><th>Mean dFP50</th></tr></thead><tbody><tr>"
+        f"<td>{int(adverse.get('adverse_fp_win_count', 0))}/{int(adverse.get('adverse_condition_count', 0))}</td>"
+        f"<td>{int(adverse.get('adverse_recall_preserved_count', 0))}/{int(adverse.get('adverse_condition_count', 0))}</td>"
+        f"<td>{int(adverse.get('adverse_joint_fp_recall_win_count', 0))}/{int(adverse.get('adverse_condition_count', 0))}</td>"
+        f"<td>{_task_delta_cell(adverse.get('mean_adverse_delta_precision@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(adverse.get('mean_adverse_delta_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(adverse.get('mean_adverse_delta_small_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(adverse.get('mean_adverse_delta_fp@0.50'), lower_is_better=True)}</td>"
+        "</tr></tbody></table>"
+        "<h3>Adverse Condition Rows</h3>"
+        "<table><thead><tr><th>Condition</th><th>Run</th><th>Input</th><th>dP50</th><th>dR50</th><th>dSmallR50</th><th>dFP50</th></tr></thead>"
+        f"<tbody>{primary_rows}</tbody></table>"
+        "<h3>Adverse Native RAW Checks</h3>"
+        f"<table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>"
+    )
+
+
+def _adverse_native_slice_primary_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('condition', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('run_id', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('input', '')))}</code></td>"
+        f"<td>{_task_delta_cell(row.get('delta_precision@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_small_recall@0.50'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(row.get('delta_fp@0.50'), lower_is_better=True)}</td>"
         "</tr>"
     )
 

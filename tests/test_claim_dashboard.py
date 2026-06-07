@@ -27,6 +27,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            adverse_native = _write_adverse_native_slice(root / "adverse_native")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
@@ -47,6 +48,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                adverse_native_slice=adverse_native,
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
@@ -74,6 +76,11 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
+            self.assertTrue(dashboard["adverse_native_slice"]["pass"])
+            self.assertEqual(dashboard["adverse_native_slice"]["claim_status"], "adverse_fp_reducer_supported")
+            self.assertEqual(dashboard["adverse_native_slice"]["adverse_fp_win_count"], 5)
+            self.assertEqual(dashboard["adverse_native_slice"]["native_count"], 192)
+            self.assertEqual(dashboard["adverse_native_slice"]["remapped_count"], 0)
             self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
             detector_run = dashboard["cfa_lenspsf_detector_sweep"]["runs"][0]
             self.assertEqual(detector_run["true_sensor_cfa_mosaic_fraction"], 1.0)
@@ -100,6 +107,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Recall-budgeted FP reduction", evidence_areas)
             self.assertIn("High-information scene edge similarity", evidence_areas)
             self.assertIn("Aux evidence used downstream", evidence_areas)
+            self.assertIn("Adverse native RAW slice", evidence_areas)
             self.assertIn("CFA/LensPSF detector condition sweep", evidence_areas)
             self.assertIn("CFA/LensPSF proposal-edge bridge", evidence_areas)
             self.assertIn("CFA/LensPSF native-CFA separation", evidence_areas)
@@ -113,6 +121,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 )
             )
             future_evidence = [row["evidence"] for row in dashboard["evidence_map"]["future_evidence"]]
+            self.assertIn("Adverse-condition/native RAW slice", future_evidence)
             self.assertIn("Scene-edge proposal correlation across CFA/LensPSF", future_evidence)
             self.assertIn("CFA/LensPSF detector sweep", future_evidence)
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
@@ -147,6 +156,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Adverse native RAW slice supports simulated-condition FP reduction: adverse FP wins 5/5, recall preserved 4/5, mean dR -0.0030, mean dFP -0.3500. Treat this as simulated native RAW evidence, not proof on real adverse datasets.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -211,6 +224,9 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
+            self.assertIn("Adverse Native RAW Slice", html)
+            self.assertIn("Adverse Condition Rows", html)
+            self.assertIn("adverse_fp_reducer_supported", html)
             self.assertIn("Success/Failure Casebook", html)
             self.assertIn("fp_reduction_success", html)
             self.assertIn("Removed FP Edge Delta vs Kept TP", html)
@@ -281,6 +297,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            adverse_native = _write_adverse_native_slice(root / "adverse_native")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
@@ -313,6 +330,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(scene_information),
                         "--aux-contribution-audit",
                         str(aux_contribution),
+                        "--adverse-native-slice",
+                        str(adverse_native),
                         "--cfa-lenspsf-detector-sweep",
                         str(cfa_lenspsf_detector),
                         "--cfa-lenspsf-proposal-audit",
@@ -343,6 +362,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
+            self.assertTrue(summary["adverse_native_slice"]["pass"])
+            self.assertEqual(summary["adverse_native_slice"]["claim_status"], "adverse_fp_reducer_supported")
             self.assertTrue(summary["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_native_audit"]["pass"])
@@ -924,6 +945,112 @@ def _write_aux_contribution_audit(path: Path) -> Path:
         )
         + "\n"
     )
+    return path
+
+
+def _write_adverse_native_slice(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    conditions = ["nominal", "night", "fog", "glare", "low_mtf", "hdr"]
+    runs = [
+        {
+            "run_id": f"adverse-{condition}",
+            "condition": condition,
+            "raw_condition_summary": {
+                "true_sensor_cfa_mosaic_count": 32,
+                "pattern_remapped_count": 0,
+            },
+        }
+        for condition in conditions
+    ]
+    primary_rows = [
+        {
+            "condition": "nominal",
+            "run_id": "adverse-nominal",
+            "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "delta_precision@0.50": 0.035,
+            "delta_recall@0.50": -0.016,
+            "delta_small_recall@0.50": -0.031,
+            "delta_fp@0.50": -0.250,
+        },
+        {
+            "condition": "night",
+            "run_id": "adverse-night",
+            "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "delta_precision@0.50": 0.053,
+            "delta_recall@0.50": 0.0,
+            "delta_small_recall@0.50": 0.0,
+            "delta_fp@0.50": -0.469,
+        },
+        {
+            "condition": "fog",
+            "run_id": "adverse-fog",
+            "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "delta_precision@0.50": 0.082,
+            "delta_recall@0.50": 0.005,
+            "delta_small_recall@0.50": 0.005,
+            "delta_fp@0.50": -0.438,
+        },
+        {
+            "condition": "glare",
+            "run_id": "adverse-glare",
+            "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "delta_precision@0.50": 0.076,
+            "delta_recall@0.50": -0.003,
+            "delta_small_recall@0.50": 0.005,
+            "delta_fp@0.50": -0.406,
+        },
+        {
+            "condition": "low_mtf",
+            "run_id": "adverse-low_mtf",
+            "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "delta_precision@0.50": 0.039,
+            "delta_recall@0.50": 0.0,
+            "delta_small_recall@0.50": 0.0,
+            "delta_fp@0.50": -0.250,
+        },
+        {
+            "condition": "hdr",
+            "run_id": "adverse-hdr",
+            "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+            "delta_precision@0.50": -0.011,
+            "delta_recall@0.50": -0.018,
+            "delta_small_recall@0.50": -0.018,
+            "delta_fp@0.50": -0.188,
+        },
+    ]
+    payload = {
+        "status": "pass",
+        "claim_status": "adverse_fp_reducer_supported",
+        "run_count": 6,
+        "expected_run_count": 6,
+        "count": 32,
+        "conditions": conditions,
+        "cfa_pattern": "GRBG",
+        "psf_sigma": 0.0,
+        "use_camerae2e": True,
+        "runs": runs,
+        "checks": [
+            {"id": "condition_grid_complete", "status": "pass", "evidence": "runs=6 expected=6"},
+            {"id": "native_camerae2e_raw_used", "status": "pass", "evidence": "true_native=192 remapped=0"},
+            {"id": "adverse_fp_reduction_observed", "status": "pass", "evidence": "fp_wins=5/5"},
+        ],
+        "aggregate": {
+            "sample_count": 192,
+            "adverse_condition_count": 5,
+            "adverse_fp_win_count": 5,
+            "adverse_recall_preserved_count": 4,
+            "adverse_joint_fp_recall_win_count": 4,
+            "mean_adverse_delta_precision@0.50": 0.0477,
+            "mean_adverse_delta_recall@0.50": -0.003,
+            "mean_adverse_delta_small_recall@0.50": -0.0016,
+            "mean_adverse_delta_fp@0.50": -0.35,
+            "primary_rows": primary_rows,
+        },
+        "interpretation": "unit adverse native RAW slice",
+        "claim_boundary": "unit simulated adverse boundary",
+    }
+    (path / "adverse_native_slice_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

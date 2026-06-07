@@ -21,7 +21,7 @@ boundary used by the benchmark protocol and claim gates.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, adverse native RAW slice, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -108,6 +108,13 @@ Known limits:
   identifies removed FP proposals versus kept TP proposals with AUC `0.6904`,
   and source scene-edge support inside the same proposal boxes gives AUC
   `0.6681`.
+- `adverse_native_slice` applies adverse scene transforms before CameraE2E
+  native CFA RAW generation and reruns the same HumanISP/PerceptionISP fixed
+  detector protocol. The current KITTI val32 GRBG slice covers nominal, night,
+  fog, glare, low-MTF, and HDR, with 192/192 native CameraE2E CFA samples and 0
+  remap. PerceptionISP reduces FP in 5/5 adverse conditions and preserves recall
+  in 4/5, but HDR remains a tradeoff. This is simulated adverse feasibility
+  evidence, not a real adverse RAW dataset or broad-superiority result.
 - The success/failure casebook renders representative sample-level wins and
   counterexamples from the same comparison report used by claim gates. The
   current KITTI val1496 casebook selects 32 visual cases and shows
