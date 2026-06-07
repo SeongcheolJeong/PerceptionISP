@@ -91,6 +91,9 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertEqual(summary["cleanup"]["first_sufficient_candidate"], "data/raw_datasets/pascalraw_full_archive")
             acquisition_commands = {row["step"]: row["command"] for row in summary["acquisition_commands"]}
             self.assertIn("DELETE_AODRAW_CLEANUP_CANDIDATES", acquisition_commands["free_space"])
+            self.assertIn("aodraw_acquisition", acquisition_commands["approved_acquisition_runner"])
+            self.assertIn("--open-download", acquisition_commands["approved_acquisition_runner"])
+            self.assertIn("--watch", acquisition_commands["approved_acquisition_runner"])
 
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

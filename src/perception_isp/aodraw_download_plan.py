@@ -112,15 +112,17 @@ def build_aodraw_download_plan(
     manifest: str | Path | Sequence[Mapping[str, Any]],
     availability_summary: str | Path | Mapping[str, Any] | None,
     dataset_root: str | Path,
+    project_root: str | Path | None = None,
 ) -> Dict[str, Any]:
     root = Path(dataset_root).expanduser()
+    project_path = Path.cwd() if project_root is None else Path(project_root).expanduser().resolve()
     manifest_rows = _load_manifest(manifest)
     availability = _load_availability_summary(availability_summary)
     raw_files = sorted({str(row.get("expected_raw_relative_path", "")) for row in manifest_rows if row.get("expected_raw_relative_path")})
     srgb_files = sorted({str(row.get("expected_srgb_relative_path", "")) for row in manifest_rows if row.get("expected_srgb_relative_path")})
     missing_files = [str(row.get("relative_path", "")) for row in availability.get("missing_files", ()) if isinstance(row, Mapping)]
     disk = _disk_summary(root)
-    cleanup_candidates = _cleanup_candidates(Path.cwd())
+    cleanup_candidates = _cleanup_candidates(project_path)
     cleanup = _cleanup_summary(disk, cleanup_candidates)
     steps = _download_steps(root=root, raw_files=raw_files, srgb_files=srgb_files, disk=disk)
     checks = _checks(manifest_rows, raw_files, srgb_files, availability, disk)
@@ -438,6 +440,19 @@ def _acquisition_commands(cleanup: Mapping[str, Any]) -> list[Dict[str, str]]:
                     "--output-dir reports/perception_aodraw_storage_cleanup_execute_v1"
                 ),
                 "why": "Run only after accepting deletion of the selected cleanup candidate.",
+            }
+        )
+        commands.append(
+            {
+                "step": "approved_acquisition_runner",
+                "status": "requires_explicit_approval",
+                "command": (
+                    "PYTHONPATH=src python3 -m perception_isp.aodraw_acquisition "
+                    f"--execute-cleanup --confirm-token {CLEANUP_CONFIRM_TOKEN} "
+                    "--open-download --watch --watch-iterations 1 "
+                    "--output-dir reports/perception_aodraw_acquisition_raw_first_v1"
+                ),
+                "why": "After cleanup approval, this runs cleanup, opens Safari/Baidu, and writes the first RAW-only watch report.",
             }
         )
     commands.extend(
