@@ -131,6 +131,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
             self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
+            self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_aux_confidence_minus_human_source_edge_f1_mean"], -0.29)
+            self.assertAlmostEqual(summary["scene_edge_confidence"]["perception_aux_confidence_source_edge_f1_win_rate"], 0.0)
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             self.assertTrue(summary["object_boundary_edge"]["pass"])
             self.assertEqual(summary["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")

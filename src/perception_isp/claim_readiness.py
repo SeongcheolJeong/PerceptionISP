@@ -658,8 +658,12 @@ def _scene_edge_confidence_summary(path: str | Path | Sequence[str | Path] | Non
         "perception_aux_confidence_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_mean"),
         "perception_rgb_minus_human_source_edge_f1_mean": _weighted_report_mean(reports, "perception_rgb_minus_human_source_edge_f1_mean"),
         "perception_aux_strength_minus_human_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_strength_minus_human_source_edge_f1_mean"),
+        "perception_aux_confidence_minus_human_source_edge_f1_mean": _weighted_report_mean(
+            reports, "perception_aux_confidence_minus_human_source_edge_f1_mean"
+        ),
         "perception_rgb_source_edge_f1_win_rate": _weighted_report_mean(reports, "perception_rgb_source_edge_f1_win_rate"),
         "perception_aux_strength_source_edge_f1_win_rate": _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_win_rate"),
+        "perception_aux_confidence_source_edge_f1_win_rate": _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_win_rate"),
         "reports": reports,
     }
 
@@ -691,8 +695,12 @@ def _scene_edge_confidence_summary_one(path: str | Path) -> Dict[str, Any]:
         "perception_aux_confidence_source_edge_f1_mean": _optional_float(aggregate.get("perception_aux_confidence_source_edge_f1_mean")),
         "perception_rgb_minus_human_source_edge_f1_mean": _optional_float(aggregate.get("perception_rgb_minus_human_source_edge_f1_mean")),
         "perception_aux_strength_minus_human_source_edge_f1_mean": _optional_float(aggregate.get("perception_aux_strength_minus_human_source_edge_f1_mean")),
+        "perception_aux_confidence_minus_human_source_edge_f1_mean": _optional_float(
+            aggregate.get("perception_aux_confidence_minus_human_source_edge_f1_mean")
+        ),
         "perception_rgb_source_edge_f1_win_rate": _optional_float(aggregate.get("perception_rgb_source_edge_f1_win_rate")),
         "perception_aux_strength_source_edge_f1_win_rate": _optional_float(aggregate.get("perception_aux_strength_source_edge_f1_win_rate")),
+        "perception_aux_confidence_source_edge_f1_win_rate": _optional_float(aggregate.get("perception_aux_confidence_source_edge_f1_win_rate")),
     }
 
 

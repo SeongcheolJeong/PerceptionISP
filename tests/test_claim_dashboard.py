@@ -145,6 +145,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
             self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
+            self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_confidence_minus_human_source_edge_f1_mean"], -0.29)
+            self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_confidence_source_edge_f1_win_rate"], 0.0)
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard["adverse_native_slice"]["pass"])
