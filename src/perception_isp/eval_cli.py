@@ -348,6 +348,15 @@ def parse_label_map(value: str | None) -> dict[str, str]:
             "wine_glass": "wine glass",
             "hot_dog": "hot dog",
         }
+    if normalized.lower().replace("_", "-") in {"pascal-coco", "pascal-voc-coco", "pascal-to-coco", "voc-coco"}:
+        return {
+            "aeroplane": "airplane",
+            "diningtable": "dining table",
+            "motorbike": "motorcycle",
+            "pottedplant": "potted plant",
+            "sofa": "couch",
+            "tvmonitor": "tv",
+        }
     mapping: dict[str, str] = {}
     for token in normalized.split(","):
         token = token.strip()
