@@ -51,8 +51,10 @@ class RawDatasetAcquisitionTest(unittest.TestCase):
             dataset_root = root / "datasets"
             download_root = root / "downloads"
             (dataset_root / "aodraw" / "annotations").mkdir(parents=True)
+            (dataset_root / "sid" / "downloads").mkdir(parents=True)
             download_root.mkdir()
             (dataset_root / "aodraw" / "annotations" / "AODRaw_annotations.zip").write_bytes(b"annotations")
+            (dataset_root / "sid" / "downloads" / "Sony2025.zip").write_bytes(b"partial-sid")
             (download_root / "AODRaw_downsampled_srgb.zip").write_bytes(b"partial")
 
             summary = build_raw_dataset_acquisition(
@@ -67,9 +69,11 @@ class RawDatasetAcquisitionTest(unittest.TestCase):
             self.assertTrue(summary["local_state"]["aodraw_annotations_present"])
             self.assertEqual(summary["local_state"]["aodraw_test_raw_zip"]["status"], "missing")
             self.assertEqual(summary["local_state"]["aodraw_srgb_zip"]["status"], "partial")
+            self.assertEqual(summary["local_state"]["sid_sony_zip"]["status"], "partial")
             resources = {(row["dataset"], row["resource"]): row for row in summary["resources"]}
             self.assertEqual(resources[("AODRaw", "annotations_google_drive")]["acquisition_status"], "local_available")
             self.assertEqual(resources[("AODRaw", "images_downsampled_srgb_baidu")]["acquisition_status"], "local_invalid_retry")
+            self.assertEqual(resources[("SID", "sony_raw_google_storage")]["acquisition_status"], "local_invalid_retry")
             self.assertIn("local file is only", resources[("AODRaw", "images_downsampled_srgb_baidu")]["blocker"])
 
     def test_write_and_cli(self) -> None:

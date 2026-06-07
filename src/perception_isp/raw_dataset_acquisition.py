@@ -145,6 +145,86 @@ DATASET_RESOURCES: tuple[Dict[str, Any], ...] = (
         "first_action": "Download a small manual subset before full RAW-dark images.",
     },
     {
+        "dataset": "SID",
+        "priority": "P1",
+        "resource": "official_project",
+        "kind": "metadata",
+        "url": "https://cchen156.github.io/SID.html",
+        "expected_access": "public",
+        "disk_estimate_gb": 0.0,
+        "first_action": "Use as a low-light RAW/reference diagnostic dataset; it has paired RAW references but no object-detection boxes.",
+    },
+    {
+        "dataset": "SID",
+        "priority": "P1",
+        "resource": "official_repo",
+        "kind": "code",
+        "url": "https://github.com/cchen156/Learning-to-See-in-the-Dark",
+        "expected_access": "public",
+        "disk_estimate_gb": 0.0,
+        "first_action": "Use the official file lists to pair short-exposure RAW with long-exposure references.",
+    },
+    {
+        "dataset": "SID",
+        "priority": "P1",
+        "resource": "sony_raw_google_storage",
+        "kind": "raw_images",
+        "url": "https://storage.googleapis.com/isl-datasets/SID/Sony2025.zip",
+        "expected_access": "public_direct",
+        "disk_estimate_gb": 25.08,
+        "first_action": "Download Sony2025.zip for real low-light Bayer RAW edge/confidence diagnostics.",
+    },
+    {
+        "dataset": "SID",
+        "priority": "P2",
+        "resource": "fuji_raw_google_storage",
+        "kind": "raw_images",
+        "url": "https://storage.googleapis.com/isl-datasets/SID/Fuji2025.zip",
+        "expected_access": "public_direct",
+        "disk_estimate_gb": 51.61,
+        "first_action": "Defer until Sony RAW diagnostics are working; Fuji uses a different sensor pattern.",
+    },
+    {
+        "dataset": "RAW-NOD",
+        "priority": "P1",
+        "resource": "official_repo",
+        "kind": "metadata",
+        "url": "https://github.com/igor-morawski/RAW-NOD",
+        "expected_access": "public",
+        "disk_estimate_gb": 0.0,
+        "first_action": "Use as a low-light RAW object-detection candidate after requesting dataset access.",
+    },
+    {
+        "dataset": "RAW-NOD",
+        "priority": "P1",
+        "resource": "dataset_request_form",
+        "kind": "raw_images",
+        "url": "https://docs.google.com/forms/d/1aIKTV6026daYFRtje7zcx4LeDz68AOcpWIH7XxNCICY/viewform",
+        "expected_access": "google_form_approval",
+        "disk_estimate_gb": None,
+        "first_action": "Submit the form for access; it is a true low-light RAW object-detection dataset but not immediately downloadable.",
+    },
+    {
+        "dataset": "QUT low-light RAW",
+        "priority": "P2",
+        "resource": "dataset_page",
+        "kind": "metadata",
+        "url": "https://open.qcr.ai/dataset/low-light/",
+        "expected_access": "public",
+        "disk_estimate_gb": 0.0,
+        "first_action": "Use only as controlled low-light DNG diagnostics; it is not a detector benchmark.",
+    },
+    {
+        "dataset": "QUT low-light RAW",
+        "priority": "P2",
+        "resource": "cloudstor_zip",
+        "kind": "raw_images",
+        "url": "https://cloudstor.aarnet.edu.au/plus/index.php/s/gdJNon8OdEnQeXU/download",
+        "expected_access": "public_direct",
+        "disk_estimate_gb": 23.3,
+        "first_action": "Try only if the CloudStor link resolves; current public page may point at a retired host.",
+    },
+    {
         "dataset": "PASCALRAW",
         "priority": "P2",
         "resource": "stanford_purl",
@@ -337,8 +417,10 @@ def _acquisition_status(resource: Mapping[str, Any]) -> str:
     disk = resource.get("disk_estimate_gb")
     if disk is not None and float(disk) >= 100.0:
         return "defer_large_download"
-    if expected in {"baidu", "browser_or_gdrive", "browser_or_login_possible"}:
+    if expected in {"baidu", "browser_or_gdrive", "browser_or_login_possible", "google_form_approval"}:
         return "manual_access_likely"
+    if expected == "public_direct":
+        return "ready_to_try"
     if str(resource.get("kind", "")) in {"metadata", "code", "annotation"}:
         return "ready_to_try"
     return "needs_manual_check"
@@ -451,6 +533,13 @@ def _build_local_state(*, dataset_root: str | Path, download_roots: Sequence[str
         "aodraw_test_raw_zip": test_raw,
         "aodraw_train_raw_zip": train_raw,
         "aodraw_srgb_zip": srgb,
+        "sid_sony_zip": _find_download_candidate(search_roots + [root / "sid" / "downloads"], "Sony2025.zip", expected_bytes=26926662016),
+        "sid_fuji_zip": _find_download_candidate(search_roots + [root / "sid" / "downloads"], "Fuji2025.zip", expected_bytes=55409370853),
+        "qut_low_light_zip": _find_download_candidate(
+            search_roots + [root / "qut_low_light" / "downloads"],
+            "qut_low_light_raw_dataset.zip",
+            expected_bytes=int(23.3 * 1024**3),
+        ),
         "next_local_action": _local_next_action(annotations_present=annotations.is_file(), test_raw=test_raw, srgb=srgb),
     }
 
@@ -522,6 +611,20 @@ def _resource_local_status(resource: Mapping[str, Any], local_state: Mapping[str
     dataset = str(resource.get("dataset", ""))
     name = str(resource.get("resource", ""))
     if dataset != "AODRaw":
+        if dataset == "SID":
+            key_by_resource = {
+                "sony_raw_google_storage": "sid_sony_zip",
+                "fuji_raw_google_storage": "sid_fuji_zip",
+            }
+            key = key_by_resource.get(name)
+            if key:
+                candidate = dict(local_state.get(key, {}) if isinstance(local_state.get(key), Mapping) else {})
+                candidate["checked"] = True
+                return candidate
+        if dataset == "QUT low-light RAW" and name == "cloudstor_zip":
+            candidate = dict(local_state.get("qut_low_light_zip", {}) if isinstance(local_state.get("qut_low_light_zip"), Mapping) else {})
+            candidate["checked"] = True
+            return candidate
         return {"checked": True, "status": "not_applicable", "message": ""}
     if name == "annotations_google_drive":
         present = bool(local_state.get("aodraw_annotations_present"))
@@ -646,6 +749,9 @@ def _local_state_html(local_state: Mapping[str, Any]) -> str:
         ("AODRaw test RAW zip", _candidate_status(local_state.get("aodraw_test_raw_zip")), _candidate_message(local_state.get("aodraw_test_raw_zip"))),
         ("AODRaw train RAW zip", _candidate_status(local_state.get("aodraw_train_raw_zip")), _candidate_message(local_state.get("aodraw_train_raw_zip"))),
         ("AODRaw sRGB zip", _candidate_status(local_state.get("aodraw_srgb_zip")), _candidate_message(local_state.get("aodraw_srgb_zip"))),
+        ("SID Sony RAW zip", _candidate_status(local_state.get("sid_sony_zip")), _candidate_message(local_state.get("sid_sony_zip"))),
+        ("SID Fuji RAW zip", _candidate_status(local_state.get("sid_fuji_zip")), _candidate_message(local_state.get("sid_fuji_zip"))),
+        ("QUT low-light RAW zip", _candidate_status(local_state.get("qut_low_light_zip")), _candidate_message(local_state.get("qut_low_light_zip"))),
     ]
     body = "".join(
         "<tr>"
