@@ -152,17 +152,19 @@ same 128-sample KITTI subset:
 | --- | --- |
 | Export | `exports/perception_rgb_aux_kitti_val128_detector_log_extended/index.html` |
 | Tensor key | `rgb_aux_extended_chw` |
-| Tensor shape | 13 channels, verified in the exported NPZ files |
+| Tensor shape | 13 channels in this historical artifact; current code exports 15 channels after adding PSF blur and PSF edge-likelihood aux maps |
 | RAW provenance | 128 true CFA mosaics, source/target `GRBG`, no remap |
 | Train run | 96 train / 32 eval, 5 epochs, 36.6 sample-epochs/s |
 | Loss | `2.2398 -> 0.4899` train, best eval loss `0.9939` |
 | Direct eval | `reports/perception_rgb_aux_dense_kitti_val128_extended_rgb_aux_eval_conf050/index.html` |
 | Direct eval result | P50 `0.0032`, R50 `0.0642`, FP/sample `96.4063` |
 
-This closes the data-path question for 13-channel aux tensors: the maps can be
-exported, loaded, trained, checkpointed, and evaluated by the current compact
-DNN path. It does not close the performance question because the compact direct
-detector is still weak.
+This closed the data-path question for the prior 13-channel aux tensor: the maps
+could be exported, loaded, trained, checkpointed, and evaluated by the compact
+DNN path. The current code extends that tensor to 15 channels with PSF blur and
+PSF edge-likelihood maps; the historical dense-detector metrics above are not a
+refreshed 15-channel performance result. It does not close the performance
+question because the compact direct detector is still weak.
 
 The timing answer is therefore favorable for this compact path: on this Mac
 with MPS, the observed compact dense median is about `59.3 sample-epochs/s`.
@@ -590,7 +592,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | Front-end mechanism validation | `pass` for low-light, glare, low-MTF, and CFA-support checks; this is signal feasibility evidence, not detector performance evidence |
 | CFA stress sweep | Available as diagnostic evidence; `MONO` ranks highest for low-light/low-MTF synthetic scores and `RGBIR` for glare |
 | Edge-confidence suite | `pass` for synthetic low-light, glare, and low-MTF difficult-edge checks; this is front-end confidence evidence, not detector performance evidence |
-| Object edge-fidelity suite | `pass`; object/sensor edge oracles are compared against HumanISP RGB edges, PerceptionISP RGB edges, and aux edge maps across CFA/LensPSF. LensPSF sigma `0.0 -> 1.6` sensor pixels reduces absolute sensor-edge P95 `0.0546 -> 0.0362` (`ratio=0.6624`). This is front-end edge evidence, not detector performance evidence |
+| Object edge-fidelity suite | `pass`; object/sensor edge oracles are compared against HumanISP RGB edges, PerceptionISP RGB edges, and aux edge maps across CFA/LensPSF. LensPSF sigma `0.0 -> 1.6` sensor pixels reduces absolute sensor-edge P95 `0.0546 -> 0.0362` (`ratio=0.6624`). `psf_sigma_map` now feeds PSF blur-confidence and PSF edge-likelihood aux maps. This is front-end edge evidence, not detector performance evidence |
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622` |
 | Benchmark protocol coverage | `coverage_status=coverage_complete` for the configured KITTI evidence bundle; this only means the matrix is covered |

@@ -147,6 +147,7 @@ def _run_case(
     raw = _raw_from_sensor_rgb(
         sensor_rgb,
         cfa_pattern=cfa_pattern,
+        psf_sigma=psf_sigma,
         seed=seed,
         provenance={"edge_fidelity_psf_sigma": float(psf_sigma), "edge_fidelity_cfa_pattern": str(cfa_pattern)},
     )
@@ -256,6 +257,7 @@ def _raw_from_sensor_rgb(
     rgb: np.ndarray,
     *,
     cfa_pattern: str,
+    psf_sigma: float = 0.0,
     seed: int,
     exposures: Sequence[float] = (1.0, 0.25, 0.0625),
     provenance: Mapping[str, Any] | None = None,
@@ -291,6 +293,7 @@ def _raw_from_sensor_rgb(
         lens_shading_gain=np.ones((height, width), dtype=np.float64),
         prnu_gain=np.ones((height, width), dtype=np.float64),
         mtf_confidence_map=np.ones((height, width), dtype=np.float64),
+        psf_sigma_map=np.full((height, width), max(float(psf_sigma), 0.0), dtype=np.float64),
     )
     return RawFrame(data=np.stack(planes, axis=0), metadata=metadata, calibration=calibration, provenance=dict(provenance or {}))
 

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import unittest
 
 import numpy as np
 
-from perception_isp import PerceptionISPConfig, PerceptionISPPipeline, PreviousFrameState, make_synthetic_raw
+from perception_isp import PerceptionISPConfig, PerceptionISPPipeline, PreviousFrameState, RawFrame, make_synthetic_raw
 
 
 class PerceptionISPPipelineTest(unittest.TestCase):
@@ -64,6 +65,34 @@ class PerceptionISPPipelineTest(unittest.TestCase):
         human_log_result = PerceptionISPPipeline(PerceptionISPConfig(tone_mapping="human_log")).run(raw)
         self.assertEqual(detector_result.metadata["processing"]["tone_mapping"], "detector_log")
         self.assertTrue(np.allclose(detector_result.vision_rgb, human_log_result.vision_rgb))
+
+    def test_psf_sigma_map_modulates_edge_aux_confidence(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48, cfa_pattern="RGGB")
+        shape = (48, 80)
+        zero_psf = RawFrame(
+            data=raw.data.copy(),
+            metadata=raw.metadata,
+            calibration=replace(raw.calibration, psf_sigma_map=np.zeros(shape, dtype=np.float64)),
+            provenance=raw.provenance,
+        )
+        blurred_psf = RawFrame(
+            data=raw.data.copy(),
+            metadata=raw.metadata,
+            calibration=replace(raw.calibration, psf_sigma_map=np.full(shape, 1.6, dtype=np.float64)),
+            provenance=raw.provenance,
+        )
+
+        pipeline = PerceptionISPPipeline()
+        zero_result = pipeline.run(zero_psf)
+        blurred_result = pipeline.run(blurred_psf)
+
+        self.assertIn("psf_sigma", blurred_result.maps)
+        self.assertIn("psf_blur_confidence", blurred_result.maps)
+        self.assertIn("psf_edge_likelihood", blurred_result.maps)
+        self.assertAlmostEqual(float(np.mean(blurred_result.maps["psf_sigma"])), 1.6)
+        self.assertGreater(float(np.mean(zero_result.maps["psf_blur_confidence"])), float(np.mean(blurred_result.maps["psf_blur_confidence"])))
+        self.assertGreater(float(np.mean(zero_result.maps["edge_confidence"])), float(np.mean(blurred_result.maps["edge_confidence"])))
+        self.assertGreater(float(np.mean(zero_result.maps["psf_edge_likelihood"])), float(np.mean(blurred_result.maps["psf_edge_likelihood"])))
 
 
 if __name__ == "__main__":

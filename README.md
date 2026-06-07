@@ -65,7 +65,8 @@ rgb_r, rgb_g, rgb_b,
 noise_variance, snr_map, saturation, clipping_distance, hdr_confidence,
 edge_strength, edge_confidence, demosaic_confidence,
 hdr_exposure_source, lens_gain, color_confidence,
-ir_or_clear, blur_focus_confidence
+ir_or_clear, blur_focus_confidence,
+mtf_confidence, psf_sigma, psf_blur_confidence, psf_edge_likelihood
 ```
 
 The fast tensor uses channels:
@@ -94,7 +95,8 @@ rgb_r, rgb_g, rgb_b,
 aux_edge_strength, aux_saturation, aux_reliability,
 aux_noise_risk, aux_clipping_distance, aux_demosaic_confidence,
 aux_hdr_confidence, aux_lens_gain, aux_color_confidence,
-aux_blur_focus_confidence
+aux_blur_focus_confidence, aux_psf_blur_confidence,
+aux_psf_edge_likelihood
 ```
 
 Export a small CameraE2E-backed COCO8 smoke dataset:
@@ -133,7 +135,7 @@ PYTHONPATH=src \
 ```
 
 Use `--tensor-key rgb_aux_extended_chw` to train the same smoke path on the
-extended 13-channel sensor-native tensor. The default remains `rgb_aux_chw` so
+extended 15-channel sensor-native tensor. The default remains `rgb_aux_chw` so
 existing checkpoints and timing reports stay reproducible.
 
 This smoke training is not a detector-performance claim. It only verifies the
@@ -186,7 +188,7 @@ the direct detector metrics are weak and produce too many false positives.
 Use `--channel-mode rgb_only` or `--channel-mode aux_only` for ablations with
 the same selected tensor shape and zeroed input groups. Use
 `--tensor-key rgb_aux_extended_chw` to train the compact dense detector on the
-extended 13-channel sensor-native tensor.
+extended 15-channel sensor-native tensor.
 
 The current MPS timing is good for iteration, not for a performance claim. From
 the observed KITTI ablation runs, compact dense training is about
@@ -197,7 +199,7 @@ for training only, 50 epochs is about 1.4 hours, and 100 epochs is about
 training is about 41.6 minutes for 5,985 images.
 
 Roll up export, training, and dense-eval summaries into one timing/diagnostic
-report, including the extended 13-channel sensor-native tensor run:
+report, including the extended 15-channel sensor-native tensor run:
 
 ```bash
 PYTHONPATH=src \
@@ -220,10 +222,11 @@ The rollup is a resource and diagnostic view. It now includes a Training-Time
 Plan derived from observed sample-epochs/sec and export samples/sec, making
 compact KITTI-sized timing scenarios reproducible. It also makes clear that the
 compact dense path trains quickly, while its direct detector metrics are still
-too weak for a HumanISP-vs-PerceptionISP performance claim. The extended run
-verifies that `rgb_aux_extended_chw` can be exported, trained, and evaluated as
-a 13-channel DNN input, but its direct dense-detector metrics are diagnostic
-only.
+too weak for a HumanISP-vs-PerceptionISP performance claim. The current code
+exports `rgb_aux_extended_chw` as a 15-channel DNN input including PSF blur and
+PSF edge-likelihood channels. Older KITTI extended artifacts were produced with
+the prior 13-channel layout, so their direct dense-detector metrics remain
+historical diagnostics until the export/train/eval bundle is refreshed.
 
 Run the trained smoke checkpoint through the normal comparison harness:
 
@@ -966,8 +969,11 @@ those oracles. In the current synthetic case, LensPSF sigma from `0.0` to
 than the sensor pixel pitch, or if PSF is applied only after low-resolution
 sensor sampling, this effect can be nearly invisible. The report's LensPSF
 Visibility table makes this explicit with ratio-vs-nominal and delta-vs-previous
-edge-contrast metrics. Treat this as front-end edge-fidelity evidence across
-CFA/LensPSF, not detector-performance evidence.
+edge-contrast metrics. The PerceptionISP edge block also consumes calibration
+`psf_sigma_map` as a PSF blur-confidence prior and exports `psf_blur_confidence`
+and `psf_edge_likelihood` aux maps, including the extended RGB+aux DNN tensor.
+Treat this as front-end edge-fidelity evidence across CFA/LensPSF, not
+detector-performance evidence.
 
 To verify that the test is not merely passing an RGB scene through both ISPs,
 run the scene-information stress suite. It creates a higher-resolution scene

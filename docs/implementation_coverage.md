@@ -30,8 +30,10 @@ Known limits:
 - The Bayer demosaic block is an edge-aware numpy reference, not a production ISP demosaic.
 - The RGB+aux compact dense detector is still a learning-path benchmark, not a claim-quality detector.
 - The RGB+aux smoke checkpoint predicts one generic box and is not a useful trained detector.
-- The extended 13-channel RGB+aux tensor has export/train/eval evidence, but
-  the direct dense metrics remain diagnostic and weak.
+- The current extended RGB+aux tensor is 15 channels after adding PSF blur and
+  PSF edge-likelihood aux channels. Older 13-channel export/train/eval artifacts
+  remain historical diagnostics; direct dense metrics are still weak and should
+  not be used as a claim-quality detector result.
 - The task gate currently fails the recall-improvement profile on the KITTI
   t001 evidence bundle, so task-level recall improvement should not be claimed.
 - Synthetic mechanism validation shows expected low-light, glare, low-MTF, and
@@ -48,7 +50,8 @@ Known limits:
   LensPSF blur, but it remains front-end edge evidence rather than
   detector-performance evidence. PSF effects can be nearly invisible when the
   PSF footprint is much smaller than the sensor pixel pitch or is applied only
-  after low-resolution sampling.
+  after low-resolution sampling. `psf_sigma_map` now feeds PSF blur-confidence
+  and PSF edge-likelihood aux maps when calibration provides it.
 - The scene-information stress suite validates high-resolution scene detail
   loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor
   loss, but it is diagnostic scene-to-sensor evidence and does not show that

@@ -27,6 +27,8 @@ RGB_AUX_EXTENDED_CHANNELS = RGB_AUX_CHANNELS + (
     "aux_lens_gain",
     "aux_color_confidence",
     "aux_blur_focus_confidence",
+    "aux_psf_blur_confidence",
+    "aux_psf_edge_likelihood",
 )
 RGB_AUX_TENSOR_KEY = "rgb_aux_chw"
 RGB_AUX_EXTENDED_TENSOR_KEY = "rgb_aux_extended_chw"
@@ -131,6 +133,10 @@ def _dnn_channel(name: str, *, rgb: np.ndarray, aux: np.ndarray, aux_maps: Mappi
         return _map_or_fallback(aux_maps, "color_confidence", np.ones(shape, dtype=np.float64), shape)
     if normalized == "aux_blur_focus_confidence":
         return _map_or_fallback(aux_maps, "blur_focus_confidence", np.ones(shape, dtype=np.float64), shape)
+    if normalized == "aux_psf_blur_confidence":
+        return _map_or_fallback(aux_maps, "psf_blur_confidence", np.ones(shape, dtype=np.float64), shape)
+    if normalized == "aux_psf_edge_likelihood":
+        return _map_or_fallback(aux_maps, "psf_edge_likelihood", np.ones(shape, dtype=np.float64), shape)
     raise ValueError(f"unsupported RGB+aux channel: {name!r}")
 
 

@@ -42,10 +42,14 @@ class AuxDNNExportTest(unittest.TestCase):
         self.assertEqual(extended.shape, (48, 64, len(RGB_AUX_EXTENDED_CHANNELS)))
         self.assertEqual(tuple(RGB_AUX_CHANNELS[:3]), ("rgb_r", "rgb_g", "rgb_b"))
         self.assertIn("aux_demosaic_confidence", RGB_AUX_EXTENDED_CHANNELS)
+        self.assertIn("aux_psf_edge_likelihood", RGB_AUX_EXTENDED_CHANNELS)
         self.assertIn("clipping_distance", images.aux_maps)
+        self.assertIn("psf_edge_likelihood", images.aux_maps)
         self.assertTrue(np.isfinite(hwc).all())
         self.assertTrue(np.isfinite(extended).all())
         self.assertGreater(float(np.mean(hwc[:, :, 3])), 0.0)
+        psf_index = RGB_AUX_EXTENDED_CHANNELS.index("aux_psf_edge_likelihood")
+        self.assertTrue(np.allclose(extended[:, :, psf_index], images.aux_maps["psf_edge_likelihood"]))
 
     def test_channel_masks_zero_expected_groups(self) -> None:
         tensor = np.ones((6, 2, 3), dtype=np.float32)
@@ -86,6 +90,7 @@ class AuxDNNExportTest(unittest.TestCase):
                 self.assertEqual(payload["rgb_aux_extended_chw"].shape, (len(RGB_AUX_EXTENDED_CHANNELS), 48, 64))
                 self.assertEqual(payload["rgb_aux_extended_hwc"].shape, (48, 64, len(RGB_AUX_EXTENDED_CHANNELS)))
                 self.assertIn("aux_clipping_distance", [str(value) for value in payload["extended_channel_names"]])
+                self.assertIn("aux_psf_edge_likelihood", [str(value) for value in payload["extended_channel_names"]])
                 self.assertEqual(payload["boxes_xyxy"].shape[1], 4)
             self.assertEqual(rows[0]["extended_channels"], list(RGB_AUX_EXTENDED_CHANNELS))
             self.assertIn("extended_tensor_stats", rows[0])

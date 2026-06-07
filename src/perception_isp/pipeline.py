@@ -115,6 +115,10 @@ class PerceptionISPPipeline:
                 np.asarray(color_payload["clear_channel"], dtype=np.float64),
             ),
             "blur_focus_confidence": np.asarray(edge_payload["blur_focus_confidence"], dtype=np.float64),
+            "mtf_confidence": np.asarray(edge_payload["mtf_confidence"], dtype=np.float64),
+            "psf_sigma": np.asarray(edge_payload["psf_sigma"], dtype=np.float64),
+            "psf_blur_confidence": np.asarray(edge_payload["psf_blur_confidence"], dtype=np.float64),
+            "psf_edge_likelihood": np.asarray(edge_payload["psf_edge_likelihood"], dtype=np.float64),
         }
         metadata_packet["_fast_maps"] = {
             "luma": np.asarray(cfa_payload["luma"], dtype=np.float64),
@@ -405,10 +409,12 @@ class PerceptionISPPipeline:
         edge_strength = np.sqrt(np.maximum(lambda1, 0.0))
         if float(np.max(edge_strength)) > EPS:
             edge_strength = edge_strength / float(np.max(edge_strength))
-        edge_confidence = (lambda1 - lambda2) / (lambda1 + lambda2 + EPS)
         mtf = _optional_map(calibration.mtf_confidence_map, luma.shape, 1.0)
+        psf_sigma = np.maximum(_optional_map(calibration.psf_sigma_map, luma.shape, 0.0), 0.0)
+        psf_blur_confidence = _psf_blur_confidence(psf_sigma)
+        structure_edge_confidence = (lambda1 - lambda2) / (lambda1 + lambda2 + EPS)
         saturation_gate = 1.0 - np.asarray(hdr_payload["saturation"], dtype=np.float64)
-        edge_confidence = np.clip(edge_confidence * mtf * saturation_gate * confidence_base, 0.0, 1.0)
+        edge_confidence = np.clip(structure_edge_confidence * mtf * psf_blur_confidence * saturation_gate * confidence_base, 0.0, 1.0)
         orientation = 0.5 * np.arctan2(2.0 * jxy, jxx - jyy + EPS)
 
         luma_edge = np.sqrt(gradients[0][0] * gradients[0][0] + gradients[0][1] * gradients[0][1])
@@ -425,7 +431,7 @@ class PerceptionISPPipeline:
         blur_focus_confidence = _blur_focus_confidence(edge_strength, edge_confidence, self.config.blur_edge_percentile)
         demosaic_confidence = np.asarray(cfa_payload.get("demosaic_confidence", np.ones_like(luma)), dtype=np.float64)
         demosaic_confidence = np.clip(demosaic_confidence * edge_confidence + (1.0 - edge_strength) * 0.5, 0.0, 1.0)
-        psf_likelihood = np.clip(edge_confidence * mtf - np.asarray(hdr_payload["ghost_motion_artifact"], dtype=np.float64), 0.0, 1.0)
+        psf_likelihood = np.clip(edge_confidence - np.asarray(hdr_payload["ghost_motion_artifact"], dtype=np.float64), 0.0, 1.0)
         return {
             "edge_strength": edge_strength,
             "edge_confidence": edge_confidence,
@@ -436,6 +442,8 @@ class PerceptionISPPipeline:
             "demosaic_confidence": demosaic_confidence,
             "blur_focus_confidence": blur_focus_confidence,
             "mtf_confidence": mtf,
+            "psf_sigma": psf_sigma,
+            "psf_blur_confidence": psf_blur_confidence,
             "psf_edge_likelihood": psf_likelihood,
         }
 
@@ -852,6 +860,10 @@ class PerceptionISPPipeline:
             "edge_type": np.asarray(edge_payload["edge_type"], dtype=np.float64),
             "demosaic_confidence": np.asarray(edge_payload["demosaic_confidence"], dtype=np.float64),
             "blur_focus_confidence": np.asarray(edge_payload["blur_focus_confidence"], dtype=np.float64),
+            "mtf_confidence": np.asarray(edge_payload["mtf_confidence"], dtype=np.float64),
+            "psf_sigma": np.asarray(edge_payload["psf_sigma"], dtype=np.float64),
+            "psf_blur_confidence": np.asarray(edge_payload["psf_blur_confidence"], dtype=np.float64),
+            "psf_edge_likelihood": np.asarray(edge_payload["psf_edge_likelihood"], dtype=np.float64),
             "color_confidence": np.asarray(color_payload["color_confidence"], dtype=np.float64),
             "log_r_over_g": np.asarray(color_payload["log_r_over_g"], dtype=np.float64),
             "log_b_over_g": np.asarray(color_payload["log_b_over_g"], dtype=np.float64),
@@ -1153,6 +1165,11 @@ def _blur_focus_confidence(edge_strength: ArrayF, edge_confidence: ArrayF, edge_
         return np.zeros_like(edge_strength)
     local = edge_strength / threshold
     return np.clip(0.5 * local + 0.5 * edge_confidence, 0.0, 1.0)
+
+
+def _psf_blur_confidence(psf_sigma: ArrayF) -> ArrayF:
+    sigma = np.maximum(np.asarray(psf_sigma, dtype=np.float64), 0.0)
+    return np.clip(np.exp(-0.5 * sigma * sigma), 0.0, 1.0)
 
 
 def _fast_roi(shape: Tuple[int, int], mode: str, fraction: float) -> Tuple[int, int, int, int]:
