@@ -688,9 +688,8 @@ artifact is trained on `perception_fusion_rgb_aux` proposals.
 Detector comparisons can now be conditioned by LensPSF as well as CFA. Use
 `--psf-sigma` to inject a constant `psf_sigma_map` into each RAW calibration;
 the value is also written into `run_config`, sample metadata, and RAW
-provenance. This is the intended path for the next CFA/LensPSF detector sweep,
-because it changes the PerceptionISP aux/confidence inputs rather than merely
-tagging the report:
+provenance. This changes the PerceptionISP aux/confidence inputs rather than
+merely tagging the report:
 
 ```bash
 PYTHONPATH=src \
@@ -714,6 +713,58 @@ PYTHONPATH=src \
   --proposal-calibration-model reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001/proposal_calibration_model.json \
   --output-dir reports/perception_compare_kitti_val128_grbg_psf1p2_score_label_aux
 ```
+
+The consolidated CFA/LensPSF detector sweep runner uses that same RAW
+conditioning path and writes a condition-level dashboard:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.cfa_lenspsf_detector_sweep \
+  --source yolo-dataset \
+  --dataset data/kitti/data.yaml \
+  --split val \
+  --count 32 \
+  --width 640 \
+  --height 192 \
+  --cfa GRBG \
+  --cfa RGGB \
+  --cfa BGGR \
+  --cfa GBRG \
+  --psf-sigma 0 \
+  --psf-sigma 0.8 \
+  --psf-sigma 1.6 \
+  --rgb-detector yolo \
+  --rgb-detector-model yolo11n.pt \
+  --rgb-detector-confidence 0.25 \
+  --label-aware \
+  --ground-truth-label-map kitti-coco \
+  --no-visuals \
+  --tone-mapping detector_log \
+  --denoise-strength 0.30 \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.20 \
+  --human-tone-mapping log \
+  --human-denoise-strength 0.18 \
+  --human-demosaic-method edge_aware \
+  --human-demosaic-artifact-suppression 0.20 \
+  --raw-cache-dir data/.cache/perception_isp_raw \
+  --proposal-calibration-model reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001/proposal_calibration_model.json \
+  --output-dir reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf
+```
+
+The current sweep report is:
+
+```text
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf/index.html
+```
+
+It covers 12 Bayer CFA/LensPSF conditions with 32 KITTI val samples per
+condition. The PSF provenance check records `384/384` samples, and the best
+calibrated downstream FP delta is `-0.4062` at `GRBG`, PSF `0.8`. Because the
+CameraE2E source CFA is GRBG, the non-GRBG rows show
+`pattern_remapped_fraction=1.0`; use those rows as bridge-remap sensitivity
+evidence, not as native sensor-CFA proof.
 
 For stricter evidence, train the proposal calibrator on a KITTI train report and
 apply it to the KITTI val report. An earlier comparison branch uses a
@@ -861,6 +912,7 @@ PYTHONPATH=src \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
+  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
   --output-dir reports/perception_claim_readiness_score_label_aux_t001_fp_vs_human_extended
@@ -1261,6 +1313,7 @@ reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
@@ -1282,12 +1335,13 @@ source scene-edge support with low-scene-edge AUC `0.6681`, without treating
 that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
-The same dashboard's `Performance Evidence Map` lists 12 current evidence rows
-and five next evidence targets: scene-edge proposal correlation across
+The same dashboard's `Performance Evidence Map` now includes a diagnostic
+CFA/LensPSF detector condition sweep row. It lists five next evidence targets:
+scene-edge proposal correlation across
 CFA/LensPSF, CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune gate,
 high-information real-scene expansion, and a failure/slice casebook. The
-previous aux-edge and source scene-edge same-sample proposal correlations are
-now part of the current evidence row.
+previous aux-edge, source scene-edge same-sample proposal correlations, and
+val32 CFA/LensPSF detector sweep are now part of the current evidence rows.
 
 The current 1496-image naive RAW-like baseline is:
 

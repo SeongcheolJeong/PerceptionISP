@@ -57,9 +57,10 @@ Known limits:
   and PSF edge-likelihood aux maps when calibration provides it.
 - `eval_cli` now supports `--psf-sigma`, which injects a constant
   `psf_sigma_map` into RAW calibration and records it in run config, sample
-  metadata, and RAW provenance. This enables CFA/LensPSF detector sweeps, but
-  the sweep still needs to be run before claiming detector robustness across
-  lens blur conditions.
+  metadata, and RAW provenance. `cfa_lenspsf_detector_sweep` uses that path to
+  run fixed-detector CFA/LensPSF condition sweeps and report remap/provenance
+  checks. The current KITTI val32 sweep is diagnostic only; it is not enough to
+  claim detector robustness across lens blur or native CFA conditions.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor

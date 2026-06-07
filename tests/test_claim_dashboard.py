@@ -27,6 +27,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -41,6 +42,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -62,6 +64,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
+            self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertEqual(
                 dashboard["evidence_map"]["claim_posture"]["recommended_claim"],
                 "Use a narrow recall-budgeted FP-reduction claim, with front-end/aux evidence as feasibility support.",
@@ -71,6 +74,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Recall-budgeted FP reduction", evidence_areas)
             self.assertIn("High-information scene edge similarity", evidence_areas)
             self.assertIn("Aux evidence used downstream", evidence_areas)
+            self.assertIn("CFA/LensPSF detector condition sweep", evidence_areas)
             self.assertTrue(
                 any(
                     row["area"] == "Broad HumanISP superiority" and row["status"] == "not_supported"
@@ -111,6 +115,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "CFA/LensPSF detector sweep is available as condition-level detector evidence; use it for sensitivity analysis, not broad superiority.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertTrue(
@@ -181,6 +189,7 @@ class ClaimDashboardTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -207,6 +216,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(scene_information),
                         "--aux-contribution-audit",
                         str(aux_contribution),
+                        "--cfa-lenspsf-detector-sweep",
+                        str(cfa_lenspsf_detector),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -225,6 +236,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["scene_edge_confidence"]["report_count"], 2)
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
+            self.assertTrue(summary["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -806,6 +818,64 @@ def _write_comparison_rollup(path: Path) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
     (path / "rollup_summary.json").write_text(json.dumps({"run_count": 1, "baseline_input": "human_rgb", "runs": []}) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_detector_sweep(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "run_count": 2,
+        "expected_run_count": 2,
+        "count": 16,
+        "cfa_patterns": ["GRBG"],
+        "psf_sigmas": [0.0, 1.2],
+        "use_camerae2e": True,
+        "checks": [
+            {"id": "condition_grid_complete", "status": "pass", "evidence": "runs=2 expected=2"},
+            {"id": "psf_sigma_recorded_in_raw_provenance", "status": "pass", "evidence": "recorded=32 samples=32"},
+        ],
+        "rankings": {
+            "calibrated_or_fusion_by_delta_fp@0.50": [
+                {
+                    "run_id": "cfa-grbg_psf-1p20",
+                    "report": "002_cfa-grbg_psf-1p20/index.html",
+                    "input": "perception_calibrated_score_label_aux_fusion_rgb_aux_t001",
+                    "cfa_pattern": "GRBG",
+                    "psf_sigma": 1.2,
+                    "delta": -0.4,
+                }
+            ]
+        },
+        "runs": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "report": "001_cfa-grbg_psf-0p00/index.html",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "sample_count": 16,
+                "raw_condition_summary": {"pattern_remapped_fraction": 0.0, "psf_recorded_fraction": 1.0},
+                "metrics": {
+                    "perception_calibrated_score_label_aux_fusion_rgb_aux_t001": {
+                        "precision@0.50_mean": 0.65,
+                        "recall@0.50_mean": 0.45,
+                        "fp@0.50_mean": 1.0,
+                    }
+                },
+                "delta_vs_human": {
+                    "perception_calibrated_score_label_aux_fusion_rgb_aux_t001": {
+                        "precision@0.50_mean": 0.03,
+                        "recall@0.50_mean": -0.004,
+                        "fp@0.50_mean": -0.3,
+                    }
+                },
+            }
+        ],
+        "interpretation": "unit CFA/LensPSF detector sweep",
+        "claim_boundary": "unit boundary",
+    }
+    (path / "cfa_lenspsf_detector_sweep_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

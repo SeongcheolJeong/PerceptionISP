@@ -25,6 +25,7 @@ EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
+CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -41,6 +42,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
+    parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -58,6 +60,7 @@ def main(argv: Any = None) -> int:
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
+        cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -91,6 +94,7 @@ def build_claim_dashboard(
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
+    cfa_lenspsf_detector_sweep: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
@@ -105,6 +109,11 @@ def build_claim_dashboard(
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence) if _as_path_specs(scene_edge_confidence) else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
+    cfa_lenspsf_detector = (
+        _load_cfa_lenspsf_detector_sweep(cfa_lenspsf_detector_sweep)
+        if cfa_lenspsf_detector_sweep is not None
+        else None
+    )
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
     decisions = _claim_decisions(
         claims,
@@ -119,6 +128,7 @@ def build_claim_dashboard(
         scene_edge,
         scene_information,
         aux_contribution,
+        cfa_lenspsf_detector,
     )
     evidence_map = _build_evidence_map(
         claims,
@@ -133,6 +143,7 @@ def build_claim_dashboard(
         scene_edge,
         scene_information,
         aux_contribution,
+        cfa_lenspsf_detector,
     )
     return {
         "claims": claims,
@@ -147,6 +158,7 @@ def build_claim_dashboard(
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
+        "cfa_lenspsf_detector_sweep": cfa_lenspsf_detector,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "evidence_map": evidence_map,
@@ -628,6 +640,74 @@ def _load_aux_contribution_audit(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_cfa_lenspsf_detector_sweep(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    runs = []
+    for row in data.get("runs", ()):
+        if not isinstance(row, Mapping):
+            continue
+        raw_summary = row.get("raw_condition_summary", {}) if isinstance(row.get("raw_condition_summary"), Mapping) else {}
+        primary = _dashboard_primary_downstream_input(row)
+        primary_metrics = row.get("metrics", {}).get(primary, {}) if isinstance(row.get("metrics"), Mapping) else {}
+        primary_delta = row.get("delta_vs_human", {}).get(primary, {}) if isinstance(row.get("delta_vs_human"), Mapping) else {}
+        row_report = str(row.get("report", ""))
+        runs.append(
+            {
+                "run_id": str(row.get("run_id", "")),
+                "report": row_report,
+                "html_path": str(summary_path.parent / row_report) if row_report else "",
+                "cfa_pattern": str(row.get("cfa_pattern", "")),
+                "psf_sigma": _maybe_float(row.get("psf_sigma")),
+                "sample_count": int(row.get("sample_count", 0)),
+                "primary_input": primary,
+                "precision@0.50_mean": _maybe_float(primary_metrics.get("precision@0.50_mean")),
+                "recall@0.50_mean": _maybe_float(primary_metrics.get("recall@0.50_mean")),
+                "fp@0.50_mean": _maybe_float(primary_metrics.get("fp@0.50_mean")),
+                "delta_precision@0.50_mean": _maybe_float(primary_delta.get("precision@0.50_mean")),
+                "delta_recall@0.50_mean": _maybe_float(primary_delta.get("recall@0.50_mean")),
+                "delta_fp@0.50_mean": _maybe_float(primary_delta.get("fp@0.50_mean")),
+                "pattern_remapped_fraction": _maybe_float(raw_summary.get("pattern_remapped_fraction")),
+                "psf_recorded_fraction": _maybe_float(raw_summary.get("psf_recorded_fraction")),
+            }
+        )
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "run_count": int(data.get("run_count", len(runs))),
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "count": int(data.get("count", 0)),
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [_maybe_float(value) for value in data.get("psf_sigmas", ())],
+        "use_camerae2e": bool(data.get("use_camerae2e", False)),
+        "checks": checks,
+        "failed_checks": failed,
+        "rankings": data.get("rankings", {}) if isinstance(data.get("rankings"), Mapping) else {},
+        "runs": runs,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _dashboard_primary_downstream_input(run: Mapping[str, Any]) -> str:
+    metrics = run.get("metrics", {}) if isinstance(run.get("metrics"), Mapping) else {}
+    for input_name in metrics:
+        if str(input_name).startswith("perception_calibrated"):
+            return str(input_name)
+    if "perception_fusion_rgb_aux" in metrics:
+        return "perception_fusion_rgb_aux"
+    if "perception_rgb" in metrics:
+        return "perception_rgb"
+    return next(iter(metrics), "")
+
+
 def _load_aux_sample_bridge(payload: Any) -> Dict[str, Any] | None:
     if not isinstance(payload, Mapping):
         return None
@@ -776,6 +856,7 @@ def _build_evidence_map(
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
+    cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
 ) -> Dict[str, Any]:
     current: list[Dict[str, Any]] = []
     broad = _first_claim(claims, "broad_superiority")
@@ -886,6 +967,18 @@ def _build_evidence_map(
             }
         )
 
+    if cfa_lenspsf_detector_sweep is not None:
+        current.append(
+            {
+                "area": "CFA/LensPSF detector condition sweep",
+                "status": "diagnostic" if bool(cfa_lenspsf_detector_sweep.get("pass")) else "not_supported",
+                "claim_strength": "condition_detector_diagnostic",
+                "evidence": _cfa_lenspsf_detector_evidence(cfa_lenspsf_detector_sweep),
+                "claim_boundary": "Condition-level detector evidence only; do not treat remapped CFA rows as native sensor-CFA proof.",
+                "next_evidence": "Scale the sweep to more held-out samples and add same-sample proposal edge correlation per CFA/LensPSF condition.",
+            }
+        )
+
     if scene_edge_confidence is not None:
         current.append(
             {
@@ -943,6 +1036,7 @@ def _build_evidence_map(
             aux_contribution_audit=aux_contribution_audit,
             edge_fidelity_suite=edge_fidelity_suite,
             cfa_stress_sweep=cfa_stress_sweep,
+            cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
             training=training,
         ),
     }
@@ -1034,6 +1128,34 @@ def _cfa_evidence(cfa_stress: Mapping[str, Any]) -> str:
         if isinstance(row, Mapping)
     )
     return f"cases={int(cfa_stress.get('case_count', 0))}; conditions={int(cfa_stress.get('condition_count', 0))}; top={top or 'none'}"
+
+
+def _cfa_lenspsf_detector_evidence(sweep: Mapping[str, Any]) -> str:
+    cfas = ", ".join(str(value) for value in sweep.get("cfa_patterns", ())) or "none"
+    psf = ", ".join(_fmt(value) for value in sweep.get("psf_sigmas", ()) if value is not None) or "none"
+    ranking = sweep.get("rankings", {}) if isinstance(sweep.get("rankings"), Mapping) else {}
+    fp_rows = ranking.get("calibrated_or_fusion_by_delta_fp@0.50", ())
+    best_fp = next((row for row in fp_rows if isinstance(row, Mapping)), None)
+    best_clause = (
+        "no downstream FP ranking"
+        if best_fp is None
+        else (
+            f"best dFP={_fmt(best_fp.get('delta'), signed=True)} "
+            f"at {best_fp.get('cfa_pattern', '')}/psf={_fmt(best_fp.get('psf_sigma'))} "
+            f"input={best_fp.get('input', '')}"
+        )
+    )
+    remap_values = [
+        _maybe_float_or_none(row.get("pattern_remapped_fraction"))
+        for row in sweep.get("runs", ())
+        if isinstance(row, Mapping)
+    ]
+    max_remap = max((value for value in remap_values if value is not None), default=None)
+    return (
+        f"runs={int(sweep.get('run_count', 0))}/{int(sweep.get('expected_run_count', 0))}; "
+        f"samples/run={int(sweep.get('count', 0))}; CFA={cfas}; LensPSF={psf}; "
+        f"{best_clause}; max_remap={_fmt(max_remap)}"
+    )
 
 
 def _edge_confidence_evidence(edge_confidence: Mapping[str, Any]) -> str:
@@ -1133,6 +1255,7 @@ def _future_evidence_rows(
     aux_contribution_audit: Mapping[str, Any] | None,
     edge_fidelity_suite: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
+    cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
@@ -1147,11 +1270,12 @@ def _future_evidence_rows(
         scene_aux_gap = "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
     else:
         scene_aux_gap = "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
-    cfa_gap = (
-        "CFA/LensPSF front-end diagnostics exist, but detector metrics are not yet swept per CFA/LensPSF condition."
-        if cfa_stress_sweep is not None or edge_fidelity_suite is not None
-        else "Need CFA/LensPSF front-end diagnostics first."
-    )
+    if cfa_lenspsf_detector_sweep is not None:
+        cfa_gap = "Detector sweep exists; expand sample scale and connect each condition to same-sample proposal edge correlation."
+    elif cfa_stress_sweep is not None or edge_fidelity_suite is not None:
+        cfa_gap = "CFA/LensPSF front-end diagnostics exist, but detector metrics are not yet swept per CFA/LensPSF condition."
+    else:
+        cfa_gap = "Need CFA/LensPSF front-end diagnostics first."
     training_status = str(training.get("status", "")) if training is not None else "missing"
     return [
         {
@@ -1242,6 +1366,7 @@ def _claim_decisions(
     scene_edge_confidence: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
+    cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -1315,6 +1440,17 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in scene_information_stress.get("failed_checks", ())) or "configured scene-information checks"
             decisions.append({"status": "not_supported", "claim": f"Scene-information stress suite failed for {failed}; do not use RGB-scene pass-through tests as feasibility evidence."})
+    if cfa_lenspsf_detector_sweep is not None:
+        if bool(cfa_lenspsf_detector_sweep.get("pass")):
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": "CFA/LensPSF detector sweep is available as condition-level detector evidence; use it for sensitivity analysis, not broad superiority.",
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in cfa_lenspsf_detector_sweep.get("failed_checks", ())) or "configured CFA/LensPSF detector checks"
+            decisions.append({"status": "not_supported", "claim": f"CFA/LensPSF detector sweep failed for {failed}; do not use it as condition detector evidence yet."})
     if aux_contribution_audit is not None:
         if bool(aux_contribution_audit.get("pass")):
             decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
@@ -1584,6 +1720,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     edge_confidence_html = _edge_confidence_html(edge_confidence, destination) if isinstance(edge_confidence, Mapping) else "<p>No edge-confidence suite summary was provided.</p>"
     edge_fidelity = dashboard.get("edge_fidelity_suite")
     edge_fidelity_html = _edge_fidelity_html(edge_fidelity, destination) if isinstance(edge_fidelity, Mapping) else "<p>No object edge-fidelity suite summary was provided.</p>"
+    cfa_lenspsf_detector = dashboard.get("cfa_lenspsf_detector_sweep")
+    cfa_lenspsf_detector_html = (
+        _cfa_lenspsf_detector_html(cfa_lenspsf_detector, destination)
+        if isinstance(cfa_lenspsf_detector, Mapping)
+        else "<p>No CFA/LensPSF detector sweep summary was provided.</p>"
+    )
     scene_edge = dashboard.get("scene_edge_confidence")
     scene_edge_html = _scene_edge_html(scene_edge, destination) if isinstance(scene_edge, Mapping) else "<p>No scene edge-confidence summary was provided.</p>"
     scene_information = dashboard.get("scene_information_stress")
@@ -1647,6 +1789,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {edge_confidence_html}
   <h2>Object Edge Fidelity</h2>
   {edge_fidelity_html}
+  <h2>CFA/LensPSF Detector Sweep</h2>
+  {cfa_lenspsf_detector_html}
   <h2>Scene Edge Confidence</h2>
   {scene_edge_html}
   <h2>Scene Information Stress</h2>
@@ -2032,6 +2176,60 @@ def _edge_fidelity_html(edge_fidelity: Mapping[str, Any], destination: Path) -> 
         "<table>"
         "<thead><tr><th>Case</th><th>CFA</th><th>LensPSF</th><th>Human Obj F1</th><th>Perception Obj F1</th><th>Aux Obj F1</th></tr></thead>"
         f"<tbody>{case_rows}</tbody></table>"
+    )
+
+
+def _cfa_lenspsf_detector_html(sweep: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(sweep.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in sweep.get("failed_checks", ())) or "none"
+    check_rows = "".join(
+        f"<tr><td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('status', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td></tr>"
+        for row in sweep.get("checks", ())
+        if isinstance(row, Mapping)
+    )
+    run_rows = "".join(_cfa_lenspsf_detector_run_row(row, destination) for row in sweep.get("runs", ()))
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(sweep.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(sweep.get('interpretation', '')))} "
+        f"{html_lib.escape(str(sweep.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Runs</th><th>Samples/Run</th><th>CFA</th><th>PSF</th><th>CameraE2E</th><th>Failed</th></tr></thead><tbody>"
+        f"<tr><td>{_report_link(sweep, destination)}</td>"
+        f"<td>{int(sweep.get('run_count', 0))}/{int(sweep.get('expected_run_count', 0))}</td>"
+        f"<td>{int(sweep.get('count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in sweep.get('cfa_patterns', ())) or 'none')}</td>"
+        f"<td>{html_lib.escape(', '.join(_fmt(value) for value in sweep.get('psf_sigmas', ()) if value is not None) or 'none')}</td>"
+        f"<td>{html_lib.escape(str(bool(sweep.get('use_camerae2e'))))}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<h3>CFA/LensPSF Checks</h3>"
+        f"<table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>"
+        "<h3>Primary Downstream Input By Condition</h3>"
+        "<table><thead><tr><th>Run</th><th>CFA</th><th>PSF</th><th>Input</th><th>P50</th><th>R50</th><th>FP50</th><th>dP50</th><th>dR50</th><th>dFP50</th><th>Remap</th><th>PSF Rec</th></tr></thead>"
+        f"<tbody>{run_rows}</tbody></table>"
+    )
+
+
+def _cfa_lenspsf_detector_run_row(row: Mapping[str, Any], destination: Path) -> str:
+    link = ""
+    if row.get("html_path"):
+        relative = os.path.relpath(str(row.get("html_path")), start=str(destination))
+        link = f"<a href=\"{html_lib.escape(relative)}\">{html_lib.escape(str(row.get('run_id', '')))}</a>"
+    return (
+        "<tr>"
+        f"<td>{link or html_lib.escape(str(row.get('run_id', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('cfa_pattern', '')))}</td>"
+        f"<td>{_fmt(row.get('psf_sigma'))}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('primary_input', '')))}</code></td>"
+        f"<td>{_fmt(row.get('precision@0.50_mean'))}</td>"
+        f"<td>{_fmt(row.get('recall@0.50_mean'))}</td>"
+        f"<td>{_fmt(row.get('fp@0.50_mean'))}</td>"
+        f"<td>{_fmt(row.get('delta_precision@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('delta_recall@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('delta_fp@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('pattern_remapped_fraction'))}</td>"
+        f"<td>{_fmt(row.get('psf_recorded_fraction'))}</td>"
+        "</tr>"
     )
 
 

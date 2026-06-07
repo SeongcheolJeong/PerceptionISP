@@ -45,6 +45,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="Scene-edge confidence summary path/dir used as high-information scene edge evidence. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
+    parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir used as condition detector evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
 
@@ -69,6 +70,7 @@ def main(argv: Any = None) -> int:
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
+        cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -97,6 +99,7 @@ def run_claim_readiness(
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
+    cfa_lenspsf_detector_sweep: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
     destination = Path(output_dir).expanduser()
@@ -227,6 +230,7 @@ def run_claim_readiness(
         scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
+        cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
         comparison_rollup_specs=comparison_rollups,
     )
     dashboard_html = write_claim_dashboard(dashboard, dashboard_dir)
@@ -299,6 +303,7 @@ def run_claim_readiness(
         "scene_edge_confidence": _scene_edge_confidence_summary(scene_edge_confidence),
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
+        "cfa_lenspsf_detector_sweep": _cfa_lenspsf_detector_sweep_summary(cfa_lenspsf_detector_sweep),
         "benchmark_protocol": {
             "report": str(protocol_html),
             "summary_json": str(protocol_html.parent / "protocol_coverage_summary.json"),
@@ -558,6 +563,32 @@ def _aux_contribution_audit_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _cfa_lenspsf_detector_sweep_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "cfa_lenspsf_detector_sweep_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"CFA/LensPSF detector sweep summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) != "pass"]
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "failed_checks": failed,
+        "run_count": int(data.get("run_count", 0)),
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "count": int(data.get("count", 0)),
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [_optional_float(value) for value in data.get("psf_sigmas", ())],
+    }
+
+
 def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "summary_json": summary.get("summary_json"),
@@ -575,6 +606,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "scene_edge_confidence": summary.get("scene_edge_confidence"),
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
+        "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],
