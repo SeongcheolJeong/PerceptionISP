@@ -166,6 +166,22 @@ PSF edge-likelihood maps; the historical dense-detector metrics above are not a
 refreshed 15-channel performance result. It does not close the performance
 question because the compact direct detector is still weak.
 
+The current 15-channel path now has a separate CameraE2E-backed smoke artifact:
+
+| Evidence | Value |
+| --- | --- |
+| Export | `exports/perception_rgb_aux_15ch_camerae2e_grbg_smoke_export/index.html` |
+| Rollup | `reports/perception_rgb_aux_15ch_camerae2e_grbg_smoke_rollup/index.html` |
+| Tensor key | `rgb_aux_extended_chw` |
+| Tensor shape | `15 x 64 x 96`, verified in exported NPZ |
+| Added channels | `aux_psf_blur_confidence`, `aux_psf_edge_likelihood` |
+| RAW provenance | 4 true CFA mosaics, source/target `GRBG`, no remap |
+| Smoke train | 2 train / 2 eval, 1 epoch, MPS, input channels `15` |
+| Loss | first `0.6445`, last `0.6362`, final eval `0.6615` |
+
+This proves the current 15-channel export/load/train/checkpoint path. It is a
+smoke/data-path result only, not a detector-performance result.
+
 The timing answer is therefore favorable for this compact path: on this Mac
 with MPS, the observed compact dense median is about `59.3 sample-epochs/s`.
 A 1,496-sample KITTI-val-sized run is estimated at about 2.1 minutes for

@@ -228,6 +228,20 @@ PSF edge-likelihood channels. Older KITTI extended artifacts were produced with
 the prior 13-channel layout, so their direct dense-detector metrics remain
 historical diagnostics until the export/train/eval bundle is refreshed.
 
+A current 15-channel CameraE2E-backed smoke artifact is available here:
+
+```text
+exports/perception_rgb_aux_15ch_camerae2e_grbg_smoke_export/index.html
+exports/perception_rgb_aux_15ch_camerae2e_grbg_smoke_train/train_smoke_summary.json
+reports/perception_rgb_aux_15ch_camerae2e_grbg_smoke_rollup/index.html
+```
+
+It uses 4 true CFA mosaics with source/target `GRBG` and no pattern remap,
+exports `rgb_aux_extended_chw` as `15 x 64 x 96`, includes
+`aux_psf_blur_confidence` and `aux_psf_edge_likelihood`, and trains the tiny
+smoke path for 1 epoch on MPS. This proves the current 15-channel data path;
+it is not detector-performance evidence.
+
 Run the trained smoke checkpoint through the normal comparison harness:
 
 ```bash

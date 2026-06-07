@@ -33,7 +33,10 @@ Known limits:
 - The current extended RGB+aux tensor is 15 channels after adding PSF blur and
   PSF edge-likelihood aux channels. Older 13-channel export/train/eval artifacts
   remain historical diagnostics; direct dense metrics are still weak and should
-  not be used as a claim-quality detector result.
+  not be used as a claim-quality detector result. A current 15-channel
+  CameraE2E-backed smoke artifact exists at
+  `reports/perception_rgb_aux_15ch_camerae2e_grbg_smoke_rollup/index.html`; it
+  verifies export/load/train/checkpoint only, not detector performance.
 - The task gate currently fails the recall-improvement profile on the KITTI
   t001 evidence bundle, so task-level recall improvement should not be claimed.
 - Synthetic mechanism validation shows expected low-light, glare, low-MTF, and
