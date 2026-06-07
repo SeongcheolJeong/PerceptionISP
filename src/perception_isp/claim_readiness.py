@@ -47,6 +47,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir used as condition detector evidence.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir used as condition proposal bridge evidence.")
+    parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir used as native/remap boundary evidence.")
     parser.add_argument("--casebook", default=None, help="Success/failure casebook summary path/dir used as qualitative review evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
@@ -74,6 +75,7 @@ def main(argv: Any = None) -> int:
         aux_contribution_audit=args.aux_contribution_audit,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
+        cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
         casebook=args.casebook,
         output_dir=args.output_dir,
     )
@@ -105,6 +107,7 @@ def run_claim_readiness(
     aux_contribution_audit: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
+    cfa_lenspsf_native_audit: str | Path | None = None,
     casebook: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
@@ -238,6 +241,7 @@ def run_claim_readiness(
         aux_contribution_audit=aux_contribution_audit,
         cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
+        cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
         casebook=casebook,
         comparison_rollup_specs=comparison_rollups,
     )
@@ -313,6 +317,7 @@ def run_claim_readiness(
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
         "cfa_lenspsf_detector_sweep": _cfa_lenspsf_detector_sweep_summary(cfa_lenspsf_detector_sweep),
         "cfa_lenspsf_proposal_audit": _cfa_lenspsf_proposal_audit_summary(cfa_lenspsf_proposal_audit),
+        "cfa_lenspsf_native_audit": _cfa_lenspsf_native_audit_summary(cfa_lenspsf_native_audit),
         "casebook": _casebook_summary(casebook),
         "benchmark_protocol": {
             "report": str(protocol_html),
@@ -628,6 +633,40 @@ def _cfa_lenspsf_proposal_audit_summary(path: str | Path | None) -> Dict[str, An
     }
 
 
+def _cfa_lenspsf_native_audit_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "cfa_lenspsf_native_audit_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"CFA/LensPSF native audit summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    groups = data.get("groups", {}) if isinstance(data.get("groups"), Mapping) else {}
+    native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
+    remapped = groups.get("remapped", {}) if isinstance(groups.get("remapped"), Mapping) else {}
+    partial = groups.get("partial_remap", {}) if isinstance(groups.get("partial_remap"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "failed_checks": failed,
+        "run_count": int(data.get("run_count", 0)),
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "native_run_count": int(native.get("run_count", 0)),
+        "native_sample_count": int(native.get("sample_count", 0)),
+        "native_cfa_patterns": [str(value) for value in native.get("cfa_patterns", ())],
+        "remapped_run_count": int(remapped.get("run_count", 0)),
+        "remapped_sample_count": int(remapped.get("sample_count", 0)),
+        "remapped_cfa_patterns": [str(value) for value in remapped.get("cfa_patterns", ())],
+        "partial_remap_run_count": int(partial.get("run_count", 0)),
+    }
+
+
 def _casebook_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -675,6 +714,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
         "cfa_lenspsf_proposal_audit": summary.get("cfa_lenspsf_proposal_audit"),
+        "cfa_lenspsf_native_audit": summary.get("cfa_lenspsf_native_audit"),
         "casebook": summary.get("casebook"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),

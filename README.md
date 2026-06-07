@@ -766,6 +766,29 @@ CameraE2E source CFA is GRBG, the non-GRBG rows show
 `pattern_remapped_fraction=1.0`; use those rows as bridge-remap sensitivity
 evidence, not as native sensor-CFA proof.
 
+Separate the native-CFA rows from remapped sensitivity rows before using the
+sweep as claim evidence:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.cfa_lenspsf_native_audit \
+  reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf \
+  --output-dir reports/perception_cfa_lenspsf_native_audit_kitti_val32_bayer_psf
+```
+
+The current native-CFA audit report is:
+
+```text
+reports/perception_cfa_lenspsf_native_audit_kitti_val32_bayer_psf/index.html
+```
+
+It separates the 12 sweep rows into 3 native `GRBG` rows with 96 samples and 9
+fully remapped non-GRBG rows with 288 samples. The native group has mean
+calibrated FP delta `-0.3125`, with best native dFP `-0.4062` at `GRBG`, PSF
+`0.8`. The remapped group has mean dFP `-0.2431`. Treat the native group as
+native sensor-CFA evidence and the remapped group only as bridge/remap
+sensitivity evidence until CameraE2E can produce true native RAW mosaics for
+those non-GRBG target patterns.
+
 Join the same condition sweep to proposal-level edge and source-scene-edge
 evidence:
 
@@ -939,6 +962,7 @@ PYTHONPATH=src \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf \
+  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val32_bayer_psf \
   --casebook reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
@@ -966,6 +990,9 @@ section that summarizes the recommended claim posture, blocked claims, current
 evidence rows, and the next evidence to build. For the current bundle, the
 recommended posture is a narrow recall-budgeted FP-reduction claim with
 front-end/aux feasibility support; broad HumanISP superiority remains blocked.
+The dashboard also includes the native-CFA audit as a guardrail: native `GRBG`
+rows can be used as native-CFA evidence, while remapped non-GRBG rows must stay
+labeled as bridge/remap sensitivity.
 
 Build a visual success/failure casebook from the same 1496-image claim report:
 

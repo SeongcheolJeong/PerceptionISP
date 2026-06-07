@@ -29,6 +29,7 @@ class ClaimDashboardTest(unittest.TestCase):
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
             casebook = _write_casebook(root / "casebook")
             comparison = _write_comparison_rollup(root / "rollup")
 
@@ -46,6 +47,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 aux_contribution_audit=aux_contribution,
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
+                cfa_lenspsf_native_audit=cfa_lenspsf_native,
                 casebook=casebook,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
@@ -70,6 +72,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(dashboard["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertTrue(dashboard["cfa_lenspsf_native_audit"]["pass"])
             self.assertTrue(dashboard["casebook"]["pass"])
             self.assertEqual(
                 dashboard["evidence_map"]["claim_posture"]["recommended_claim"],
@@ -82,6 +85,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Aux evidence used downstream", evidence_areas)
             self.assertIn("CFA/LensPSF detector condition sweep", evidence_areas)
             self.assertIn("CFA/LensPSF proposal-edge bridge", evidence_areas)
+            self.assertIn("CFA/LensPSF native-CFA separation", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -131,6 +135,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "CFA/LensPSF proposal-edge audit passed as condition-level bridge evidence: removed FP 7, removed TP 1, source scene-edge positive conditions 2.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "CFA/LensPSF native-CFA audit passed: native rows 1, remapped rows 1. Use remapped rows only as bridge sensitivity evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -186,6 +194,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Object Edge Fidelity", html)
             self.assertIn("Scene Edge Confidence", html)
             self.assertIn("CFA/LensPSF Proposal Edge Bridge", html)
+            self.assertIn("CFA/LensPSF Native-CFA Separation", html)
             self.assertIn("Proposal Edge Bridge By Condition", html)
             self.assertIn("Evidence Report", html)
             self.assertIn("RGB Delta", html)
@@ -211,6 +220,7 @@ class ClaimDashboardTest(unittest.TestCase):
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
             casebook = _write_casebook(root / "casebook")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -242,6 +252,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(cfa_lenspsf_detector),
                         "--cfa-lenspsf-proposal-audit",
                         str(cfa_lenspsf_proposal),
+                        "--cfa-lenspsf-native-audit",
+                        str(cfa_lenspsf_native),
                         "--casebook",
                         str(casebook),
                         "--output-dir",
@@ -264,6 +276,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(summary["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertTrue(summary["cfa_lenspsf_native_audit"]["pass"])
             self.assertTrue(summary["casebook"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
@@ -966,6 +979,80 @@ def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
         "claim_boundary": "unit proposal boundary",
     }
     (path / "cfa_lenspsf_proposal_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_native_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "run_count": 2,
+        "expected_run_count": 2,
+        "cfa_patterns": ["GRBG", "RGGB"],
+        "psf_sigmas": [0.0],
+        "checks": [
+            {"id": "sweep_rows_available", "status": "pass", "evidence": "runs=2"},
+            {"id": "native_rows_identified", "status": "pass", "evidence": "native_runs=1"},
+            {"id": "remapped_rows_separated", "status": "pass", "evidence": "remapped_runs=1 partial_runs=0"},
+        ],
+        "groups": {
+            "native": {
+                "run_count": 1,
+                "sample_count": 16,
+                "cfa_patterns": ["GRBG"],
+                "psf_sigmas": [0.0],
+                "mean_delta_precision@0.50": 0.05,
+                "mean_delta_recall@0.50": 0.0,
+                "mean_delta_small_recall@0.50": 0.0,
+                "mean_delta_fp@0.50": -0.4,
+                "best_delta_fp@0.50": {"run_id": "cfa-grbg_psf-0p00", "delta": -0.4},
+                "best_delta_recall@0.50": {"run_id": "cfa-grbg_psf-0p00", "delta": 0.0},
+            },
+            "partial_remap": {"run_count": 0, "sample_count": 0, "cfa_patterns": [], "psf_sigmas": []},
+            "remapped": {
+                "run_count": 1,
+                "sample_count": 16,
+                "cfa_patterns": ["RGGB"],
+                "psf_sigmas": [0.0],
+                "mean_delta_precision@0.50": 0.04,
+                "mean_delta_recall@0.50": 0.0,
+                "mean_delta_small_recall@0.50": 0.0,
+                "mean_delta_fp@0.50": -0.2,
+                "best_delta_fp@0.50": {"run_id": "cfa-rggb_psf-0p00", "delta": -0.2},
+                "best_delta_recall@0.50": {"run_id": "cfa-rggb_psf-0p00", "delta": 0.0},
+            },
+        },
+        "runs": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "native_status": "native",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "sample_count": 16,
+                "pattern_remapped_count": 0,
+                "pattern_remapped_fraction": 0.0,
+                "delta_precision@0.50_mean": 0.05,
+                "delta_recall@0.50_mean": 0.0,
+                "delta_fp@0.50_mean": -0.4,
+            },
+            {
+                "run_id": "cfa-rggb_psf-0p00",
+                "native_status": "remapped",
+                "cfa_pattern": "RGGB",
+                "psf_sigma": 0.0,
+                "sample_count": 16,
+                "pattern_remapped_count": 16,
+                "pattern_remapped_fraction": 1.0,
+                "delta_precision@0.50_mean": 0.04,
+                "delta_recall@0.50_mean": 0.0,
+                "delta_fp@0.50_mean": -0.2,
+            },
+        ],
+        "interpretation": "unit native audit",
+        "claim_boundary": "unit native boundary",
+    }
+    (path / "cfa_lenspsf_native_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

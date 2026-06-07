@@ -21,7 +21,7 @@ boundary used by the benchmark protocol and claim gates.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, CFA/LensPSF detector sweep, CFA/LensPSF proposal audit, CFA/LensPSF native-CFA audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -68,6 +68,13 @@ Known limits:
   aux-edge support positive in 3/12. This is calibrated proposal-path bridge
   evidence, not native-CFA proof, not incremental aux-only ablation, and not a
   trained RGB+aux DNN result.
+- `cfa_lenspsf_native_audit` separates native CameraE2E source-CFA rows from
+  rows that were remapped to a requested target CFA. The current KITTI val32
+  audit has 3 native `GRBG` rows with 96 samples and 9 fully remapped non-GRBG
+  rows with 288 samples. This is an evidence guardrail: the native rows can
+  support native-CFA discussion, while the non-GRBG rows remain bridge/remap
+  sensitivity evidence until true source CFA mosaics are generated for those
+  patterns.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor

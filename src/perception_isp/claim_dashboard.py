@@ -27,6 +27,7 @@ SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
 CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
+CFA_LENSPSF_NATIVE_AUDIT_SUMMARY = "cfa_lenspsf_native_audit_summary.json"
 CASEBOOK_SUMMARY = "casebook_summary.json"
 
 
@@ -46,6 +47,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir.")
+    parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir.")
     parser.add_argument("--casebook", default=None, help="Success/failure casebook summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
@@ -66,6 +68,7 @@ def main(argv: Any = None) -> int:
         aux_contribution_audit=args.aux_contribution_audit,
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
+        cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
         casebook=args.casebook,
         comparison_rollup_specs=args.comparison_rollup,
     )
@@ -102,6 +105,7 @@ def build_claim_dashboard(
     aux_contribution_audit: str | Path | None = None,
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
+    cfa_lenspsf_native_audit: str | Path | None = None,
     casebook: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
@@ -127,6 +131,11 @@ def build_claim_dashboard(
         if cfa_lenspsf_proposal_audit is not None
         else None
     )
+    cfa_lenspsf_native = (
+        _load_cfa_lenspsf_native_audit(cfa_lenspsf_native_audit)
+        if cfa_lenspsf_native_audit is not None
+        else None
+    )
     casebook_data = _load_casebook(casebook) if casebook is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
     decisions = _claim_decisions(
@@ -144,6 +153,7 @@ def build_claim_dashboard(
         aux_contribution,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
+        cfa_lenspsf_native,
         casebook_data,
     )
     evidence_map = _build_evidence_map(
@@ -161,6 +171,7 @@ def build_claim_dashboard(
         aux_contribution,
         cfa_lenspsf_detector,
         cfa_lenspsf_proposal,
+        cfa_lenspsf_native,
         casebook_data,
     )
     return {
@@ -178,6 +189,7 @@ def build_claim_dashboard(
         "aux_contribution_audit": aux_contribution,
         "cfa_lenspsf_detector_sweep": cfa_lenspsf_detector,
         "cfa_lenspsf_proposal_audit": cfa_lenspsf_proposal,
+        "cfa_lenspsf_native_audit": cfa_lenspsf_native,
         "casebook": casebook_data,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
@@ -763,6 +775,70 @@ def _load_cfa_lenspsf_proposal_audit(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_cfa_lenspsf_native_audit(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, CFA_LENSPSF_NATIVE_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) not in {"pass", "warning"}]
+    groups: Dict[str, Any] = {}
+    for name, group in (data.get("groups", {}) if isinstance(data.get("groups"), Mapping) else {}).items():
+        if not isinstance(group, Mapping):
+            continue
+        groups[str(name)] = {
+            "run_count": int(group.get("run_count", 0)),
+            "sample_count": int(group.get("sample_count", 0)),
+            "cfa_patterns": [str(value) for value in group.get("cfa_patterns", ())],
+            "psf_sigmas": [_maybe_float(value) for value in group.get("psf_sigmas", ())],
+            "mean_delta_precision@0.50": _maybe_float(group.get("mean_delta_precision@0.50")),
+            "mean_delta_recall@0.50": _maybe_float(group.get("mean_delta_recall@0.50")),
+            "mean_delta_small_recall@0.50": _maybe_float(group.get("mean_delta_small_recall@0.50")),
+            "mean_delta_fp@0.50": _maybe_float(group.get("mean_delta_fp@0.50")),
+            "best_delta_fp@0.50": group.get("best_delta_fp@0.50", {}) if isinstance(group.get("best_delta_fp@0.50"), Mapping) else {},
+            "best_delta_recall@0.50": group.get("best_delta_recall@0.50", {}) if isinstance(group.get("best_delta_recall@0.50"), Mapping) else {},
+        }
+    rows = []
+    for row in data.get("runs", ())[:16]:
+        if not isinstance(row, Mapping):
+            continue
+        rows.append(
+            {
+                "run_id": str(row.get("run_id", "")),
+                "html_path": str(row.get("html_path", "")),
+                "native_status": str(row.get("native_status", "")),
+                "cfa_pattern": str(row.get("cfa_pattern", "")),
+                "psf_sigma": _maybe_float(row.get("psf_sigma")),
+                "sample_count": int(row.get("sample_count", 0)),
+                "pattern_remapped_count": int(row.get("pattern_remapped_count", 0)),
+                "pattern_remapped_fraction": _maybe_float(row.get("pattern_remapped_fraction")),
+                "source_cfa_patterns": row.get("source_cfa_patterns", {}) if isinstance(row.get("source_cfa_patterns"), Mapping) else {},
+                "target_cfa_patterns": row.get("target_cfa_patterns", {}) if isinstance(row.get("target_cfa_patterns"), Mapping) else {},
+                "delta_precision@0.50_mean": _maybe_float(row.get("delta_precision@0.50_mean")),
+                "delta_recall@0.50_mean": _maybe_float(row.get("delta_recall@0.50_mean")),
+                "delta_small_recall@0.50_mean": _maybe_float(row.get("delta_small_recall@0.50_mean")),
+                "delta_fp@0.50_mean": _maybe_float(row.get("delta_fp@0.50_mean")),
+            }
+        )
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "run_count": int(data.get("run_count", 0)),
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [_maybe_float(value) for value in data.get("psf_sigmas", ())],
+        "groups": groups,
+        "runs": rows,
+        "checks": checks,
+        "failed_checks": failed,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
 def _load_casebook(spec: str | Path) -> Dict[str, Any]:
     label, path = _split_named_path(spec)
     summary_path = _summary_path(path, CASEBOOK_SUMMARY)
@@ -979,6 +1055,7 @@ def _build_evidence_map(
     aux_contribution_audit: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
+    cfa_lenspsf_native_audit: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
 ) -> Dict[str, Any]:
     current: list[Dict[str, Any]] = []
@@ -1114,6 +1191,18 @@ def _build_evidence_map(
             }
         )
 
+    if cfa_lenspsf_native_audit is not None:
+        current.append(
+            {
+                "area": "CFA/LensPSF native-CFA separation",
+                "status": "diagnostic" if bool(cfa_lenspsf_native_audit.get("pass")) else "not_supported",
+                "claim_strength": "claim_boundary_guardrail",
+                "evidence": _cfa_lenspsf_native_evidence(cfa_lenspsf_native_audit),
+                "claim_boundary": "Native group can support native-CFA evidence; remapped group is bridge/remap sensitivity only.",
+                "next_evidence": "Generate true native CameraE2E sweeps for each target CFA or keep non-native rows explicitly labeled as remap sensitivity.",
+            }
+        )
+
     if scene_edge_confidence is not None:
         current.append(
             {
@@ -1185,6 +1274,7 @@ def _build_evidence_map(
             cfa_stress_sweep=cfa_stress_sweep,
             cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
             cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
+            cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
             casebook=casebook,
             training=training,
         ),
@@ -1322,6 +1412,27 @@ def _cfa_lenspsf_proposal_evidence(audit: Mapping[str, Any]) -> str:
     )
 
 
+def _cfa_lenspsf_native_evidence(audit: Mapping[str, Any]) -> str:
+    groups = audit.get("groups", {}) if isinstance(audit.get("groups"), Mapping) else {}
+    native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
+    remapped = groups.get("remapped", {}) if isinstance(groups.get("remapped"), Mapping) else {}
+    partial = groups.get("partial_remap", {}) if isinstance(groups.get("partial_remap"), Mapping) else {}
+    native_best = native.get("best_delta_fp@0.50", {}) if isinstance(native.get("best_delta_fp@0.50"), Mapping) else {}
+    remapped_best = remapped.get("best_delta_fp@0.50", {}) if isinstance(remapped.get("best_delta_fp@0.50"), Mapping) else {}
+    return (
+        f"runs={int(audit.get('run_count', 0))}/{int(audit.get('expected_run_count', 0))}; "
+        f"native={int(native.get('run_count', 0))} runs/{int(native.get('sample_count', 0))} samples "
+        f"CFA={', '.join(str(value) for value in native.get('cfa_patterns', ())) or 'none'} "
+        f"mean dFP={_fmt(native.get('mean_delta_fp@0.50'), signed=True)} "
+        f"best={native_best.get('run_id', '')}@{_fmt(native_best.get('delta'), signed=True)}; "
+        f"remapped={int(remapped.get('run_count', 0))} runs/{int(remapped.get('sample_count', 0))} samples "
+        f"CFA={', '.join(str(value) for value in remapped.get('cfa_patterns', ())) or 'none'} "
+        f"mean dFP={_fmt(remapped.get('mean_delta_fp@0.50'), signed=True)} "
+        f"best={remapped_best.get('run_id', '')}@{_fmt(remapped_best.get('delta'), signed=True)}; "
+        f"partial={int(partial.get('run_count', 0))}"
+    )
+
+
 def _casebook_evidence(casebook: Mapping[str, Any]) -> str:
     categories = casebook.get("categories", {}) if isinstance(casebook.get("categories"), Mapping) else {}
     parts = [
@@ -1436,6 +1547,7 @@ def _future_evidence_rows(
     cfa_stress_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
+    cfa_lenspsf_native_audit: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
@@ -1443,7 +1555,9 @@ def _future_evidence_rows(
     scene_edge_correlation = _sample_bridge_scene_edge_correlation(aux_contribution_audit)
     has_edge_correlation = isinstance(edge_correlation, Mapping) and bool(edge_correlation.get("lower_feature_predicts_positive"))
     has_scene_edge_correlation = isinstance(scene_edge_correlation, Mapping) and bool(scene_edge_correlation.get("lower_feature_predicts_positive"))
-    if cfa_lenspsf_proposal_audit is not None:
+    if cfa_lenspsf_native_audit is not None:
+        scene_aux_gap = "Native/remap CFA separation exists; next step is larger scale and true native-CFA generation for non-GRBG patterns."
+    elif cfa_lenspsf_proposal_audit is not None:
         scene_aux_gap = "CFA/LensPSF proposal-edge bridge exists; next step is larger scale and native-CFA separation."
     elif has_scene_edge_correlation:
         scene_aux_gap = "Same-sample source scene-edge proposal correlation exists; it is not yet swept across CFA/LensPSF conditions."
@@ -1453,7 +1567,9 @@ def _future_evidence_rows(
         scene_aux_gap = "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
     else:
         scene_aux_gap = "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
-    if cfa_lenspsf_detector_sweep is not None:
+    if cfa_lenspsf_native_audit is not None:
+        cfa_gap = "Detector sweep exists and native/remap rows are separated; expand sample scale and add true native-CFA rows for non-GRBG patterns."
+    elif cfa_lenspsf_detector_sweep is not None:
         cfa_gap = "Detector sweep exists; expand sample scale and connect each condition to same-sample proposal edge correlation."
     elif cfa_stress_sweep is not None or edge_fidelity_suite is not None:
         cfa_gap = "CFA/LensPSF front-end diagnostics exist, but detector metrics are not yet swept per CFA/LensPSF condition."
@@ -1556,6 +1672,7 @@ def _claim_decisions(
     aux_contribution_audit: Mapping[str, Any] | None,
     cfa_lenspsf_detector_sweep: Mapping[str, Any] | None,
     cfa_lenspsf_proposal_audit: Mapping[str, Any] | None,
+    cfa_lenspsf_native_audit: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
@@ -1657,6 +1774,24 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in cfa_lenspsf_proposal_audit.get("failed_checks", ())) or "configured CFA/LensPSF proposal checks"
             decisions.append({"status": "not_supported", "claim": f"CFA/LensPSF proposal-edge audit failed for {failed}; do not use it as proposal bridge evidence yet."})
+    if cfa_lenspsf_native_audit is not None:
+        if bool(cfa_lenspsf_native_audit.get("pass")):
+            groups = cfa_lenspsf_native_audit.get("groups", {}) if isinstance(cfa_lenspsf_native_audit.get("groups"), Mapping) else {}
+            native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
+            remapped = groups.get("remapped", {}) if isinstance(groups.get("remapped"), Mapping) else {}
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": (
+                        "CFA/LensPSF native-CFA audit passed: "
+                        f"native rows {int(native.get('run_count', 0))}, remapped rows {int(remapped.get('run_count', 0))}. "
+                        "Use remapped rows only as bridge sensitivity evidence."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in cfa_lenspsf_native_audit.get("failed_checks", ())) or "configured native-CFA separation checks"
+            decisions.append({"status": "not_supported", "claim": f"CFA/LensPSF native-CFA audit failed for {failed}; do not make native CFA claims yet."})
     if aux_contribution_audit is not None:
         if bool(aux_contribution_audit.get("pass")):
             decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
@@ -1960,6 +2095,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(cfa_lenspsf_proposal, Mapping)
         else "<p>No CFA/LensPSF proposal-edge audit summary was provided.</p>"
     )
+    cfa_lenspsf_native = dashboard.get("cfa_lenspsf_native_audit")
+    cfa_lenspsf_native_html = (
+        _cfa_lenspsf_native_html(cfa_lenspsf_native, destination)
+        if isinstance(cfa_lenspsf_native, Mapping)
+        else "<p>No CFA/LensPSF native-CFA audit summary was provided.</p>"
+    )
     scene_edge = dashboard.get("scene_edge_confidence")
     scene_edge_html = _scene_edge_html(scene_edge, destination) if isinstance(scene_edge, Mapping) else "<p>No scene edge-confidence summary was provided.</p>"
     scene_information = dashboard.get("scene_information_stress")
@@ -2029,6 +2170,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {cfa_lenspsf_detector_html}
   <h2>CFA/LensPSF Proposal Edge Bridge</h2>
   {cfa_lenspsf_proposal_html}
+  <h2>CFA/LensPSF Native-CFA Separation</h2>
+  {cfa_lenspsf_native_html}
   <h2>Scene Edge Confidence</h2>
   {scene_edge_html}
   <h2>Scene Information Stress</h2>
@@ -2592,6 +2735,76 @@ def _cfa_lenspsf_proposal_condition_row(row: Mapping[str, Any], destination: Pat
         f"<td>{_fmt(row.get('edge_support_delta_removed_fp_minus_kept_tp'), signed=True)} / {_fmt(row.get('edge_auc_low_predicts_removed_fp'))}</td>"
         f"<td>{_fmt(row.get('scene_edge_support_delta_removed_fp_minus_kept_tp'), signed=True)} / {_fmt(row.get('scene_edge_auc_low_predicts_removed_fp'))}</td>"
         f"<td>{report_link}</td>"
+        "</tr>"
+    )
+
+
+def _cfa_lenspsf_native_html(audit: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(audit.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in audit.get("failed_checks", ())) or "none"
+    group_rows = "".join(
+        _cfa_lenspsf_native_group_row(name, group)
+        for name, group in (audit.get("groups", {}) if isinstance(audit.get("groups"), Mapping) else {}).items()
+        if isinstance(group, Mapping)
+    )
+    if not group_rows:
+        group_rows = '<tr><td colspan="9">No native/remap groups were available.</td></tr>'
+    run_rows = "".join(_cfa_lenspsf_native_run_row(row, destination) for row in audit.get("runs", ()))
+    if not run_rows:
+        run_rows = '<tr><td colspan="9">No native/remap run rows were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(audit.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(audit.get('interpretation', '')))} "
+        f"{html_lib.escape(str(audit.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Runs</th><th>CFA</th><th>PSF</th><th>Failed</th></tr></thead><tbody>"
+        f"<tr><td>{_report_link(audit, destination)}</td>"
+        f"<td>{int(audit.get('run_count', 0))}/{int(audit.get('expected_run_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in audit.get('cfa_patterns', ())) or 'none')}</td>"
+        f"<td>{html_lib.escape(', '.join(_fmt(value) for value in audit.get('psf_sigmas', ()) if value is not None) or 'none')}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<h3>Native/Remap Groups</h3>"
+        "<table><thead><tr><th>Group</th><th>Runs</th><th>Samples</th><th>CFA</th><th>Mean dP50</th><th>Mean dR50</th><th>Mean dSmallR50</th><th>Mean dFP50</th><th>Best dFP50</th></tr></thead>"
+        f"<tbody>{group_rows}</tbody></table>"
+        "<h3>Native/Remap Runs</h3>"
+        "<table><thead><tr><th>Run</th><th>Status</th><th>CFA</th><th>PSF</th><th>Samples</th><th>Remap</th><th>dP50</th><th>dR50</th><th>dFP50</th></tr></thead>"
+        f"<tbody>{run_rows}</tbody></table>"
+    )
+
+
+def _cfa_lenspsf_native_group_row(name: str, group: Mapping[str, Any]) -> str:
+    best = group.get("best_delta_fp@0.50", {}) if isinstance(group.get("best_delta_fp@0.50"), Mapping) else {}
+    best_text = "" if not best else f"{best.get('run_id', '')} {_fmt(best.get('delta'), signed=True)}"
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(name))}</code></td>"
+        f"<td>{int(group.get('run_count', 0))}</td>"
+        f"<td>{int(group.get('sample_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in group.get('cfa_patterns', ())) or 'none')}</td>"
+        f"<td>{_fmt(group.get('mean_delta_precision@0.50'), signed=True)}</td>"
+        f"<td>{_fmt(group.get('mean_delta_recall@0.50'), signed=True)}</td>"
+        f"<td>{_fmt(group.get('mean_delta_small_recall@0.50'), signed=True)}</td>"
+        f"<td>{_fmt(group.get('mean_delta_fp@0.50'), signed=True)}</td>"
+        f"<td>{html_lib.escape(best_text)}</td>"
+        "</tr>"
+    )
+
+
+def _cfa_lenspsf_native_run_row(row: Mapping[str, Any], destination: Path) -> str:
+    link = html_lib.escape(str(row.get("run_id", "")))
+    if row.get("html_path"):
+        relative = os.path.relpath(str(row.get("html_path")), start=str(destination))
+        link = f"<a href=\"{html_lib.escape(relative)}\">{html_lib.escape(str(row.get('run_id', '')))}</a>"
+    return (
+        "<tr>"
+        f"<td>{link}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('native_status', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('cfa_pattern', '')))}</td>"
+        f"<td>{_fmt(row.get('psf_sigma'))}</td>"
+        f"<td>{int(row.get('sample_count', 0))}</td>"
+        f"<td>{int(row.get('pattern_remapped_count', 0))} ({_fmt(row.get('pattern_remapped_fraction'))})</td>"
+        f"<td>{_fmt(row.get('delta_precision@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('delta_recall@0.50_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('delta_fp@0.50_mean'), signed=True)}</td>"
         "</tr>"
     )
 
