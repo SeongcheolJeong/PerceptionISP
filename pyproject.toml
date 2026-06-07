@@ -28,6 +28,7 @@ perception-isp-isp-sweep = "perception_isp.isp_sweep:main"
 perception-isp-threshold-sweep = "perception_isp.threshold_sweep:main"
 perception-isp-proposal-calibration = "perception_isp.proposal_calibration:main"
 perception-isp-apply-proposal-calibration = "perception_isp.proposal_calibration_apply:main"
+perception-isp-scene-edge-casebook = "perception_isp.scene_edge_casebook:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
