@@ -830,8 +830,11 @@ RGB+Aux fusion proposal baseline, with net `dFP=-195` and `dTP=-2`. Source
 scene-edge support is directionally positive in 12/12 conditions, with best
 low-scene-edge AUC `0.6825` at `BGGR`, PSF `0.8`; aux-edge support is
 directionally positive in 10/12 conditions, with best low-edge AUC `0.5794` at
-`BGGR`, PSF `0.8`. This is a post-hoc proposal bridge for the calibrated path,
-not an incremental aux-only ablation and not a trained RGB+Aux DNN result.
+`BGGR`, PSF `0.8`. Across all 12 conditions, the mean source scene-edge
+removed-FP-vs-kept-TP delta/AUC is `-0.0184`/`0.5933`, and the mean aux-edge
+delta/AUC is `-0.0087`/`0.5298`. This is a post-hoc proposal bridge for the
+calibrated path, not an incremental aux-only ablation and not a trained RGB+Aux
+DNN result.
 
 For stricter evidence, train the proposal calibrator on a KITTI train report and
 apply it to the KITTI val report. An earlier comparison branch uses a
@@ -1453,8 +1456,10 @@ CFA/LensPSF detector condition sweep row and a CFA/LensPSF proposal-edge bridge
 row, plus a visual success/failure casebook row. The native_bayer_v1 proposal
 bridge removes 197 FP and 0 TP proposals across the val64 condition sweep;
 source scene-edge evidence is directionally positive in 12/12 conditions, while
-aux-edge evidence is positive in 10/12. The native-CFA audit has 12 native rows,
-768 samples, and 0 remapped rows. The casebook selects
+aux-edge evidence is positive in 10/12. Mean source scene-edge delta/AUC is
+`-0.0184`/`0.5933`, and mean aux-edge delta/AUC is `-0.0087`/`0.5298`. The
+native-CFA audit has 12 native rows, 768 samples, and 0 remapped rows. The
+casebook selects
 32 review images and keeps both wins and counterexamples visible. It lists five
 next evidence targets: larger/native CFA-separated scene-edge proposal
 correlation across CFA/LensPSF, a larger CFA/LensPSF detector sweep, RGB+Aux DNN

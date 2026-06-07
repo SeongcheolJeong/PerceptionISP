@@ -1425,6 +1425,8 @@ def _cfa_lenspsf_proposal_evidence(audit: Mapping[str, Any]) -> str:
         f"dFP={int(aggregate.get('fp_delta_count', 0))}; "
         f"scenePositive={int(aggregate.get('scene_edge_positive_condition_count', 0))}; "
         f"edgePositive={int(aggregate.get('edge_positive_condition_count', 0))}; "
+        f"sceneMean={_fmt(aggregate.get('scene_edge_support_delta_condition_mean'), signed=True)}/{_fmt(aggregate.get('scene_edge_auc_condition_mean'))}; "
+        f"edgeMean={_fmt(aggregate.get('edge_support_delta_condition_mean'), signed=True)}/{_fmt(aggregate.get('edge_auc_condition_mean'))}; "
         f"bestSceneAUC={best_scene.get('run_id', '')}@{_fmt(best_scene.get('scene_edge_auc_low_predicts_removed_fp'))}; "
         f"bestEdgeAUC={best_edge.get('run_id', '')}@{_fmt(best_edge.get('edge_auc_low_predicts_removed_fp'))}"
     )
@@ -1793,7 +1795,10 @@ def _claim_decisions(
                     "claim": (
                         "CFA/LensPSF proposal-edge audit passed as condition-level bridge evidence: "
                         f"removed FP {int(aggregate.get('removed_fp_count', 0))}, removed TP {int(aggregate.get('removed_tp_count', 0))}, "
-                        f"source scene-edge positive conditions {int(aggregate.get('scene_edge_positive_condition_count', 0))}."
+                        f"source scene-edge positive conditions {int(aggregate.get('scene_edge_positive_condition_count', 0))}, "
+                        f"aux-edge positive conditions {int(aggregate.get('edge_positive_condition_count', 0))}, "
+                        f"mean scene-edge AUC {_fmt(aggregate.get('scene_edge_auc_condition_mean'))}, "
+                        f"mean aux-edge AUC {_fmt(aggregate.get('edge_auc_condition_mean'))}."
                     ),
                 }
             )
@@ -2739,6 +2744,12 @@ def _cfa_lenspsf_proposal_html(audit: Mapping[str, Any], destination: Path) -> s
         f"<td>{int(aggregate.get('scene_edge_positive_condition_count', 0))}</td>"
         f"<td>{int(aggregate.get('edge_positive_condition_count', 0))}</td>"
         f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<table><thead><tr><th>Mean Source Scene-Edge d/AUC</th><th>Mean Aux-Edge d/AUC</th><th>Removed-FP Weighted Source Scene-Edge d/AUC</th><th>Removed-FP Weighted Aux-Edge d/AUC</th></tr></thead><tbody><tr>"
+        f"<td>{_fmt(aggregate.get('scene_edge_support_delta_condition_mean'), signed=True)} / {_fmt(aggregate.get('scene_edge_auc_condition_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('edge_support_delta_condition_mean'), signed=True)} / {_fmt(aggregate.get('edge_auc_condition_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('scene_edge_support_delta_removed_fp_weighted_mean'), signed=True)} / {_fmt(aggregate.get('scene_edge_auc_removed_fp_weighted_mean'))}</td>"
+        f"<td>{_fmt(aggregate.get('edge_support_delta_removed_fp_weighted_mean'), signed=True)} / {_fmt(aggregate.get('edge_auc_removed_fp_weighted_mean'))}</td>"
+        "</tr></tbody></table>"
         "<table><thead><tr><th>Best Source Scene-Edge AUC</th><th>Best Aux-Edge AUC</th></tr></thead><tbody><tr>"
         f"<td><code>{html_lib.escape(str(best_scene.get('run_id', '')))}</code> {_fmt(best_scene.get('scene_edge_auc_low_predicts_removed_fp'))}</td>"
         f"<td><code>{html_lib.escape(str(best_edge.get('run_id', '')))}</code> {_fmt(best_edge.get('edge_auc_low_predicts_removed_fp'))}</td>"

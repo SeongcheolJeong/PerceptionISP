@@ -973,12 +973,18 @@ def _load_cfa_lenspsf_proposal_audit(path: str | Path | None) -> Dict[str, Any]:
         "removed_tp_count": int(aggregate.get("removed_tp_count", 0)),
         "scene_edge_positive_condition_count": int(aggregate.get("scene_edge_positive_condition_count", 0)),
         "edge_positive_condition_count": int(aggregate.get("edge_positive_condition_count", 0)),
+        "scene_edge_auc_condition_mean": _maybe_float(aggregate.get("scene_edge_auc_condition_mean")),
+        "edge_auc_condition_mean": _maybe_float(aggregate.get("edge_auc_condition_mean")),
+        "scene_edge_support_delta_condition_mean": _maybe_float(aggregate.get("scene_edge_support_delta_condition_mean")),
+        "edge_support_delta_condition_mean": _maybe_float(aggregate.get("edge_support_delta_condition_mean")),
         "failed_checks": failed,
         "summary": (
             f"{status}, conditions={int(data.get('condition_count', 0))}/{int(data.get('expected_condition_count', 0))}, "
             f"removedFP={int(aggregate.get('removed_fp_count', 0))}, removedTP={int(aggregate.get('removed_tp_count', 0))}, "
             f"scenePositive={int(aggregate.get('scene_edge_positive_condition_count', 0))}, "
-            f"edgePositive={int(aggregate.get('edge_positive_condition_count', 0))}"
+            f"edgePositive={int(aggregate.get('edge_positive_condition_count', 0))}, "
+            f"sceneMean={_fmt_optional(aggregate.get('scene_edge_support_delta_condition_mean'))}/{_fmt_optional(aggregate.get('scene_edge_auc_condition_mean'))}, "
+            f"edgeMean={_fmt_optional(aggregate.get('edge_support_delta_condition_mean'))}/{_fmt_optional(aggregate.get('edge_auc_condition_mean'))}"
         ),
     }
 

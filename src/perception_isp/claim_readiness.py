@@ -633,6 +633,10 @@ def _cfa_lenspsf_proposal_audit_summary(path: str | Path | None) -> Dict[str, An
         "fp_delta_count": int(aggregate.get("fp_delta_count", 0)),
         "scene_edge_positive_condition_count": int(aggregate.get("scene_edge_positive_condition_count", 0)),
         "edge_positive_condition_count": int(aggregate.get("edge_positive_condition_count", 0)),
+        "scene_edge_auc_condition_mean": _optional_float(aggregate.get("scene_edge_auc_condition_mean")),
+        "edge_auc_condition_mean": _optional_float(aggregate.get("edge_auc_condition_mean")),
+        "scene_edge_support_delta_condition_mean": _optional_float(aggregate.get("scene_edge_support_delta_condition_mean")),
+        "edge_support_delta_condition_mean": _optional_float(aggregate.get("edge_support_delta_condition_mean")),
     }
 
 

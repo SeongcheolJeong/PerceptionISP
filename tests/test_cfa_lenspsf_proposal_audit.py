@@ -27,6 +27,19 @@ class CfaLensPsfProposalAuditTest(unittest.TestCase):
             self.assertLess(condition["edge_support_delta_removed_fp_minus_kept_tp"], 0.0)
             self.assertLess(condition["scene_edge_support_delta_removed_fp_minus_kept_tp"], 0.0)
             self.assertGreater(condition["scene_edge_auc_low_predicts_removed_fp"], 0.5)
+            aggregate = summary["aggregate"]
+            self.assertEqual(aggregate["sample_count"], 1)
+            self.assertEqual(aggregate["removed_fp_count"], 1)
+            self.assertEqual(aggregate["edge_delta_negative_condition_count"], 1)
+            self.assertEqual(aggregate["scene_edge_delta_negative_condition_count"], 1)
+            self.assertAlmostEqual(
+                aggregate["edge_support_delta_condition_mean"],
+                condition["edge_support_delta_removed_fp_minus_kept_tp"],
+            )
+            self.assertAlmostEqual(
+                aggregate["scene_edge_auc_condition_mean"],
+                condition["scene_edge_auc_low_predicts_removed_fp"],
+            )
             html_path = write_cfa_lenspsf_proposal_audit(summary, root / "audit")
             self.assertTrue(html_path.exists())
             self.assertTrue((html_path.parent / "cfa_lenspsf_proposal_audit_summary.json").exists())

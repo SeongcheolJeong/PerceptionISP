@@ -141,7 +141,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
-                "CFA/LensPSF proposal-edge audit passed as condition-level bridge evidence: removed FP 7, removed TP 1, source scene-edge positive conditions 2.",
+                "CFA/LensPSF proposal-edge audit passed as condition-level bridge evidence: removed FP 7, removed TP 1, source scene-edge positive conditions 2, aux-edge positive conditions 1, mean scene-edge AUC 0.6200, mean aux-edge AUC 0.5300.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -959,6 +959,16 @@ def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
             "tp_delta_count": -1,
             "scene_edge_positive_condition_count": 2,
             "edge_positive_condition_count": 1,
+            "scene_edge_delta_negative_condition_count": 2,
+            "edge_delta_negative_condition_count": 1,
+            "scene_edge_auc_condition_mean": 0.62,
+            "edge_auc_condition_mean": 0.53,
+            "scene_edge_support_delta_condition_mean": -0.02,
+            "edge_support_delta_condition_mean": -0.05,
+            "scene_edge_auc_removed_fp_weighted_mean": 0.62,
+            "edge_auc_removed_fp_weighted_mean": 0.53,
+            "scene_edge_support_delta_removed_fp_weighted_mean": -0.02,
+            "edge_support_delta_removed_fp_weighted_mean": -0.05,
             "best_scene_edge_auc_condition": {
                 "run_id": "cfa-grbg_psf-0p00",
                 "cfa_pattern": "GRBG",

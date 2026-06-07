@@ -253,15 +253,57 @@ def _aggregate(conditions: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     best_edge = _best_auc(pass_conditions, "edge_auc_low_predicts_removed_fp")
     return {
         "condition_count": len(pass_conditions),
+        "sample_count": sum(int(row.get("sample_count", 0)) for row in pass_conditions),
+        "baseline_detection_count": sum(int(row.get("baseline_detection_count", 0)) for row in pass_conditions),
+        "target_detection_count": sum(int(row.get("target_detection_count", 0)) for row in pass_conditions),
         "removed_fp_count": sum(int(row.get("removed_fp_count", 0)) for row in pass_conditions),
         "removed_tp_count": sum(int(row.get("removed_tp_count", 0)) for row in pass_conditions),
+        "added_fp_count": sum(int(row.get("added_fp_count", 0)) for row in pass_conditions),
+        "added_tp_count": sum(int(row.get("added_tp_count", 0)) for row in pass_conditions),
         "fp_delta_count": sum(int(row.get("fp_delta_count", 0)) for row in pass_conditions),
         "tp_delta_count": sum(int(row.get("tp_delta_count", 0)) for row in pass_conditions),
         "scene_edge_positive_condition_count": sum(1 for row in pass_conditions if bool(row.get("scene_edge_lower_predicts_removed_fp"))),
         "edge_positive_condition_count": sum(1 for row in pass_conditions if bool(row.get("edge_lower_predicts_removed_fp"))),
+        "scene_edge_delta_negative_condition_count": _negative_condition_count(pass_conditions, "scene_edge_support_delta_removed_fp_minus_kept_tp"),
+        "edge_delta_negative_condition_count": _negative_condition_count(pass_conditions, "edge_support_delta_removed_fp_minus_kept_tp"),
+        "scene_edge_auc_condition_mean": _condition_mean(pass_conditions, "scene_edge_auc_low_predicts_removed_fp"),
+        "edge_auc_condition_mean": _condition_mean(pass_conditions, "edge_auc_low_predicts_removed_fp"),
+        "scene_edge_support_delta_condition_mean": _condition_mean(pass_conditions, "scene_edge_support_delta_removed_fp_minus_kept_tp"),
+        "edge_support_delta_condition_mean": _condition_mean(pass_conditions, "edge_support_delta_removed_fp_minus_kept_tp"),
+        "scene_edge_auc_removed_fp_weighted_mean": _weighted_condition_mean(pass_conditions, "scene_edge_auc_low_predicts_removed_fp", "removed_fp_count"),
+        "edge_auc_removed_fp_weighted_mean": _weighted_condition_mean(pass_conditions, "edge_auc_low_predicts_removed_fp", "removed_fp_count"),
+        "scene_edge_support_delta_removed_fp_weighted_mean": _weighted_condition_mean(pass_conditions, "scene_edge_support_delta_removed_fp_minus_kept_tp", "removed_fp_count"),
+        "edge_support_delta_removed_fp_weighted_mean": _weighted_condition_mean(pass_conditions, "edge_support_delta_removed_fp_minus_kept_tp", "removed_fp_count"),
         "best_scene_edge_auc_condition": best_scene,
         "best_edge_auc_condition": best_edge,
     }
+
+
+def _condition_mean(conditions: Sequence[Mapping[str, Any]], key: str) -> float | None:
+    values = [_maybe_float(row.get(key)) for row in conditions if row.get(key) is not None]
+    if not values:
+        return None
+    return float(sum(values) / len(values))
+
+
+def _weighted_condition_mean(conditions: Sequence[Mapping[str, Any]], key: str, weight_key: str) -> float | None:
+    weighted_sum = 0.0
+    weight_sum = 0.0
+    for row in conditions:
+        if row.get(key) is None:
+            continue
+        weight = float(row.get(weight_key, 0) or 0)
+        if weight <= 0.0:
+            continue
+        weighted_sum += float(row.get(key)) * weight
+        weight_sum += weight
+    if weight_sum <= 0.0:
+        return None
+    return float(weighted_sum / weight_sum)
+
+
+def _negative_condition_count(conditions: Sequence[Mapping[str, Any]], key: str) -> int:
+    return sum(1 for row in conditions if row.get(key) is not None and float(row.get(key, 0.0)) < 0.0)
 
 
 def _best_auc(conditions: Sequence[Mapping[str, Any]], key: str) -> Dict[str, Any]:
@@ -314,6 +356,9 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   <table><tbody>
     <tr><th>Removed FP</th><td>{int(aggregate.get('removed_fp_count', 0))}</td><th>Removed TP</th><td>{int(aggregate.get('removed_tp_count', 0))}</td></tr>
     <tr><th>Net FP Delta</th><td>{int(aggregate.get('fp_delta_count', 0))}</td><th>Net TP Delta</th><td>{int(aggregate.get('tp_delta_count', 0))}</td></tr>
+    <tr><th>Scene-Edge d/AUC Mean</th><td>{_fmt(aggregate.get('scene_edge_support_delta_condition_mean'), signed=True)} / {_fmt(aggregate.get('scene_edge_auc_condition_mean'))}</td><th>Aux-Edge d/AUC Mean</th><td>{_fmt(aggregate.get('edge_support_delta_condition_mean'), signed=True)} / {_fmt(aggregate.get('edge_auc_condition_mean'))}</td></tr>
+    <tr><th>Scene-Edge Negative d Conditions</th><td>{int(aggregate.get('scene_edge_delta_negative_condition_count', 0))}</td><th>Aux-Edge Negative d Conditions</th><td>{int(aggregate.get('edge_delta_negative_condition_count', 0))}</td></tr>
+    <tr><th>Scene-Edge Removed-FP Weighted d/AUC</th><td>{_fmt(aggregate.get('scene_edge_support_delta_removed_fp_weighted_mean'), signed=True)} / {_fmt(aggregate.get('scene_edge_auc_removed_fp_weighted_mean'))}</td><th>Aux-Edge Removed-FP Weighted d/AUC</th><td>{_fmt(aggregate.get('edge_support_delta_removed_fp_weighted_mean'), signed=True)} / {_fmt(aggregate.get('edge_auc_removed_fp_weighted_mean'))}</td></tr>
     <tr><th>Best Scene-Edge AUC</th><td>{html_lib.escape(str(aggregate.get('best_scene_edge_auc_condition', {})))}</td><th>Best Aux-Edge AUC</th><td>{html_lib.escape(str(aggregate.get('best_edge_auc_condition', {})))}</td></tr>
   </tbody></table>
   <h2>Checks</h2>
