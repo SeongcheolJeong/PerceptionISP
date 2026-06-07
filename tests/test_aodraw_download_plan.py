@@ -45,7 +45,9 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertEqual(summary["cleanup_candidates"][0]["path"], "data/raw_datasets/pascalraw_full_archive")
             self.assertIn("images_downsampled_raw/00000001.npy", summary["required_subset_files"])
             self.assertIn("--kind raw", summary["post_download_commands"][0])
-            self.assertIn("aodraw_image_availability", summary["post_download_commands"][0])
+            self.assertIn("aodraw_pipeline", summary["post_download_commands"][0])
+            self.assertIn("raw_only", summary["post_download_commands"][0])
+            self.assertNotIn("eval_cli", summary["post_download_commands"][0])
 
     def test_build_plan_blocks_when_raw_zip_has_no_headroom(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

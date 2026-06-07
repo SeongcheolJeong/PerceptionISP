@@ -385,21 +385,14 @@ def _checks(
 def _post_download_commands() -> list[str]:
     return [
         (
-            "PYTHONPATH=src python3 -m perception_isp.aodraw_image_availability "
-            "reports/perception_aodraw_subset_plan_test_downsample_adverse_24_v1/aodraw_subset_manifest.json "
+            "PYTHONPATH=src python3 -m perception_isp.aodraw_pipeline "
             "--kind raw "
+            "--download-root ~/Downloads "
             "--dataset-root data/raw_datasets/aodraw "
-            "--output-dir reports/perception_aodraw_image_availability_test_downsample_adverse_24_raw_only_v1"
-        ),
-        (
-            "PYTHONPATH=src python3 -m perception_isp.eval_cli "
-            "--source aodraw-dataset "
-            "--dataset data/raw_datasets/aodraw "
-            "--aodraw-manifest reports/perception_aodraw_subset_plan_test_downsample_adverse_24_v1/aodraw_subset_manifest.json "
-            "--count 24 --width 768 --height 512 --aodraw-cfa RGGB "
+            "--output-dir reports/perception_aodraw_pipeline_test_downsample_adverse_24_raw_only_v1 "
+            "--count 24 --width 768 --height 512 "
             "--rgb-detector yolo --rgb-detector-model yolo11n.pt --label-aware "
-            "--ground-truth-label-map aodraw-coco --ground-truth-label-keep aodraw-coco-overlap "
-            "--output-dir reports/perception_aodraw_compare_test_downsample_adverse_24_v1"
+            "--no-visuals"
         ),
     ]
 
