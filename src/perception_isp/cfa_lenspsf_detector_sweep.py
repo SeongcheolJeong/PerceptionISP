@@ -238,7 +238,10 @@ def raw_condition_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any
     target_cfas = {}
     requested_cfas = {}
     psf_values = {}
+    camerae2e_camera_types = {}
+    native_cfa_bridge_versions = {}
     pattern_remapped_count = 0
+    true_sensor_cfa_mosaic_count = 0
     psf_recorded_count = 0
     for sample in samples:
         metadata = sample.get("metadata", {})
@@ -253,13 +256,20 @@ def raw_condition_summary(samples: Sequence[Mapping[str, Any]]) -> Dict[str, Any
         if psf is not None:
             psf_recorded_count += 1
             _bump(psf_values, f"{float(psf):.2f}")
+        _bump(camerae2e_camera_types, raw_provenance.get("camerae2e_camera_type"))
+        _bump(native_cfa_bridge_versions, raw_provenance.get("camerae2e_native_cfa_bridge_version"))
         pattern_remapped_count += int(bool(raw_provenance.get("pattern_remapped", False)))
+        true_sensor_cfa_mosaic_count += int(bool(raw_provenance.get("true_sensor_cfa_mosaic", False)))
     total = int(len(samples))
     return {
         "sample_count": total,
         "source_cfa_patterns": source_cfas,
         "target_cfa_patterns": target_cfas,
         "requested_cfa_patterns": requested_cfas,
+        "camerae2e_camera_types": camerae2e_camera_types,
+        "camerae2e_native_cfa_bridge_versions": native_cfa_bridge_versions,
+        "true_sensor_cfa_mosaic_count": int(true_sensor_cfa_mosaic_count),
+        "true_sensor_cfa_mosaic_fraction": 0.0 if total <= 0 else float(true_sensor_cfa_mosaic_count / total),
         "psf_sigmas": psf_values,
         "pattern_remapped_count": int(pattern_remapped_count),
         "pattern_remapped_fraction": 0.0 if total <= 0 else float(pattern_remapped_count / total),
@@ -310,8 +320,9 @@ def build_sweep_summary(
             "It is condition-sensitivity evidence for detector outputs, not a broad HumanISP superiority proof."
         ),
         "claim_boundary": (
-            "Use this as a detector-side CFA/LensPSF sweep. When CameraE2E uses a fixed native CFA, explicit non-native "
-            "CFA rows can involve bridge remapping; check pattern_remapped_count before making sensor-CFA claims."
+            "Use this as a detector-side CFA/LensPSF sweep. Explicit Bayer CFA requests can use native CameraE2E "
+            "camera types, but older cached rows can still be bridge-remapped; check pattern_remapped_count, "
+            "true_sensor_cfa_mosaic_fraction, and camerae2e_native_cfa_bridge_versions before making sensor-CFA claims."
         ),
     }
 
@@ -561,7 +572,9 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
                 f"<td>{_fmt(run.get('psf_sigma'))}</td>"
                 f"<td>{int(run.get('sample_count', 0))}</td>"
                 f"<td>{_fmt(raw_summary.get('pattern_remapped_fraction'))}</td>"
+                f"<td>{_fmt(raw_summary.get('true_sensor_cfa_mosaic_fraction'))}</td>"
                 f"<td>{_fmt(raw_summary.get('psf_recorded_fraction'))}</td>"
+                f"<td>{html_lib.escape(', '.join(str(value) for value in raw_summary.get('camerae2e_camera_types', {}).keys()) or 'n/a')}</td>"
                 f"<td>{html_lib.escape(str(input_name))}</td>"
                 f"<td>{_fmt(metrics.get('precision@0.50_mean'))}</td>"
                 f"<td>{_fmt(metrics.get('recall@0.50_mean'))}</td>"
@@ -602,7 +615,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   <table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{check_rows}</tbody></table>
   <h2>Condition Metrics</h2>
   <table>
-    <thead><tr><th>Run</th><th>CFA</th><th>PSF</th><th>Samples</th><th>Remap Frac</th><th>PSF Rec Frac</th><th>Input</th><th>P50</th><th>R50</th><th>Small R50</th><th>FP50</th><th>dP50</th><th>dR50</th><th>dFP50</th></tr></thead>
+    <thead><tr><th>Run</th><th>CFA</th><th>PSF</th><th>Samples</th><th>Remap Frac</th><th>True CFA Frac</th><th>PSF Rec Frac</th><th>CameraE2E Type</th><th>Input</th><th>P50</th><th>R50</th><th>Small R50</th><th>FP50</th><th>dP50</th><th>dR50</th><th>dFP50</th></tr></thead>
     <tbody>{''.join(metric_rows)}</tbody>
   </table>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code></p>

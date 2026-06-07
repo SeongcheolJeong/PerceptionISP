@@ -71,10 +71,12 @@ Known limits:
 - `cfa_lenspsf_native_audit` separates native CameraE2E source-CFA rows from
   rows that were remapped to a requested target CFA. The current KITTI val32
   audit has 3 native `GRBG` rows with 96 samples and 9 fully remapped non-GRBG
-  rows with 288 samples. This is an evidence guardrail: the native rows can
-  support native-CFA discussion, while the non-GRBG rows remain bridge/remap
-  sensitivity evidence until true source CFA mosaics are generated for those
-  patterns.
+  rows with 288 samples. This is an evidence guardrail for the historical
+  report: the native rows can support native-CFA discussion, while the non-GRBG
+  rows remain bridge/remap sensitivity evidence. `camerae2e_bridge` now supports
+  explicit native Bayer CameraE2E requests for `RGGB`, `GRBG`, `BGGR`, and
+  `GBRG` through bridge version `native_bayer_v1`; claim-scale non-GRBG
+  native-CFA evidence requires rerunning the sweep with a fresh raw cache.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor

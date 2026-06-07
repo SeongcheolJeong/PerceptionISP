@@ -32,7 +32,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from PIL import Image
 
-from .camerae2e_bridge import raw_from_camerae2e_rgb, raw_from_rgb_direct
+from .camerae2e_bridge import CAMERAE2E_NATIVE_CFA_BRIDGE_VERSION, raw_from_camerae2e_rgb, raw_from_rgb_direct
 from .eval_types import BoundingBox, EvaluationSample
 from .sample_cache import load_cached_sample, sample_cache_key, save_cached_sample
 
@@ -94,6 +94,7 @@ def load_kitti_detection_samples(
                 "height": int(height),
                 "cfa_pattern": str(cfa_pattern),
                 "use_camerae2e": bool(use_camerae2e),
+                "camerae2e_native_cfa_bridge_version": CAMERAE2E_NATIVE_CFA_BRIDGE_VERSION if use_camerae2e else "direct",
                 "include_dontcare": bool(include_dontcare),
             },
         )

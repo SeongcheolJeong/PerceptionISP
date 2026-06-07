@@ -10,6 +10,7 @@ import numpy as np
 from perception_isp.camerae2e_bridge import (
     CAMERAE2E_SRC,
     _camerae2e_provenance,
+    _camerae2e_camera_type_for_requested_cfa,
     _camerae2e_sensor_mosaic_to_pattern,
     _camerae2e_sensor_pattern_name,
     _resolve_target_cfa_pattern,
@@ -23,6 +24,15 @@ class CameraE2EBridgeTest(unittest.TestCase):
         self.assertEqual(_resolve_target_cfa_pattern("auto", "GRBG"), "GRBG")
         self.assertEqual(_resolve_target_cfa_pattern("native", "GBRG"), "GBRG")
         self.assertEqual(_resolve_target_cfa_pattern("RGGB", "GRBG"), "RGGB")
+
+    def test_explicit_bayer_cfa_selects_camerae2e_camera_type(self) -> None:
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("auto"), "default")
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("native"), "default")
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("RGGB"), "bayer-rggb")
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("GRBG"), "bayer-grbg")
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("BGGR"), "bayer-bggr")
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("GBRG"), "bayer-gbrg")
+        self.assertEqual(_camerae2e_camera_type_for_requested_cfa("RCCB"), "default")
 
     def test_auto_cfa_falls_back_to_rggb_without_sensor_source(self) -> None:
         rgb = np.ones((24, 32, 3), dtype=np.float64) * 0.5
@@ -80,6 +90,7 @@ class CameraE2EBridgeTest(unittest.TestCase):
         self.assertEqual(native["target_cfa_pattern"], "GRBG")
         self.assertTrue(remapped["pattern_remapped"])
         self.assertEqual(remapped["target_cfa_pattern"], "RGGB")
+        self.assertEqual(native["camerae2e_native_cfa_bridge_version"], "native_bayer_v1")
 
     def test_camerae2e_rgb_runtime_uses_sensor_native_cfa_when_auto(self) -> None:
         if not _camerae2e_runtime_available():
@@ -93,6 +104,24 @@ class CameraE2EBridgeTest(unittest.TestCase):
         self.assertEqual(raw.data.shape, (3, 24, 32))
         self.assertEqual(raw.metadata.cfa_pattern, raw.provenance["source_cfa_pattern"])
         self.assertEqual(raw.provenance["raw_source_key"], "sensor.volts")
+        self.assertTrue(raw.provenance["true_sensor_cfa_mosaic"])
+        self.assertFalse(raw.provenance["pattern_remapped"])
+        self.assertTrue(raw.provenance["native_resolution_matches_target"])
+
+    def test_camerae2e_rgb_runtime_uses_requested_native_bayer_cfa(self) -> None:
+        if not _camerae2e_runtime_available():
+            self.skipTest("CameraE2E runtime dependencies are not available")
+        rgb = np.zeros((24, 32, 3), dtype=np.float64)
+        rgb[:, :16, 0] = 1.0
+        rgb[:, 16:, 2] = 1.0
+
+        raw = raw_from_camerae2e_rgb(rgb, width=32, height=24, cfa_pattern="RGGB")
+
+        self.assertEqual(raw.data.shape, (3, 24, 32))
+        self.assertEqual(raw.metadata.cfa_pattern, "RGGB")
+        self.assertEqual(raw.provenance["source_cfa_pattern"], "RGGB")
+        self.assertEqual(raw.provenance["target_cfa_pattern"], "RGGB")
+        self.assertEqual(raw.provenance["camerae2e_camera_type"], "bayer-rggb")
         self.assertTrue(raw.provenance["true_sensor_cfa_mosaic"])
         self.assertFalse(raw.provenance["pattern_remapped"])
         self.assertTrue(raw.provenance["native_resolution_matches_target"])

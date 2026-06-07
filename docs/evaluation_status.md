@@ -284,13 +284,15 @@ HumanISP superiority, rejects task-level recall improvement through a failed
 learned RGB+aux DNN path as implemented but not claim-quality.
 
 The CFA/LensPSF detector sweep is now guarded by a native-CFA separation audit.
-The current sweep has 12 rows and 384 samples: 3 native `GRBG` rows with 96
-samples, and 9 fully remapped non-GRBG rows with 288 samples. Native `GRBG`
+The current val32 sweep has 12 rows and 384 samples: 3 native `GRBG` rows with
+96 samples, and 9 fully remapped non-GRBG rows with 288 samples. Native `GRBG`
 rows show mean calibrated FP delta `-0.3125` versus HumanISP, with best native
 dFP `-0.4062` at PSF `0.8`. The remapped rows show mean dFP `-0.2431`, but
-they are only bridge/remap sensitivity evidence. They should not be described
-as native `RGGB`, `BGGR`, or `GBRG` CameraE2E proof until those patterns are
-generated as true source CFA mosaics.
+they are only historical bridge/remap sensitivity evidence. The CameraE2E
+bridge now supports explicit native Bayer requests for `RGGB`, `GRBG`, `BGGR`,
+and `GBRG` through `native_bayer_v1`; the val32 sweep must be rerun with a
+fresh raw cache before non-GRBG rows can be described as claim-scale native
+CameraE2E CFA evidence.
 
 ### Mechanism Validation
 
@@ -623,9 +625,9 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | CFA stress sweep | Available as diagnostic evidence; `MONO` ranks highest for low-light/low-MTF synthetic scores and `RGBIR` for glare |
 | Edge-confidence suite | `pass` for synthetic low-light, glare, and low-MTF difficult-edge checks; this is front-end confidence evidence, not detector performance evidence |
 | Object edge-fidelity suite | `pass`; object/sensor edge oracles are compared against HumanISP RGB edges, PerceptionISP RGB edges, and aux edge maps across CFA/LensPSF. LensPSF sigma `0.0 -> 1.6` sensor pixels reduces absolute sensor-edge P95 `0.0546 -> 0.0362` (`ratio=0.6624`). `psf_sigma_map` now feeds PSF blur-confidence and PSF edge-likelihood aux maps. This is front-end edge evidence, not detector performance evidence |
-| CFA/LensPSF detector sweep | `pass` as diagnostic condition evidence; `reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf` covers GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6`, 32 KITTI val samples per condition, fixed YOLO11n recipe, and calibrated score-label-aux proposals. PSF provenance is recorded for `384/384` samples. Best calibrated downstream FP delta is `-0.4062` at GRBG/PSF `0.8`. Non-GRBG CameraE2E rows are bridge-remapped from source GRBG (`max_remap=1.0`), so this is condition sensitivity evidence, not native sensor-CFA proof or broad superiority |
+| CFA/LensPSF detector sweep | `pass` as diagnostic condition evidence; `reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf` covers GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6`, 32 KITTI val samples per condition, fixed YOLO11n recipe, and calibrated score-label-aux proposals. PSF provenance is recorded for `384/384` samples. Best calibrated downstream FP delta is `-0.4062` at GRBG/PSF `0.8`. This val32 report predates `native_bayer_v1`, so non-GRBG CameraE2E rows are bridge-remapped from source GRBG (`max_remap=1.0`); it is condition sensitivity evidence, not non-GRBG native sensor-CFA proof or broad superiority |
 | CFA/LensPSF proposal-edge bridge | `pass` as diagnostic proposal bridge evidence; `reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_bayer_psf` joins the same 12 CFA/LensPSF detector conditions to same-sample proposal edge and source-scene-edge support. The calibrated proposal path removes 121 FP and 0 TP proposals versus RGB+Aux fusion. Source scene-edge support is directionally positive in 10/12 conditions, best low-scene-edge AUC `0.6635` at GRBG/PSF `0.0`; aux-edge support is positive in 3/12, best low-edge AUC `0.5216` at GRBG/PSF `1.6`. This is post-hoc calibrated proposal evidence, not incremental aux-only ablation, trained-DNN proof, native-CFA proof, or broad superiority |
-| CFA/LensPSF native-CFA separation | `pass` as a claim-boundary guardrail; `reports/perception_cfa_lenspsf_native_audit_kitti_val32_bayer_psf` separates the same detector sweep into 3 native `GRBG` rows with 96 samples and 9 fully remapped non-GRBG rows with 288 samples. Native rows have mean dFP `-0.3125`, best native dFP `-0.4062` at GRBG/PSF `0.8`; remapped rows have mean dFP `-0.2431`. Use only the native group as native-CFA evidence; keep non-GRBG rows labeled as bridge/remap sensitivity until true source CFA mosaics are generated for those patterns |
+| CFA/LensPSF native-CFA separation | `pass` as a claim-boundary guardrail; `reports/perception_cfa_lenspsf_native_audit_kitti_val32_bayer_psf` separates the same historical detector sweep into 3 native `GRBG` rows with 96 samples and 9 fully remapped non-GRBG rows with 288 samples. Native rows have mean dFP `-0.3125`, best native dFP `-0.4062` at GRBG/PSF `0.8`; remapped rows have mean dFP `-0.2431`. Use only the native group from this report as native-CFA evidence. The code now supports true native Bayer generation through `native_bayer_v1`, but claim-scale non-GRBG native-CFA evidence requires rerunning the sweep with a fresh versioned cache |
 | Scene edge-confidence suite | `pass`; a `640 x 480` real sample image is fed through CameraE2E to a `320 x 240` `GRBG` sensor target with no CFA remap. Against the high-resolution scene-edge proxy, HumanISP RGB proxy F1 is `0.6644`, PerceptionISP RGB proxy F1 is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and aux edge-confidence F1 is `0.3727`. This is front-end scene-edge evidence, not object-boundary or detector performance evidence |
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622`. In the same-sample bridge, incremental aux scoring removes 95 FP and 16 TP proposals; removed FP has lower aux edge support than kept TP (`delta=-0.0596`, low-edge AUC `0.6904`) and lower source scene-edge support (`delta=-0.0302`, low-scene-edge AUC `0.6681`) |

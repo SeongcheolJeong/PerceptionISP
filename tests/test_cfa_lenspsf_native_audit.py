@@ -31,24 +31,43 @@ class CfaLensPsfNativeAuditTest(unittest.TestCase):
             self.assertTrue((html_path.parent / "cfa_lenspsf_native_audit_summary.json").exists())
             self.assertIn("Native-CFA Audit", html_path.read_text())
 
+    def test_all_native_sweep_passes_without_remapped_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sweep = _write_sweep(
+                root / "sweep",
+                runs=[
+                    _run("cfa-grbg_psf-0p00", "GRBG", 0, 0.0, -0.4),
+                    _run("cfa-rggb_psf-0p00", "RGGB", 0, 0.0, -0.2, source_cfa="RGGB"),
+                ],
+            )
 
-def _write_sweep(path: Path) -> Path:
+            summary = build_native_audit_from_path(sweep)
+
+            self.assertEqual(summary["status"], "pass")
+            self.assertEqual(summary["groups"]["native"]["run_count"], 2)
+            self.assertEqual(summary["groups"]["remapped"]["run_count"], 0)
+            self.assertEqual(summary["checks"][2]["status"], "pass")
+
+
+def _write_sweep(path: Path, *, runs: list[dict] | None = None) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
+    payload_runs = runs or [
+        _run("cfa-grbg_psf-0p00", "GRBG", 0, 0.0, -0.4),
+        _run("cfa-rggb_psf-0p00", "RGGB", 4, 1.0, -0.2),
+    ]
     payload = {
-        "run_count": 2,
-        "cfa_patterns": ["GRBG", "RGGB"],
+        "run_count": len(payload_runs),
+        "cfa_patterns": sorted({str(row["cfa_pattern"]) for row in payload_runs}),
         "psf_sigmas": [0.0],
-        "runs": [
-            _run("cfa-grbg_psf-0p00", "GRBG", 0, 0.0, -0.4),
-            _run("cfa-rggb_psf-0p00", "RGGB", 4, 1.0, -0.2),
-        ],
+        "runs": payload_runs,
     }
     (path / "cfa_lenspsf_detector_sweep_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 
-def _run(run_id: str, cfa: str, remapped: int, remapped_fraction: float, fp_delta: float) -> dict:
+def _run(run_id: str, cfa: str, remapped: int, remapped_fraction: float, fp_delta: float, *, source_cfa: str = "GRBG") -> dict:
     return {
         "run_id": run_id,
         "report": f"{run_id}/index.html",
@@ -57,7 +76,7 @@ def _run(run_id: str, cfa: str, remapped: int, remapped_fraction: float, fp_delt
         "sample_count": 4,
         "raw_condition_summary": {
             "sample_count": 4,
-            "source_cfa_patterns": {"GRBG": 4},
+            "source_cfa_patterns": {source_cfa: 4},
             "target_cfa_patterns": {cfa: 4},
             "pattern_remapped_count": remapped,
             "pattern_remapped_fraction": remapped_fraction,

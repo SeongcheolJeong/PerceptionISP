@@ -423,8 +423,11 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
 The sweep summary checks whether each sample used true CameraE2E sensor CFA
 data, whether CameraE2E source CFA matches the ISP target CFA, and whether
 native sensor resolution was at least the requested target. The default
-`--cfa auto` keeps CameraE2E's sensor-native CFA pattern; use an explicit
-pattern such as `--cfa RGGB` only when intentionally testing remap behavior.
+`--cfa auto` keeps CameraE2E's sensor-native CFA pattern. Explicit Bayer
+patterns `RGGB`, `GRBG`, `BGGR`, and `GBRG` now request matching CameraE2E
+native Bayer camera types through bridge version `native_bayer_v1`; older
+reports generated before that bridge version should still be interpreted from
+their recorded `pattern_remapped_fraction` provenance.
 It also includes `perception_fusion_rgb_aux`, a conservative RGB+aux adapter
 that keeps the RGB detector class labels and uses PerceptionISP edge,
 saturation, and reliability maps as support evidence. This is a reference
@@ -761,10 +764,12 @@ reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf/index.html
 
 It covers 12 Bayer CFA/LensPSF conditions with 32 KITTI val samples per
 condition. The PSF provenance check records `384/384` samples, and the best
-calibrated downstream FP delta is `-0.4062` at `GRBG`, PSF `0.8`. Because the
-CameraE2E source CFA is GRBG, the non-GRBG rows show
+calibrated downstream FP delta is `-0.4062` at `GRBG`, PSF `0.8`. This report
+was generated before the `native_bayer_v1` CameraE2E bridge, so the CameraE2E
+source CFA is GRBG and the non-GRBG rows show
 `pattern_remapped_fraction=1.0`; use those rows as bridge-remap sensitivity
-evidence, not as native sensor-CFA proof.
+evidence, not as native sensor-CFA proof. Rerun the sweep with a fresh raw cache
+to produce claim-scale native Bayer evidence for RGGB/GRBG/BGGR/GBRG.
 
 Separate the native-CFA rows from remapped sensitivity rows before using the
 sweep as claim evidence:
@@ -781,13 +786,27 @@ The current native-CFA audit report is:
 reports/perception_cfa_lenspsf_native_audit_kitti_val32_bayer_psf/index.html
 ```
 
-It separates the 12 sweep rows into 3 native `GRBG` rows with 96 samples and 9
-fully remapped non-GRBG rows with 288 samples. The native group has mean
-calibrated FP delta `-0.3125`, with best native dFP `-0.4062` at `GRBG`, PSF
-`0.8`. The remapped group has mean dFP `-0.2431`. Treat the native group as
-native sensor-CFA evidence and the remapped group only as bridge/remap
-sensitivity evidence until CameraE2E can produce true native RAW mosaics for
-those non-GRBG target patterns.
+It separates the historical 12 sweep rows into 3 native `GRBG` rows with 96
+samples and 9 fully remapped non-GRBG rows with 288 samples. The native group
+has mean calibrated FP delta `-0.3125`, with best native dFP `-0.4062` at
+`GRBG`, PSF `0.8`. The remapped group has mean dFP `-0.2431`. Treat the native
+group as native sensor-CFA evidence and the remapped group only as bridge/remap
+sensitivity evidence. The code can now request true native Bayer CameraE2E RAW
+mosaics for `RGGB`, `GRBG`, `BGGR`, and `GBRG`; the historical val32 report
+must be rerun with a fresh `native_bayer_v1` raw cache before replacing this
+guardrail with claim-scale non-GRBG native-CFA evidence.
+
+A minimal native Bayer bridge smoke report is available at:
+
+```text
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val4_native_bayer_smoke/index.html
+reports/perception_cfa_lenspsf_native_audit_kitti_val4_native_bayer_smoke/index.html
+```
+
+It has 4 native rows and 16 samples, with source CFA equal to target CFA for
+`RGGB`, `GRBG`, `BGGR`, and `GBRG`, `pattern_remapped_fraction=0.0`, and
+`true_sensor_cfa_mosaic_fraction=1.0`. This proves the simulator/provenance
+path, not detector performance.
 
 Join the same condition sweep to proposal-level edge and source-scene-edge
 evidence:
@@ -990,9 +1009,11 @@ section that summarizes the recommended claim posture, blocked claims, current
 evidence rows, and the next evidence to build. For the current bundle, the
 recommended posture is a narrow recall-budgeted FP-reduction claim with
 front-end/aux feasibility support; broad HumanISP superiority remains blocked.
-The dashboard also includes the native-CFA audit as a guardrail: native `GRBG`
-rows can be used as native-CFA evidence, while remapped non-GRBG rows must stay
-labeled as bridge/remap sensitivity.
+The dashboard also includes the native-CFA audit as a guardrail: the current
+val32 bundle has native `GRBG` rows and historical remapped non-GRBG rows. The
+new `native_bayer_v1` bridge smoke proves true native Bayer generation for
+`RGGB`, `GRBG`, `BGGR`, and `GBRG`, but the claim dashboard should be rerun at
+larger scale before using non-GRBG native-CFA rows as performance evidence.
 
 Build a visual success/failure casebook from the same 1496-image claim report:
 

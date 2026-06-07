@@ -1199,7 +1199,7 @@ def _build_evidence_map(
                 "claim_strength": "claim_boundary_guardrail",
                 "evidence": _cfa_lenspsf_native_evidence(cfa_lenspsf_native_audit),
                 "claim_boundary": "Native group can support native-CFA evidence; remapped group is bridge/remap sensitivity only.",
-                "next_evidence": "Generate true native CameraE2E sweeps for each target CFA or keep non-native rows explicitly labeled as remap sensitivity.",
+                "next_evidence": "Rerun larger CameraE2E sweeps with native_bayer_v1 and a fresh raw cache for each target Bayer CFA, or keep historical remapped rows explicitly labeled as remap sensitivity.",
             }
         )
 
@@ -1556,7 +1556,7 @@ def _future_evidence_rows(
     has_edge_correlation = isinstance(edge_correlation, Mapping) and bool(edge_correlation.get("lower_feature_predicts_positive"))
     has_scene_edge_correlation = isinstance(scene_edge_correlation, Mapping) and bool(scene_edge_correlation.get("lower_feature_predicts_positive"))
     if cfa_lenspsf_native_audit is not None:
-        scene_aux_gap = "Native/remap CFA separation exists; next step is larger scale and true native-CFA generation for non-GRBG patterns."
+        scene_aux_gap = "Native/remap CFA separation exists; next step is larger scale native_bayer_v1 reruns with same-sample scene-edge proposal correlation."
     elif cfa_lenspsf_proposal_audit is not None:
         scene_aux_gap = "CFA/LensPSF proposal-edge bridge exists; next step is larger scale and native-CFA separation."
     elif has_scene_edge_correlation:
@@ -1568,7 +1568,7 @@ def _future_evidence_rows(
     else:
         scene_aux_gap = "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
     if cfa_lenspsf_native_audit is not None:
-        cfa_gap = "Detector sweep exists and native/remap rows are separated; expand sample scale and add true native-CFA rows for non-GRBG patterns."
+        cfa_gap = "Detector sweep exists and native/remap rows are separated; rerun at larger sample scale with native_bayer_v1 and fresh raw caches for all target Bayer patterns."
     elif cfa_lenspsf_detector_sweep is not None:
         cfa_gap = "Detector sweep exists; expand sample scale and connect each condition to same-sample proposal edge correlation."
     elif cfa_stress_sweep is not None or edge_fidelity_suite is not None:

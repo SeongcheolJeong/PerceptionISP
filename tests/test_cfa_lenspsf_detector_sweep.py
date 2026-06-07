@@ -33,6 +33,9 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
                         "target_cfa_pattern": "RGGB",
                         "requested_cfa_pattern": "RGGB",
                         "pattern_remapped": True,
+                        "true_sensor_cfa_mosaic": True,
+                        "camerae2e_camera_type": "bayer-rggb",
+                        "camerae2e_native_cfa_bridge_version": "native_bayer_v1",
                         "eval_psf_sigma": 0.8,
                     }
                 },
@@ -45,6 +48,9 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
                         "target_cfa_pattern": "RGGB",
                         "requested_cfa_pattern": "RGGB",
                         "pattern_remapped": True,
+                        "true_sensor_cfa_mosaic": True,
+                        "camerae2e_camera_type": "bayer-rggb",
+                        "camerae2e_native_cfa_bridge_version": "native_bayer_v1",
                         "eval_psf_sigma": 0.8,
                     }
                 },
@@ -56,8 +62,12 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
         self.assertEqual(summary["source_cfa_patterns"], {"GRBG": 2})
         self.assertEqual(summary["target_cfa_patterns"], {"RGGB": 2})
         self.assertEqual(summary["pattern_remapped_count"], 2)
+        self.assertEqual(summary["true_sensor_cfa_mosaic_count"], 2)
+        self.assertEqual(summary["camerae2e_camera_types"], {"bayer-rggb": 2})
+        self.assertEqual(summary["camerae2e_native_cfa_bridge_versions"], {"native_bayer_v1": 2})
         self.assertEqual(summary["psf_recorded_count"], 2)
         self.assertAlmostEqual(summary["pattern_remapped_fraction"], 1.0)
+        self.assertAlmostEqual(summary["true_sensor_cfa_mosaic_fraction"], 1.0)
 
     def test_summarize_condition_run_computes_deltas_and_raw_summary(self) -> None:
         result = _comparison_result(cfa="GRBG", psf=0.8, human_fp=1.0, perception_fp=0.7)
@@ -156,6 +166,9 @@ def _comparison_result(*, cfa: str, psf: float, human_fp: float, perception_fp: 
                         "target_cfa_pattern": cfa,
                         "requested_cfa_pattern": cfa,
                         "pattern_remapped": cfa != "GRBG",
+                        "true_sensor_cfa_mosaic": True,
+                        "camerae2e_camera_type": f"bayer-{cfa.lower()}",
+                        "camerae2e_native_cfa_bridge_version": "native_bayer_v1",
                         "eval_psf_sigma": psf,
                     }
                 },
@@ -168,6 +181,9 @@ def _comparison_result(*, cfa: str, psf: float, human_fp: float, perception_fp: 
                         "target_cfa_pattern": cfa,
                         "requested_cfa_pattern": cfa,
                         "pattern_remapped": cfa != "GRBG",
+                        "true_sensor_cfa_mosaic": True,
+                        "camerae2e_camera_type": f"bayer-{cfa.lower()}",
+                        "camerae2e_native_cfa_bridge_version": "native_bayer_v1",
                         "eval_psf_sigma": psf,
                     }
                 },

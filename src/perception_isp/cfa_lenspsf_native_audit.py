@@ -153,6 +153,7 @@ def _checks(rows: Sequence[Mapping[str, Any]], groups: Mapping[str, Mapping[str,
     native_runs = int(groups.get("native", {}).get("run_count", 0))
     remapped_runs = int(groups.get("remapped", {}).get("run_count", 0))
     partial_runs = int(groups.get("partial_remap", {}).get("run_count", 0))
+    all_rows_native = bool(rows) and native_runs == len(rows) and remapped_runs == 0 and partial_runs == 0
     return [
         {
             "id": "sweep_rows_available",
@@ -166,7 +167,7 @@ def _checks(rows: Sequence[Mapping[str, Any]], groups: Mapping[str, Mapping[str,
         },
         {
             "id": "remapped_rows_separated",
-            "status": "pass" if remapped_runs > 0 or partial_runs > 0 else "warning",
+            "status": "pass" if all_rows_native or remapped_runs > 0 or partial_runs > 0 else "warning",
             "evidence": f"remapped_runs={remapped_runs} partial_runs={partial_runs}",
         },
     ]

@@ -16,6 +16,13 @@ from .types import CalibrationProfile, RawFrame, SensorMetadata
 
 CAMERAE2E_SRC = Path("/Users/seongcheoljeong/Documents/CameraE2E/src")
 CAMERAE2E_EVAL_PIXEL_PITCH_M = 2.065e-6
+CAMERAE2E_NATIVE_CFA_BRIDGE_VERSION = "native_bayer_v1"
+CAMERAE2E_BAYER_CAMERA_TYPES = {
+    "RGGB": "bayer-rggb",
+    "GRBG": "bayer-grbg",
+    "BGGR": "bayer-bggr",
+    "GBRG": "bayer-gbrg",
+}
 
 
 def raw_from_camerae2e(
@@ -41,7 +48,8 @@ def raw_from_camerae2e(
     try:
         store = AssetStore.default()
         scene = scene_create(scene_name, asset_store=store)
-        camera = _camera_for_target_resolution(camera_create(asset_store=store), camera_set)
+        camera_type = _camerae2e_camera_type_for_requested_cfa(cfa_pattern)
+        camera = _camera_for_target_resolution(camera_create(camera_type, asset_store=store), camera_set)
         camera = camera_compute(camera, scene, sensor_resize=True, asset_store=store)
         sensor = camera.fields.get("sensor")
         ip = camera.fields.get("ip")
@@ -105,6 +113,7 @@ def raw_from_camerae2e(
                 target_cfa_pattern=target_cfa_pattern,
                 requested_cfa_pattern=cfa_pattern,
                 scene_source=scene_name,
+                camera_type=camera_type,
             ),
         )
     except Exception as exc:  # pragma: no cover - environment-dependent path
@@ -146,7 +155,8 @@ def raw_from_camerae2e_rgb(
 
         store = AssetStore.default()
         scene = scene_from_file(uint8, "rgb", float(scene_luminance), "lcdExample.mat", asset_store=store)
-        camera = _camera_for_target_resolution(camera_create(asset_store=store), camera_set)
+        camera_type = _camerae2e_camera_type_for_requested_cfa(cfa_pattern)
+        camera = _camera_for_target_resolution(camera_create(camera_type, asset_store=store), camera_set)
         camera = camera_compute(camera, scene, sensor_resize=True, asset_store=store)
         sensor = camera.fields.get("sensor")
         ip = camera.fields.get("ip")
@@ -214,6 +224,7 @@ def raw_from_camerae2e_rgb(
                 target_cfa_pattern=target_cfa_pattern,
                 requested_cfa_pattern=cfa_pattern,
                 scene_source="rgb_array",
+                camera_type=camera_type,
             ),
         )
         frame.provenance["scene_input_shape"] = [int(v) for v in source.shape]
@@ -312,6 +323,13 @@ def _camera_for_target_resolution(camera: Any, camera_set_func: Any) -> Any:
     return camera_set_func(camera, "pixel size same fill factor", CAMERAE2E_EVAL_PIXEL_PITCH_M)
 
 
+def _camerae2e_camera_type_for_requested_cfa(requested_pattern: str) -> str:
+    requested = str(requested_pattern or "auto").upper().replace("-", "").replace("_", "")
+    if requested in {"AUTO", "SENSOR", "NATIVE", "SOURCE", "CAMERAE2E"}:
+        return "default"
+    return CAMERAE2E_BAYER_CAMERA_TYPES.get(requested, "default")
+
+
 def _camerae2e_provenance(
     *,
     sensor: Any,
@@ -322,6 +340,7 @@ def _camerae2e_provenance(
     target_cfa_pattern: str,
     requested_cfa_pattern: str,
     scene_source: str,
+    camera_type: str | None = None,
 ) -> dict[str, Any]:
     source = np.asarray(raw_source)
     source_pattern = _camerae2e_sensor_pattern_name(sensor) if sensor is not None else None
@@ -336,6 +355,8 @@ def _camerae2e_provenance(
     return {
         "bridge": "camerae2e",
         "scene_source": str(scene_source),
+        "camerae2e_camera_type": str(camera_type or "unknown"),
+        "camerae2e_native_cfa_bridge_version": CAMERAE2E_NATIVE_CFA_BRIDGE_VERSION,
         "raw_source_key": str(raw_source_key or "unknown"),
         "source_shape": source_shape,
         "source_native_hw": native_hw,
