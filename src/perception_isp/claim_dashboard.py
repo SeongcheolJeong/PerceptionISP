@@ -20,6 +20,7 @@ TASK_GATE_SUMMARY = "task_gate_summary.json"
 PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
+EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
 
 
 def main(argv: Any = None) -> int:
@@ -31,6 +32,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir.")
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
+    parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
     args = parser.parse_args(argv)
@@ -43,6 +45,7 @@ def main(argv: Any = None) -> int:
         protocol_coverage=args.protocol_coverage,
         mechanism_validation=args.mechanism_validation,
         cfa_stress_sweep=args.cfa_stress_sweep,
+        edge_confidence_suite=args.edge_confidence_suite,
         comparison_rollup_specs=args.comparison_rollup,
     )
     html_path = write_claim_dashboard(dashboard, args.output_dir)
@@ -71,6 +74,7 @@ def build_claim_dashboard(
     protocol_coverage: str | Path | None = None,
     mechanism_validation: str | Path | None = None,
     cfa_stress_sweep: str | Path | None = None,
+    edge_confidence_suite: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
@@ -80,8 +84,9 @@ def build_claim_dashboard(
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
     mechanism = _load_mechanism_validation(mechanism_validation) if mechanism_validation is not None else None
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
+    edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism, cfa_stress)
+    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism, cfa_stress, edge_confidence)
     return {
         "claims": claims,
         "training": training,
@@ -90,6 +95,7 @@ def build_claim_dashboard(
         "protocol_coverage": protocol,
         "mechanism_validation": mechanism,
         "cfa_stress_sweep": cfa_stress,
+        "edge_confidence_suite": edge_confidence,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
         "interpretation": "This dashboard separates supported engineering claims from claims that the current evidence does not support.",
@@ -302,6 +308,42 @@ def _load_cfa_stress_sweep(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_edge_confidence_suite(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, EDGE_CONFIDENCE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    status = str(data.get("status", ""))
+    key_deltas = []
+    for check in checks:
+        criteria = check.get("criteria", ()) if isinstance(check.get("criteria", ()), Sequence) else ()
+        for criterion in criteria:
+            if not isinstance(criterion, Mapping):
+                continue
+            key_deltas.append(
+                {
+                    "check": str(check.get("id", "")),
+                    "metric": str(criterion.get("metric", "")),
+                    "delta": _maybe_float(criterion.get("delta")),
+                    "threshold": _maybe_float(criterion.get("threshold")),
+                    "pass": bool(criterion.get("pass")),
+                }
+            )
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "check_count": len(checks),
+        "case_count": len(data.get("cases", ())),
+        "failed_checks": failed,
+        "key_deltas": key_deltas[:8],
+        "interpretation": str(data.get("interpretation", "")),
+    }
+
+
 def _select_task_target(data: Mapping[str, Any], *, claims: Sequence[Mapping[str, Any]], baseline_input: str) -> str:
     available = {str(value) for value in data.get("inputs", ())}
     for profile in ("fp_reducer", "broad_superiority"):
@@ -386,6 +428,7 @@ def _claim_decisions(
     protocol_coverage: Mapping[str, Any] | None,
     mechanism_validation: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
+    edge_confidence_suite: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
     broad_claims = [claim for claim in claims if claim.get("profile") == "broad_superiority"]
@@ -420,6 +463,12 @@ def _claim_decisions(
             decisions.append({"status": "diagnostic", "claim": "CFA stress sweep is available as diagnostic evidence for condition-dependent front-end signals; it is not detector-performance evidence."})
         else:
             decisions.append({"status": "not_supported", "claim": "CFA stress sweep failed or is incomplete; do not use it as CFA feasibility evidence yet."})
+    if edge_confidence_suite is not None:
+        if bool(edge_confidence_suite.get("pass")):
+            decisions.append({"status": "diagnostic", "claim": "Edge-confidence suite passed; PerceptionISP confidence maps respond to difficult-edge stressors, but this is not detector-performance evidence."})
+        else:
+            failed = ", ".join(str(value) for value in edge_confidence_suite.get("failed_checks", ())) or "configured edge-confidence checks"
+            decisions.append({"status": "not_supported", "claim": f"Edge-confidence suite failed for {failed}; do not use edge confidence as feasibility evidence yet."})
     if task_gate is not None:
         profile = str(task_gate.get("profile", "task"))
         if bool(task_gate.get("pass")):
@@ -591,6 +640,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     mechanism_html = _mechanism_html(mechanism, destination) if isinstance(mechanism, Mapping) else "<p>No mechanism validation summary was provided.</p>"
     cfa_stress = dashboard.get("cfa_stress_sweep")
     cfa_stress_html = _cfa_stress_html(cfa_stress, destination) if isinstance(cfa_stress, Mapping) else "<p>No CFA stress sweep summary was provided.</p>"
+    edge_confidence = dashboard.get("edge_confidence_suite")
+    edge_confidence_html = _edge_confidence_html(edge_confidence, destination) if isinstance(edge_confidence, Mapping) else "<p>No edge-confidence suite summary was provided.</p>"
     protocol = dashboard.get("protocol_coverage")
     protocol_html = _protocol_html(protocol, destination) if isinstance(protocol, Mapping) else "<p>No benchmark protocol coverage summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
@@ -639,6 +690,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {mechanism_html}
   <h2>CFA Stress Sweep</h2>
   {cfa_stress_html}
+  <h2>Edge Confidence Suite</h2>
+  {edge_confidence_html}
   <h2>Benchmark Protocol Coverage</h2>
   {protocol_html}
   <h2>Supporting Rollups</h2>
@@ -815,6 +868,42 @@ def _cfa_stress_row(row: Mapping[str, Any]) -> str:
         f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
         f"<td>{_fmt(row.get('condition_score'))}</td>"
         f"<td>{html_lib.escape(str(row.get('score_definition', '')))}</td>"
+        "</tr>"
+    )
+
+
+def _edge_confidence_html(edge_confidence: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(edge_confidence.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in edge_confidence.get("failed_checks", ())) or "none"
+    rows = "".join(_edge_confidence_delta_row(row) for row in edge_confidence.get("key_deltas", ()))
+    if not rows:
+        rows = '<tr><td colspan="5">No edge-confidence deltas were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(edge_confidence.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(edge_confidence.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Cases</th><th>Checks</th><th>Failed</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(edge_confidence, destination)}</td>"
+        f"<td>{int(edge_confidence.get('case_count', 0))}</td>"
+        f"<td>{int(edge_confidence.get('check_count', 0))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Check</th><th>Metric</th><th>Delta</th><th>Threshold</th><th>Pass</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _edge_confidence_delta_row(row: Mapping[str, Any]) -> str:
+    status_class = "supported" if bool(row.get("pass")) else "not_supported"
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('check', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('metric', '')))}</code></td>"
+        f"<td>{_fmt(row.get('delta'))}</td>"
+        f"<td>{_fmt(row.get('threshold'))}</td>"
+        f"<td class=\"{status_class}\">{html_lib.escape(str(bool(row.get('pass'))))}</td>"
         "</tr>"
     )
 

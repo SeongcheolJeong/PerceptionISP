@@ -23,6 +23,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             condition_gate = _write_condition_gate(root / "condition_gate")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
 
             summary = build_protocol_coverage(
                 comparison_reports=[report],
@@ -34,6 +35,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 condition_gate=condition_gate,
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
+                edge_confidence_suite=edge_confidence,
                 min_samples=3,
             )
 
@@ -45,6 +47,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(rows["classical_lightweight_transform"]["status"], "covered")
             self.assertEqual(rows["front_end_mechanism_validation"]["status"], "covered")
             self.assertEqual(rows["cfa_stress_sweep"]["status"], "covered")
+            self.assertEqual(rows["edge_confidence_suite"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
             self.assertIn("naive_raw_baseline", summary["missing_raw_claim"])
 
@@ -66,6 +69,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             condition_gate = _write_condition_gate(root / "condition_gate")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
 
             summary = build_protocol_coverage(
                 comparison_reports=[classical, naive],
@@ -78,6 +82,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 condition_gate=condition_gate,
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
+                edge_confidence_suite=edge_confidence,
                 min_samples=3,
             )
 
@@ -99,6 +104,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             gate = _write_claim_gate(root / "gate")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = protocol_main(
@@ -119,6 +125,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(mechanism),
                         "--cfa-stress-sweep",
                         str(cfa_stress),
+                        "--edge-confidence-suite",
+                        str(edge_confidence),
                         "--min-samples",
                         "3",
                         "--output-dir",
@@ -288,6 +296,29 @@ def _write_cfa_stress_sweep(path: Path) -> Path:
         ],
     }
     (path / "cfa_stress_sweep_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_edge_confidence_suite(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cases": [{"id": "nominal_sharp"}, {"id": "low_light"}, {"id": "glare_saturated"}, {"id": "low_mtf"}],
+        "checks": [
+            {
+                "id": "low_light_edge_confidence_drop",
+                "status": "pass",
+                "criteria": [{"metric": "edge_confidence_mean", "delta": -0.15, "threshold": -0.10, "pass": True}],
+            },
+            {
+                "id": "glare_edge_confidence_drop",
+                "status": "pass",
+                "criteria": [{"metric": "demosaic_confidence_mean", "delta": -0.12, "threshold": -0.08, "pass": True}],
+            },
+        ],
+    }
+    (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

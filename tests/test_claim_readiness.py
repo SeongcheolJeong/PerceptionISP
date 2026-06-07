@@ -20,6 +20,7 @@ class ClaimReadinessTest(unittest.TestCase):
             rollup_dir = _write_comparison_rollup(root / "rollup")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -30,6 +31,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 comparison_rollups=[f"Calibration={rollup_dir}"],
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
+                edge_confidence_suite=edge_confidence,
                 output_dir=root / "readiness",
             )
 
@@ -50,6 +52,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("condition_gate", summary)
             self.assertIn("mechanism_validation", summary)
             self.assertIn("cfa_stress_sweep", summary)
+            self.assertIn("edge_confidence_suite", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
@@ -73,6 +76,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["task_gate"]["verdict"], "task_gate_pass")
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
+            self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
@@ -116,6 +120,7 @@ class ClaimReadinessTest(unittest.TestCase):
             eval_dir = _write_eval_summary(root / "eval")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -126,6 +131,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 protocol_comparison_reports=[naive_dir],
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
+                edge_confidence_suite=edge_confidence,
                 output_dir=root / "readiness",
             )
 
@@ -139,6 +145,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["protocol_coverage"]["metric_claim_status"], "fp_reducer_only")
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
+            self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
 
 
 def _write_comparison_report(
@@ -318,6 +325,29 @@ def _write_cfa_stress_sweep(path: Path) -> Path:
         ],
     }
     (path / "cfa_stress_sweep_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_edge_confidence_suite(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cases": [{"id": "nominal_sharp"}, {"id": "low_light"}, {"id": "glare_saturated"}, {"id": "low_mtf"}],
+        "checks": [
+            {
+                "id": "low_light_edge_confidence_drop",
+                "status": "pass",
+                "criteria": [{"metric": "edge_confidence_mean", "delta": -0.15, "threshold": -0.10, "pass": True}],
+            },
+            {
+                "id": "glare_edge_confidence_drop",
+                "status": "pass",
+                "criteria": [{"metric": "demosaic_confidence_mean", "delta": -0.12, "threshold": -0.08, "pass": True}],
+            },
+        ],
+    }
+    (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

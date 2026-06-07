@@ -21,6 +21,7 @@ class ClaimDashboardTest(unittest.TestCase):
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             comparison = _write_comparison_rollup(root / "rollup")
 
             dashboard = build_claim_dashboard(
@@ -30,6 +31,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 protocol_coverage=protocol,
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
+                edge_confidence_suite=edge_confidence,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
 
@@ -42,6 +44,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(dashboard["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
             self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
+            self.assertTrue(dashboard["edge_confidence_suite"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
                 "Task-level VRU/person recall improvement versus HumanISP is not supported; the current evidence supports only the narrower FP-reduction claim.",
@@ -53,6 +56,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "CFA stress sweep is available as diagnostic evidence for condition-dependent front-end signals; it is not detector-performance evidence.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Edge-confidence suite passed; PerceptionISP confidence maps respond to difficult-edge stressors, but this is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertTrue(
@@ -71,6 +78,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Task Metrics", html)
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
+            self.assertIn("Edge Confidence Suite", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
@@ -83,6 +91,7 @@ class ClaimDashboardTest(unittest.TestCase):
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
+            edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = dashboard_main(
@@ -97,6 +106,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(mechanism),
                         "--cfa-stress-sweep",
                         str(cfa_stress),
+                        "--edge-confidence-suite",
+                        str(edge_confidence),
                         "--output-dir",
                         str(root / "dashboard"),
                     ]
@@ -109,6 +120,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(summary["mechanism_validation"]["pass"])
             self.assertTrue(summary["cfa_stress_sweep"]["pass"])
+            self.assertTrue(summary["edge_confidence_suite"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
     def test_dashboard_uses_task_gate_when_present(self) -> None:
@@ -399,6 +411,34 @@ def _write_cfa_stress_sweep(path: Path) -> Path:
                     },
                 ],
                 "interpretation": "unit cfa stress sweep",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_edge_confidence_suite(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "edge_confidence_suite_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "cases": [{"id": "nominal_sharp"}, {"id": "low_light"}, {"id": "glare_saturated"}, {"id": "low_mtf"}],
+                "checks": [
+                    {
+                        "id": "low_light_edge_confidence_drop",
+                        "status": "pass",
+                        "criteria": [{"metric": "edge_confidence_mean", "delta": -0.15, "threshold": -0.10, "pass": True}],
+                    },
+                    {
+                        "id": "glare_edge_confidence_drop",
+                        "status": "pass",
+                        "criteria": [{"metric": "demosaic_confidence_mean", "delta": -0.12, "threshold": -0.08, "pass": True}],
+                    },
+                ],
+                "interpretation": "unit edge confidence suite",
             }
         )
         + "\n"
