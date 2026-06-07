@@ -21,6 +21,7 @@ PERFORMANCE_AREAS = {
     "Recall-budgeted FP reduction",
     "Task-level recall claim",
     "RGB+Aux DNN training path",
+    "RGB+Aux DNN fine-tune gate",
 }
 BOUNDARY_AREAS = {
     "Benchmark protocol coverage",
@@ -232,6 +233,8 @@ def _disallowed_language(
             lines.append("Do not claim task-level recall improvement for VRU/person/small-object groups until the task gate passes.")
         elif area == "RGB+Aux DNN training path":
             lines.append("Do not claim a trained RGB+Aux DNN detector improvement from the current compact dense-detector metrics.")
+        elif area == "RGB+Aux DNN fine-tune gate":
+            lines.append("Do not claim the aux tensor improves a learned detector until the RGB+Aux DNN gate passes.")
         elif area == "Broad HumanISP superiority":
             lines.append("Do not claim broad HumanISP superiority from the current gate evidence.")
     for decision in decisions:

@@ -36,6 +36,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-require-ci", action="store_true", help="Do not require paired bootstrap CIs to satisfy each claim gate.")
     parser.add_argument("--training-summary", action="append", default=[], help="RGB+aux export/train/eval summary path/dir. Repeat to build a training rollup.")
     parser.add_argument("--training-rollup", default=None, help="Existing training rollup summary path/dir. Ignored when --training-summary is used.")
+    parser.add_argument("--rgb-aux-dnn-gate", default=None, help="Existing RGB+Aux versus RGB-only DNN gate summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Existing comparison rollup path/dir, optionally name=path.")
     parser.add_argument("--protocol-comparison-report", action="append", default=[], help="Additional comparison report used only for benchmark-protocol coverage, for example a naive RAW baseline.")
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir used for RAW/sensor-native claim coverage.")
@@ -68,6 +69,7 @@ def main(argv: Any = None) -> int:
         require_ci=not bool(args.no_require_ci),
         training_summaries=args.training_summary,
         training_rollup=args.training_rollup,
+        rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
         comparison_rollups=args.comparison_rollup,
         protocol_comparison_reports=args.protocol_comparison_report,
         mechanism_validation=args.mechanism_validation,
@@ -104,6 +106,7 @@ def run_claim_readiness(
     require_ci: bool = True,
     training_summaries: Sequence[str | Path] = (),
     training_rollup: str | Path | None = None,
+    rgb_aux_dnn_gate: str | Path | None = None,
     comparison_rollups: Sequence[str | Path] = (),
     protocol_comparison_reports: Sequence[str | Path] = (),
     mechanism_validation: str | Path | None = None,
@@ -245,6 +248,7 @@ def run_claim_readiness(
             f"FP reducer vs RGB+Aux Fusion={fp_dir}",
         ],
         training_rollup=training_rollup_path,
+        rgb_aux_dnn_gate=rgb_aux_dnn_gate,
         task_metrics=task_metrics_dir,
         task_gate=task_gate_dir,
         protocol_coverage=protocol_dir,
@@ -294,6 +298,7 @@ def run_claim_readiness(
             "failed": [item.get("metric") for item in fp_summary.get("criteria", ()) if not bool(item.get("pass"))],
         },
         "training_rollup": "" if training_rollup_path is None else str(training_rollup_path),
+        "rgb_aux_dnn_gate": _rgb_aux_dnn_gate_summary(rgb_aux_dnn_gate),
         "task_metrics": {
             "report": str(task_html),
             "summary_json": str(task_html.parent / "task_metrics_summary.json"),
@@ -602,6 +607,42 @@ def _aux_contribution_audit_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _rgb_aux_dnn_gate_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "rgb_aux_dnn_gate_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"RGB+Aux DNN gate summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    criteria = [row for row in data.get("criteria", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in criteria if str(row.get("status", "")) != "pass"]
+    deltas = data.get("deltas", {}) if isinstance(data.get("deltas"), Mapping) else {}
+    primary_name = str(data.get("primary_run", "rgb_aux"))
+    primary = next(
+        (
+            row
+            for row in data.get("runs", ())
+            if isinstance(row, Mapping) and str(row.get("name", "")) == primary_name
+        ),
+        {},
+    )
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": bool(data.get("pass")),
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "profile": data.get("profile"),
+        "sample_count": int((primary if isinstance(primary, Mapping) else {}).get("sample_count", 0)),
+        "failed_criteria": failed,
+        "delta_recall@0.50": _optional_float(deltas.get("recall@0.50_mean")),
+        "delta_fp@0.50": _optional_float(deltas.get("fp@0.50_mean")),
+    }
+
+
 def _adverse_native_slice_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -884,6 +925,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "scene_edge_confidence": summary.get("scene_edge_confidence"),
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
+        "rgb_aux_dnn_gate": summary.get("rgb_aux_dnn_gate"),
         "adverse_native_slice": summary.get("adverse_native_slice"),
         "adverse_task_slice": summary.get("adverse_task_slice"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),

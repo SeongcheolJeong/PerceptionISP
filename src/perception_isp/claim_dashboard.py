@@ -14,6 +14,7 @@ from .types import json_ready
 
 CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
+RGB_AUX_DNN_GATE_SUMMARY = "rgb_aux_dnn_gate_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 TASK_GATE_SUMMARY = "task_gate_summary.json"
@@ -40,6 +41,7 @@ def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Create a consolidated PerceptionISP claim-readiness dashboard.")
     parser.add_argument("--claim-gate", action="append", default=[], help="Claim gate summary path/dir, optionally name=path.")
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
+    parser.add_argument("--rgb-aux-dnn-gate", default=None, help="RGB+Aux versus RGB-only DNN gate summary path/dir.")
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
     parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
@@ -65,6 +67,7 @@ def main(argv: Any = None) -> int:
     dashboard = build_claim_dashboard(
         claim_gate_specs=args.claim_gate,
         training_rollup=args.training_rollup,
+        rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
         task_metrics=args.task_metrics,
         task_gate=args.task_gate,
         protocol_coverage=args.protocol_coverage,
@@ -106,6 +109,7 @@ def build_claim_dashboard(
     *,
     claim_gate_specs: Sequence[str | Path],
     training_rollup: str | Path | None = None,
+    rgb_aux_dnn_gate: str | Path | None = None,
     task_metrics: str | Path | None = None,
     task_gate: str | Path | None = None,
     protocol_coverage: str | Path | None = None,
@@ -128,6 +132,7 @@ def build_claim_dashboard(
 ) -> Dict[str, Any]:
     claims = [_load_claim_gate(spec) for spec in claim_gate_specs]
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
+    rgb_aux_dnn = _load_rgb_aux_dnn_gate(rgb_aux_dnn_gate) if rgb_aux_dnn_gate is not None else None
     task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
     task_gate_data = _load_task_gate(task_gate) if task_gate is not None else None
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
@@ -170,6 +175,7 @@ def build_claim_dashboard(
     decisions = _claim_decisions(
         claims,
         training,
+        rgb_aux_dnn,
         task,
         task_gate_data,
         protocol,
@@ -192,6 +198,7 @@ def build_claim_dashboard(
     evidence_map = _build_evidence_map(
         claims,
         training,
+        rgb_aux_dnn,
         task,
         task_gate_data,
         protocol,
@@ -214,6 +221,7 @@ def build_claim_dashboard(
     return {
         "claims": claims,
         "training": training,
+        "rgb_aux_dnn_gate": rgb_aux_dnn,
         "task_metrics": task,
         "task_gate": task_gate_data,
         "protocol_coverage": protocol,
@@ -306,6 +314,44 @@ def _load_training_rollup(path: str | Path) -> Dict[str, Any]:
         "lowest_fp_eval": _dense_eval_brief(lowest_fp),
         "max_precision_eval": _dense_eval_brief(max_precision),
         "interpretation": _training_interpretation(status),
+    }
+
+
+def _load_rgb_aux_dnn_gate(path: str | Path) -> Dict[str, Any]:
+    summary_path = _summary_path(path, RGB_AUX_DNN_GATE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    criteria = [row for row in data.get("criteria", ()) if isinstance(row, Mapping)]
+    runs = [row for row in data.get("runs", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in criteria if str(row.get("status", "")) != "pass"]
+    primary_name = str(data.get("primary_run", "rgb_aux"))
+    baseline_name = str(data.get("baseline_run", "rgb_only"))
+    primary = next((row for row in runs if str(row.get("name", "")) == primary_name), None)
+    baseline = next((row for row in runs if str(row.get("name", "")) == baseline_name), None)
+    deltas = data.get("deltas", {}) if isinstance(data.get("deltas"), Mapping) else {}
+    return {
+        "name": _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": bool(data.get("pass")),
+        "claim_status": str(data.get("claim_status", "")),
+        "profile": str(data.get("profile", "")),
+        "primary_run": primary_name,
+        "baseline_run": baseline_name,
+        "sample_count": int((primary or {}).get("sample_count", 0)),
+        "failed_criteria": failed,
+        "criteria": criteria,
+        "runs": runs,
+        "primary": dict(primary or {}),
+        "baseline": dict(baseline or {}),
+        "deltas": {
+            "precision@0.50_mean": _maybe_float_or_none(deltas.get("precision@0.50_mean")),
+            "recall@0.50_mean": _maybe_float_or_none(deltas.get("recall@0.50_mean")),
+            "small_recall@0.50_mean": _maybe_float_or_none(deltas.get("small_recall@0.50_mean")),
+            "fp@0.50_mean": _maybe_float_or_none(deltas.get("fp@0.50_mean")),
+        },
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
     }
 
 
@@ -1413,6 +1459,7 @@ def _cfa_lenspsf_total_sample_count(
 def _build_evidence_map(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
+    rgb_aux_dnn_gate: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
@@ -1721,6 +1768,23 @@ def _build_evidence_map(
             }
         )
 
+    if rgb_aux_dnn_gate is not None:
+        passed = bool(rgb_aux_dnn_gate.get("pass"))
+        current.append(
+            {
+                "area": "RGB+Aux DNN fine-tune gate",
+                "status": "supported" if passed else "not_supported",
+                "claim_strength": str(rgb_aux_dnn_gate.get("claim_status", "")),
+                "evidence": _rgb_aux_dnn_gate_evidence(rgb_aux_dnn_gate),
+                "claim_boundary": (
+                    "Compact learned RGB+Aux detector evidence only; it is not full YOLO-scale RGB+Aux fine-tuning proof."
+                    if passed
+                    else "Do not claim learned RGB+Aux detector improvement until this gate passes on a larger held-out split."
+                ),
+                "next_evidence": "Train matched RGB-only and RGB+Aux models on a larger held-out split, then rerun this gate.",
+            }
+        )
+
     return {
         "claim_posture": _claim_posture(claims, protocol_coverage),
         "current_evidence": current,
@@ -1738,6 +1802,7 @@ def _build_evidence_map(
             cfa_lenspsf_aux_ablation=cfa_lenspsf_aux_ablation,
             casebook=casebook,
             training=training,
+            rgb_aux_dnn_gate=rgb_aux_dnn_gate,
         ),
     }
 
@@ -2097,6 +2162,26 @@ def _training_evidence(training: Mapping[str, Any]) -> str:
     )
 
 
+def _rgb_aux_dnn_gate_evidence(gate: Mapping[str, Any]) -> str:
+    primary = gate.get("primary") if isinstance(gate.get("primary"), Mapping) else {}
+    baseline = gate.get("baseline") if isinstance(gate.get("baseline"), Mapping) else {}
+    deltas = gate.get("deltas", {}) if isinstance(gate.get("deltas"), Mapping) else {}
+    failed = ", ".join(str(value) for value in gate.get("failed_criteria", ())) or "none"
+    return (
+        f"profile={gate.get('profile', '')}; samples={int(gate.get('sample_count', 0))}; "
+        f"RGB+Aux P50/R50/SmallR/FP="
+        f"{_fmt(primary.get('precision@0.50_mean'))}/"
+        f"{_fmt(primary.get('recall@0.50_mean'))}/"
+        f"{_fmt(primary.get('small_recall@0.50_mean'))}/"
+        f"{_fmt(primary.get('fp@0.50_mean'))}; "
+        f"RGB-only R50/FP={_fmt(baseline.get('recall@0.50_mean'))}/{_fmt(baseline.get('fp@0.50_mean'))}; "
+        f"dP={_fmt(deltas.get('precision@0.50_mean'), signed=True)}, "
+        f"dR={_fmt(deltas.get('recall@0.50_mean'), signed=True)}, "
+        f"dSmallR={_fmt(deltas.get('small_recall@0.50_mean'), signed=True)}, "
+        f"dFP={_fmt(deltas.get('fp@0.50_mean'), signed=True)}; failed={failed}"
+    )
+
+
 def _future_evidence_rows(
     *,
     scene_edge_confidence: Mapping[str, Any] | None,
@@ -2112,6 +2197,7 @@ def _future_evidence_rows(
     cfa_lenspsf_aux_ablation: Mapping[str, Any] | None,
     casebook: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
+    rgb_aux_dnn_gate: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
     scene_edge_correlation = _sample_bridge_scene_edge_correlation(aux_contribution_audit)
@@ -2185,6 +2271,20 @@ def _future_evidence_rows(
     else:
         cfa_gap = "Need CFA/LensPSF front-end diagnostics first."
     training_status = str(training.get("status", "")) if training is not None else "missing"
+    if rgb_aux_dnn_gate is not None:
+        failed = ", ".join(str(value) for value in rgb_aux_dnn_gate.get("failed_criteria", ())) or "none"
+        if bool(rgb_aux_dnn_gate.get("pass")):
+            dnn_gate_gap = (
+                f"Compact RGB+Aux DNN gate passed under profile {rgb_aux_dnn_gate.get('profile', '')}; "
+                "next step is larger held-out and full detector fine-tuning."
+            )
+        else:
+            dnn_gate_gap = (
+                f"Compact RGB+Aux DNN gate exists but failed under profile {rgb_aux_dnn_gate.get('profile', '')}: "
+                f"{failed}. Training status is {training_status}."
+            )
+    else:
+        dnn_gate_gap = f"Current DNN training status is {training_status}. {aux_gate_gap}"
     if cfa_lenspsf_casebook is not None:
         casebook_gap = "CFA/LensPSF visual casebook exists; next step is larger scale and richer TP-loss/adverse-condition review."
     elif casebook is not None:
@@ -2224,7 +2324,7 @@ def _future_evidence_rows(
             "priority": "P1",
             "evidence": "RGB+Aux DNN fine-tune gate",
             "why": "Needed before claiming the aux tensor improves a learned detector rather than only proposal calibration.",
-            "current_gap": f"Current DNN training status is {training_status}. {aux_gate_gap}",
+            "current_gap": dnn_gate_gap,
             "implementation_path": "Fine-tune matched RGB-only and RGB+Aux models on the same split, then evaluate a held-out claim gate.",
         },
         {
@@ -2284,6 +2384,7 @@ def _proposal_correlation_lookup(payload: Any, *, feature: str, comparison: str)
 def _claim_decisions(
     claims: Sequence[Mapping[str, Any]],
     training: Mapping[str, Any] | None,
+    rgb_aux_dnn_gate: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
@@ -2325,6 +2426,25 @@ def _claim_decisions(
             decisions.append({"status": "needs_gate", "claim": "The learned RGB+Aux DNN path has candidate metrics, but still needs a held-out claim gate."})
         elif status == "training_path_only":
             decisions.append({"status": "needs_eval", "claim": "The RGB+Aux DNN training path exists, but direct held-out detector evaluation is still missing."})
+    if rgb_aux_dnn_gate is not None:
+        if bool(rgb_aux_dnn_gate.get("pass")):
+            decisions.append(
+                {
+                    "status": "supported",
+                    "claim": (
+                        "RGB+Aux DNN gate passed versus RGB-only for the compact dense detector. "
+                        "Use this as compact learned-aux feasibility, not full detector superiority."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in rgb_aux_dnn_gate.get("failed_criteria", ())) or "configured DNN gate checks"
+            decisions.append(
+                {
+                    "status": "not_supported",
+                    "claim": f"RGB+Aux DNN gate failed for {failed}; do not claim the aux tensor improves a learned detector yet.",
+                }
+            )
     if mechanism_validation is not None:
         if bool(mechanism_validation.get("pass")):
             decisions.append({"status": "supported", "claim": "PerceptionISP front-end mechanism validation passed; aux/confidence maps respond to controlled sensor stressors."})
@@ -2814,6 +2934,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     claim_rows = "".join(_claim_row(item, destination) for item in dashboard.get("claims", ()))
     training = dashboard.get("training")
     training_html = _training_html(training, destination) if isinstance(training, Mapping) else "<p>No RGB+Aux training rollup was provided.</p>"
+    rgb_aux_dnn_gate = dashboard.get("rgb_aux_dnn_gate")
+    rgb_aux_dnn_gate_html = (
+        _rgb_aux_dnn_gate_html(rgb_aux_dnn_gate, destination)
+        if isinstance(rgb_aux_dnn_gate, Mapping)
+        else "<p>No RGB+Aux DNN gate summary was provided.</p>"
+    )
     aux_contribution = dashboard.get("aux_contribution_audit")
     aux_contribution_html = _aux_contribution_html(aux_contribution, destination) if isinstance(aux_contribution, Mapping) else "<p>No aux contribution audit was provided.</p>"
     adverse_native = dashboard.get("adverse_native_slice")
@@ -2921,6 +3047,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   </table>
   <h2>RGB+Aux DNN Training</h2>
   {training_html}
+  <h2>RGB+Aux DNN Gate</h2>
+  {rgb_aux_dnn_gate_html}
   <h2>Aux Contribution Audit</h2>
   {aux_contribution_html}
   <h2>Adverse Native RAW Slice</h2>
@@ -3069,6 +3197,69 @@ def _training_html(training: Mapping[str, Any], destination: Path) -> str:
         f"<td>{html_lib.escape(str(best_recall.get('name', '')))}<br>R50 {_fmt(best_recall.get('recall@0.50_mean'))}, P50 {_fmt(best_recall.get('precision@0.50_mean'))}, FP {_fmt(best_recall.get('fp@0.50_mean'))}</td>"
         f"<td>{html_lib.escape(str(lowest_fp.get('name', '')))}<br>FP {_fmt(lowest_fp.get('fp@0.50_mean'))}, R50 {_fmt(lowest_fp.get('recall@0.50_mean'))}</td>"
         "</tr></tbody></table>"
+    )
+
+
+def _rgb_aux_dnn_gate_html(gate: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(gate.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in gate.get("failed_criteria", ())) or "none"
+    deltas = gate.get("deltas", {}) if isinstance(gate.get("deltas"), Mapping) else {}
+    run_rows = "".join(_rgb_aux_dnn_gate_run_row(row) for row in gate.get("runs", ()) if isinstance(row, Mapping))
+    if not run_rows:
+        run_rows = '<tr><td colspan="9">No DNN gate runs were available.</td></tr>'
+    criterion_rows = "".join(_rgb_aux_dnn_gate_criterion_row(row) for row in gate.get("criteria", ()) if isinstance(row, Mapping))
+    if not criterion_rows:
+        criterion_rows = '<tr><td colspan="6">No DNN gate criteria were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(gate.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(gate.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(gate.get('interpretation', '')))} "
+        f"{html_lib.escape(str(gate.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Profile</th><th>Primary</th><th>Baseline</th><th>Samples</th><th>dP50</th><th>dR50</th><th>dSmallR50</th><th>dFP50</th><th>Failed</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(gate, destination)}</td>"
+        f"<td><code>{html_lib.escape(str(gate.get('profile', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(gate.get('primary_run', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(gate.get('baseline_run', '')))}</code></td>"
+        f"<td>{int(gate.get('sample_count', 0))}</td>"
+        f"<td>{_task_delta_cell(deltas.get('precision@0.50_mean'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(deltas.get('recall@0.50_mean'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(deltas.get('small_recall@0.50_mean'), lower_is_better=False)}</td>"
+        f"<td>{_task_delta_cell(deltas.get('fp@0.50_mean'), lower_is_better=True)}</td>"
+        f"<td>{html_lib.escape(failed)}</td></tr></tbody></table>"
+        "<table><thead><tr><th>Run</th><th>Mode</th><th>Tensor</th><th>Channels</th><th>Samples</th><th>P50</th><th>R50</th><th>Small R50</th><th>FP50</th></tr></thead>"
+        f"<tbody>{run_rows}</tbody></table>"
+        "<table><thead><tr><th>Criterion</th><th>Status</th><th>Target</th><th>Baseline</th><th>Delta</th><th>Threshold</th></tr></thead>"
+        f"<tbody>{criterion_rows}</tbody></table>"
+    )
+
+
+def _rgb_aux_dnn_gate_run_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('name', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('channel_mode', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('tensor_key', '')))}</code></td>"
+        f"<td>{'' if row.get('input_channels') is None else int(row.get('input_channels', 0))}</td>"
+        f"<td>{int(row.get('sample_count', 0))}</td>"
+        f"<td>{_fmt(row.get('precision@0.50_mean'))}</td>"
+        f"<td>{_fmt(row.get('recall@0.50_mean'))}</td>"
+        f"<td>{_fmt(row.get('small_recall@0.50_mean'))}</td>"
+        f"<td>{_fmt(row.get('fp@0.50_mean'))}</td>"
+        "</tr>"
+    )
+
+
+def _rgb_aux_dnn_gate_criterion_row(row: Mapping[str, Any]) -> str:
+    status = str(row.get("status", ""))
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td class=\"{'supported' if status == 'pass' else 'not_supported'}\">{html_lib.escape(status)}</td>"
+        f"<td>{_fmt(row.get('target'))}</td>"
+        f"<td>{_fmt(row.get('baseline'))}</td>"
+        f"<td>{_fmt(row.get('delta'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('threshold'))}</td>"
+        "</tr>"
     )
 
 

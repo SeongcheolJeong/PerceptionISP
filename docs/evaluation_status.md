@@ -219,6 +219,28 @@ However, the direct detector result is not useful yet:
 | `rgb_only_ablation` | 32 | 0.50 | 0.0118 | 0.0835 | 0.0312 | 40.2500 | 40.8125 |
 | `aux_only_ablation` | 32 | 0.50 | 0.0050 | 0.0767 | 0.0156 | 84.6250 | 85.0312 |
 
+A matched 12-epoch quick gate was then run on the same KITTI val128 export with
+coverage split, `car/pedestrian/cyclist`, MPS, `12x40` grid, and
+`no_object_weight=0.15`:
+
+| Run | Eval samples | Precision@0.50 | Recall@0.50 | Small Recall@0.50 | FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| RGB+Aux e12 | 32 | 0.0193 | 0.1649 | 0.0594 | 51.5625 |
+| RGB-only e12 | 32 | 0.0050 | 0.0949 | 0.0260 | 88.0000 |
+| RGB+Aux minus RGB-only | 32 | +0.0143 | +0.0701 | +0.0333 | -36.4375 |
+
+The direct DNN gate report is:
+
+```text
+reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1/index.html
+```
+
+This is a useful feasibility result: aux channels are consumed by an actually
+trained compact DNN and move recall/FP in the desired direction versus RGB-only.
+It still fails the `claim_quality` gate because the sample count is only 32 and
+absolute precision/FP remain weak (`P50=0.0193`, `FP/sample=51.5625`). It should
+not be advertised as learned RGB+Aux detector superiority.
+
 Confidence sweeps from `0.30` to `0.98` did not produce a usable operating
 point. Raising confidence lowers FP but collapses recall. This is a concrete
 negative result: the compact dense detector is useful to measure the RGB+aux
@@ -620,7 +642,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | --- | --- |
 | Broad HumanISP superiority | Not supported |
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
-| Learned RGB+Aux DNN direct detector claim | Not supported; training path exists, direct metrics are too weak |
+| Learned RGB+Aux DNN direct detector claim | Not supported; the matched KITTI val128 e12 gate improves over RGB-only (`dR50=+0.0701`, `dFP50=-36.4375`) but fails `claim_quality` on sample count, absolute precision, and absolute FP |
 | Task-level recall improvement | `task_gate_fail` for `vru`, `person`, `cyclist`, `vehicle`, and `small_all`; current evidence supports only the narrower FP-reduction claim |
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |

@@ -218,6 +218,80 @@ PYTHONPATH=src \
   --output-dir reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended
 ```
 
+Run a direct RGB+Aux versus RGB-only compact DNN gate after matched training:
+
+```bash
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_train_dense \
+  --manifest exports/perception_rgb_aux_kitti_val128_detector_log/manifest.jsonl \
+  --epochs 12 \
+  --device auto \
+  --grid 12x40 \
+  --base-channels 16 \
+  --tensor-key rgb_aux_chw \
+  --channel-mode rgb_aux \
+  --eval-fraction 0.25 \
+  --split-strategy coverage \
+  --include-labels car,pedestrian,cyclist \
+  --no-object-weight 0.15 \
+  --output-dir exports/perception_rgb_aux_kitti_val128_dnn_gate_rgb_aux_e12_v1
+
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_train_dense \
+  --manifest exports/perception_rgb_aux_kitti_val128_detector_log/manifest.jsonl \
+  --epochs 12 \
+  --device auto \
+  --grid 12x40 \
+  --base-channels 16 \
+  --tensor-key rgb_aux_chw \
+  --channel-mode rgb_only \
+  --eval-fraction 0.25 \
+  --split-strategy coverage \
+  --include-labels car,pedestrian,cyclist \
+  --no-object-weight 0.15 \
+  --output-dir exports/perception_rgb_aux_kitti_val128_dnn_gate_rgb_only_e12_v1
+
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_eval_dense \
+  --manifest exports/perception_rgb_aux_kitti_val128_detector_log/manifest.jsonl \
+  --checkpoint exports/perception_rgb_aux_kitti_val128_dnn_gate_rgb_aux_e12_v1/rgb_aux_dense_detector.pt \
+  --split eval \
+  --confidence 0.50 \
+  --device auto \
+  --include-labels car,pedestrian,cyclist \
+  --output-dir reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf050_v1
+
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.aux_eval_dense \
+  --manifest exports/perception_rgb_aux_kitti_val128_detector_log/manifest.jsonl \
+  --checkpoint exports/perception_rgb_aux_kitti_val128_dnn_gate_rgb_only_e12_v1/rgb_aux_dense_detector.pt \
+  --split eval \
+  --confidence 0.50 \
+  --device auto \
+  --include-labels car,pedestrian,cyclist \
+  --output-dir reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf050_v1
+
+PYTHONPATH=src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.rgb_aux_dnn_gate \
+  --rgb-aux reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_aux_e12_eval_conf050_v1 \
+  --rgb-only reports/perception_rgb_aux_dnn_gate_kitti_val128_rgb_only_e12_eval_conf050_v1 \
+  --profile claim_quality \
+  --output-dir reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1
+```
+
+Current result on the 32-sample eval split: RGB+Aux improves over RGB-only
+inside this compact model (`dP50=+0.0143`, `dR50=+0.0701`,
+`dSmallR50=+0.0333`, `dFP50=-36.4375`), but the gate still fails
+`claim_quality` because the sample count is small and absolute P50/FP are weak
+(`P50=0.0193`, `FP/sample=51.5625`). This is evidence that aux can be consumed
+by a trained DNN and can change detector behavior in the right direction; it is
+not yet a learned RGB+Aux performance claim.
+
 The rollup is a resource and diagnostic view. It now includes a Training-Time
 Plan derived from observed sample-epochs/sec and export samples/sec, making
 compact KITTI-sized timing scenarios reproducible. It also makes clear that the
@@ -1081,7 +1155,8 @@ PYTHONPATH=src \
   -m perception_isp.claim_dashboard \
   --claim-gate 'Aux broad vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_broad_vs_human' \
   --claim-gate 'Aux FP reducer vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human' \
-  --training-rollup reports/perception_rgb_aux_training_rollup_kitti_val128_with_extended \
+  --training-rollup reports/perception_rgb_aux_dnn_gate_kitti_val128_training_rollup_e12_v1 \
+  --rgb-aux-dnn-gate reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1 \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --task-gate reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
@@ -1106,8 +1181,11 @@ PYTHONPATH=src \
 ```
 
 The dashboard currently says: broad HumanISP superiority is not supported,
-bounded FP reduction versus HumanISP is supported, and the learned RGB+aux DNN path is
-trainable but not yet claim-quality. When task metrics are provided, it also
+bounded FP reduction versus HumanISP is supported, and the learned RGB+aux DNN
+path is trainable but not yet claim-quality. The latest compact RGB+Aux DNN
+gate improves over RGB-only inside the 12-epoch KITTI val128 quick run, but the
+gate still fails because sample scale, absolute precision, and absolute FP are
+not claim-quality. When task metrics are provided, it also
 keeps the task-level claim narrow: the `recall_improvement` task gate fails for
 VRU/person/cyclist/vehicle/small-object groups, so task recall improvement
 versus HumanISP is not supported even though FP/sample is reduced. Mechanism

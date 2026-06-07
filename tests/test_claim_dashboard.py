@@ -17,6 +17,7 @@ class ClaimDashboardTest(unittest.TestCase):
             broad = _write_claim_gate(root / "broad", profile="broad_superiority", passed=False)
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
             training = _write_training_rollup(root / "training")
+            rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
@@ -40,6 +41,7 @@ class ClaimDashboardTest(unittest.TestCase):
             dashboard = build_claim_dashboard(
                 claim_gate_specs=[f"Human superiority={broad}", f"FP reducer={fp}"],
                 training_rollup=training,
+                rgb_aux_dnn_gate=rgb_aux_dnn_gate,
                 task_metrics=task_metrics,
                 protocol_coverage=protocol,
                 mechanism_validation=mechanism,
@@ -65,6 +67,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("supported", statuses)
             self.assertIn("not_supported", statuses)
             self.assertEqual(dashboard["training"]["status"], "diagnostic_only")
+            self.assertFalse(dashboard["rgb_aux_dnn_gate"]["pass"])
+            self.assertEqual(dashboard["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
             self.assertEqual(dashboard["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(dashboard["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
@@ -119,6 +123,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA/LensPSF native-CFA separation", evidence_areas)
             self.assertIn("CFA/LensPSF visual casebook", evidence_areas)
             self.assertIn("CFA/LensPSF score-label aux ablation", evidence_areas)
+            self.assertIn("RGB+Aux DNN fine-tune gate", evidence_areas)
             self.assertIn("Visual success/failure casebook", evidence_areas)
             self.assertTrue(
                 any(
@@ -197,6 +202,10 @@ class ClaimDashboardTest(unittest.TestCase):
                 "Visual success/failure casebook is available for qualitative review: selected FP-reduction successes 2, selected counterexamples 3.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
+            self.assertIn(
+                "RGB+Aux DNN gate failed for sample_count, absolute_recall, absolute_fp_per_sample, small_recall_vs_rgb_only, fp_vs_rgb_only; do not claim the aux tensor improves a learned detector yet.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
             self.assertTrue(
                 any(
                     item["claim"].startswith("Front-end/downstream bridge is directionally positive")
@@ -233,6 +242,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Do not claim broad HumanISP superiority", html)
             self.assertIn("Scene-edge proposal correlation across CFA/LensPSF", html)
             self.assertIn("Task Metrics", html)
+            self.assertIn("RGB+Aux DNN Gate", html)
+            self.assertIn("rgb_aux_dnn_not_claim_ready", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
             self.assertIn("Adverse Native RAW Slice", html)
@@ -301,6 +312,7 @@ class ClaimDashboardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             fp = _write_claim_gate(root / "fp", profile="fp_reducer", passed=True)
+            rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
             task_metrics = _write_task_metrics(root / "task_metrics")
             protocol = _write_protocol_coverage(root / "protocol")
             mechanism = _write_mechanism_validation(root / "mechanism")
@@ -325,6 +337,8 @@ class ClaimDashboardTest(unittest.TestCase):
                     [
                         "--claim-gate",
                         str(fp),
+                        "--rgb-aux-dnn-gate",
+                        str(rgb_aux_dnn_gate),
                         "--task-metrics",
                         str(task_metrics),
                         "--protocol-coverage",
@@ -369,6 +383,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(printed["claim_count"], 1)
             summary = json.loads((root / "dashboard" / "claim_dashboard_summary.json").read_text())
+            self.assertFalse(summary["rgb_aux_dnn_gate"]["pass"])
+            self.assertEqual(summary["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
             self.assertEqual(summary["task_metrics"]["status"], "recall_tradeoff")
             self.assertEqual(summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertTrue(summary["mechanism_validation"]["pass"])
@@ -497,6 +513,100 @@ def _write_training_rollup(path: Path) -> Path:
         + "\n"
     )
     return path
+
+
+def _write_rgb_aux_dnn_gate(path: Path, *, passed: bool) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    criteria = [
+        _dnn_gate_criterion("sample_count", "fail" if not passed else "pass", target=32 if not passed else 1200, threshold=1000),
+        _dnn_gate_criterion("absolute_precision", "pass", target=0.06, threshold=0.05),
+        _dnn_gate_criterion("absolute_recall", "fail" if not passed else "pass", target=0.09 if not passed else 0.20, threshold=0.10),
+        _dnn_gate_criterion("absolute_fp_per_sample", "fail" if not passed else "pass", target=48.0 if not passed else 3.0, threshold=5.0),
+        _dnn_gate_criterion("precision_vs_rgb_only", "pass", target=0.06, baseline=0.05, delta=0.01, threshold=0.0),
+        _dnn_gate_criterion("recall_vs_rgb_only", "pass", target=0.09 if not passed else 0.20, baseline=0.08, delta=0.01 if not passed else 0.12, threshold=0.0),
+        _dnn_gate_criterion("small_recall_vs_rgb_only", "fail" if not passed else "pass", target=0.02, baseline=0.03 if not passed else 0.01, delta=-0.01 if not passed else 0.01, threshold=0.0),
+        _dnn_gate_criterion("fp_vs_rgb_only", "fail" if not passed else "pass", target=48.0 if not passed else 3.0, baseline=40.0 if not passed else 4.0, delta=8.0 if not passed else -1.0, threshold=0.0),
+        {
+            "id": "eval_classes_present",
+            "status": "pass",
+            "pass": True,
+            "target": 0,
+            "threshold": 0,
+            "direction": "empty",
+            "evidence": "none",
+        },
+    ]
+    (path / "rgb_aux_dnn_gate_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass" if passed else "fail",
+                "pass": passed,
+                "claim_status": "rgb_aux_dnn_claim_ready" if passed else "rgb_aux_dnn_not_claim_ready",
+                "profile": "claim_quality",
+                "primary_run": "rgb_aux",
+                "baseline_run": "rgb_only",
+                "runs": [
+                    {
+                        "name": "rgb_aux",
+                        "sample_count": 32 if not passed else 1200,
+                        "channel_mode": "rgb_aux",
+                        "tensor_key": "rgb_aux_chw",
+                        "input_channels": 6,
+                        "precision@0.50_mean": 0.06,
+                        "recall@0.50_mean": 0.09 if not passed else 0.20,
+                        "small_recall@0.50_mean": 0.02,
+                        "fp@0.50_mean": 48.0 if not passed else 3.0,
+                    },
+                    {
+                        "name": "rgb_only",
+                        "sample_count": 32 if not passed else 1200,
+                        "channel_mode": "rgb_only",
+                        "tensor_key": "rgb_chw",
+                        "input_channels": 3,
+                        "precision@0.50_mean": 0.05,
+                        "recall@0.50_mean": 0.08,
+                        "small_recall@0.50_mean": 0.03 if not passed else 0.01,
+                        "fp@0.50_mean": 40.0 if not passed else 4.0,
+                    },
+                ],
+                "deltas": {
+                    "precision@0.50_mean": 0.01,
+                    "recall@0.50_mean": 0.01 if not passed else 0.12,
+                    "small_recall@0.50_mean": -0.01 if not passed else 0.01,
+                    "fp@0.50_mean": 8.0 if not passed else -1.0,
+                },
+                "criteria": criteria,
+                "interpretation": "unit RGB+Aux DNN gate",
+                "claim_boundary": "unit compact-DNN boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _dnn_gate_criterion(
+    identifier: str,
+    status: str,
+    *,
+    target: float,
+    threshold: float,
+    baseline: float | None = None,
+    delta: float | None = None,
+) -> dict:
+    row = {
+        "id": identifier,
+        "status": status,
+        "pass": status == "pass",
+        "target": target,
+        "threshold": threshold,
+    }
+    if baseline is not None:
+        row["baseline"] = baseline
+    if delta is not None:
+        row["delta"] = delta
+    return row
 
 
 def _write_task_metrics(path: Path) -> Path:
