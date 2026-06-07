@@ -97,6 +97,14 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertTrue(
                 any(
+                    item["claim"].startswith("Front-end/downstream bridge is directionally positive")
+                    and item["status"] == "diagnostic"
+                    and "same-sample causal correlation" in item["claim"]
+                    for item in dashboard["decisions"]
+                )
+            )
+            self.assertTrue(
+                any(
                     item["claim"].startswith("Benchmark protocol coverage is incomplete")
                     and item["status"] == "not_supported"
                     for item in dashboard["decisions"]
@@ -117,6 +125,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Scene Edge Confidence", html)
             self.assertIn("Evidence Report", html)
             self.assertIn("RGB Delta", html)
+            self.assertIn("Front-end/downstream bridge is directionally positive", html)
             self.assertIn("Scene Information Stress", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)

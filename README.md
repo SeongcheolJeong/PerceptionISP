@@ -849,7 +849,10 @@ diagnostic difficult-edge evidence, the object edge-fidelity suite is shown as
 diagnostic CFA/LensPSF edge evidence, the scene-information stress suite is
 shown as diagnostic scene-to-sensor evidence, and the aux contribution audit is
 shown as detector-side calibration evidence, not as DNN detector-performance
-evidence.
+evidence. When scene-edge deltas and aux contribution deltas are both positive
+in the expected direction, the dashboard also reports a diagnostic
+front-end/downstream bridge; this is co-observed evidence, not same-sample
+causal correlation.
 
 Task-oriented group metrics can be extracted from the same saved detections:
 
@@ -1094,7 +1097,12 @@ feature ablation, `score_aux` versus uncalibrated RGB+Aux fusion gives
 `dP=+0.0035`, `dR50=-0.0027`, and `dFP=-0.0608`. Adding aux to
 `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, and `dFP=-0.0622` versus
 `score_label` alone. This proves aux is being used by the proposal scoring
-branch; it still does not prove a trained RGB+aux DNN detector claim.
+branch. Combined with the scene-edge reports, the dashboard now shows a
+directionally positive bridge: scene-edge RGB F1 delta `+0.0124`, aux
+edge-strength delta `+0.1830`, and incremental aux proposal-scoring dFP@0.50
+`-0.0622`.
+This still does not prove a trained RGB+aux DNN detector claim or same-sample
+causality.
 
 Make that task-level decision reproducible with the task gate:
 
@@ -1217,8 +1225,10 @@ suite, scene-information stress suite, and aux contribution audit, while
 `metric_claim_status=fp_reducer_only`.
 That is an evidence-coverage result, not a broad-superiority result; the
 dashboard still says broad HumanISP superiority is not supported, while
-recall-budgeted FP reduction versus HumanISP is supported. The condition gate
-passes the `fp_reducer` profile on 8 evaluated condition slices; the
+recall-budgeted FP reduction versus HumanISP is supported. It also reports a
+diagnostic front-end/downstream bridge between positive scene-edge deltas and
+downstream FP reduction, without treating that as causal proof. The condition
+gate passes the `fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 
 The current 1496-image naive RAW-like baseline is:

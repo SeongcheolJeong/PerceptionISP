@@ -779,6 +779,9 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in aux_contribution_audit.get("failed_checks", ())) or "configured aux contribution checks"
             decisions.append({"status": "not_supported", "claim": f"Aux contribution audit failed for {failed}; do not claim aux helps proposal scoring yet."})
+    bridge = _scene_aux_downstream_bridge(scene_edge_confidence, aux_contribution_audit)
+    if bridge is not None:
+        decisions.append(bridge)
     if task_gate is not None:
         profile = str(task_gate.get("profile", "task"))
         if bool(task_gate.get("pass")):
@@ -806,6 +809,51 @@ def _claim_decisions(
             suffix = "" if not missing else f" Missing: {', '.join(str(value) for value in missing)}."
             decisions.append({"status": "not_supported", "claim": "Benchmark protocol coverage is incomplete; do not make a broad HumanISP or RAW/sensor-native superiority claim." + suffix})
     return decisions
+
+
+def _scene_aux_downstream_bridge(
+    scene_edge_confidence: Mapping[str, Any] | None,
+    aux_contribution_audit: Mapping[str, Any] | None,
+) -> Dict[str, Any] | None:
+    if scene_edge_confidence is None or aux_contribution_audit is None:
+        return None
+    if not bool(scene_edge_confidence.get("pass")) or not bool(aux_contribution_audit.get("pass")):
+        return None
+    rgb_delta = _maybe_float_or_none(scene_edge_confidence.get("perception_rgb_minus_human_source_edge_f1_mean"))
+    aux_strength_delta = _maybe_float_or_none(scene_edge_confidence.get("perception_aux_strength_minus_human_source_edge_f1_mean"))
+    fp_delta = _preferred_aux_fp_delta(aux_contribution_audit.get("comparisons", ()))
+    if rgb_delta is None or aux_strength_delta is None or fp_delta is None:
+        return None
+    if rgb_delta <= 0.0 or aux_strength_delta <= 0.0 or fp_delta >= 0.0:
+        return None
+    return {
+        "status": "diagnostic",
+        "claim": (
+            "Front-end/downstream bridge is directionally positive: "
+            f"scene-edge RGB F1 delta {_fmt(rgb_delta, signed=True)}, "
+            f"aux edge-strength delta {_fmt(aux_strength_delta, signed=True)}, "
+            f"and incremental aux proposal-scoring dFP@0.50 {_fmt(fp_delta, signed=True)}. "
+            "This is co-observed evidence, not same-sample causal correlation."
+        ),
+    }
+
+
+def _preferred_aux_fp_delta(comparisons: Any) -> float | None:
+    if not isinstance(comparisons, Sequence) or isinstance(comparisons, (str, bytes)):
+        return None
+    rows = [row for row in comparisons if isinstance(row, Mapping)]
+    for comparison_id in ("score_label_aux_vs_score_label", "score_aux_vs_fusion"):
+        for row in rows:
+            if str(row.get("id", "")) != comparison_id:
+                continue
+            value = _maybe_float_or_none(row.get("delta_fp@0.50"))
+            if value is not None:
+                return value
+    values = [_maybe_float_or_none(row.get("delta_fp@0.50")) for row in rows]
+    values = [value for value in values if value is not None]
+    if not values:
+        return None
+    return min(values)
 
 
 def _baseline_claim_name(input_name: str) -> str:
