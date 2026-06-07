@@ -21,6 +21,7 @@ class ClaimReadinessTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
             summary = run_claim_readiness(
@@ -33,6 +34,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
             )
@@ -55,11 +57,13 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("mechanism_validation", summary)
             self.assertIn("cfa_stress_sweep", summary)
             self.assertIn("edge_confidence_suite", summary)
+            self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
+            self.assertTrue(summary["scene_information_stress"]["pass"])
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -80,6 +84,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
@@ -125,6 +130,7 @@ class ClaimReadinessTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
             summary = run_claim_readiness(
@@ -137,6 +143,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
             )
@@ -144,6 +151,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["benchmark_protocol"]["status"], "claim_ready")
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_complete")
             self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
+            self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertIn(str(naive_dir), summary["protocol_comparison_reports"])
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "claim_ready")
@@ -152,6 +160,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
 
 
@@ -355,6 +364,52 @@ def _write_edge_confidence_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_scene_information_stress(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "sensor_width": 160,
+        "sensor_height": 96,
+        "scene_width": 1280,
+        "scene_height": 768,
+        "cfa_pattern": "RGGB",
+        "cases": [
+            {
+                "id": "supersampled_thin_detail",
+                "sample_mode": "box",
+                "metrics": {
+                    "scene_luma_gradient_p90": 0.44,
+                    "sensor_luma_gradient_p90": 0.0,
+                    "luma_detail_retention_p90": 0.0,
+                    "scene_chroma_gradient_p90": 0.0,
+                    "color_confidence_mean": 0.85,
+                    "signal_contrast_retention": 0.0,
+                },
+            },
+            {
+                "id": "cfa_chroma_alias",
+                "sample_mode": "point",
+                "metrics": {
+                    "scene_luma_gradient_p90": 0.0,
+                    "sensor_luma_gradient_p90": 0.0,
+                    "luma_detail_retention_p90": 0.0,
+                    "scene_chroma_gradient_p90": 0.86,
+                    "color_confidence_mean": 0.0,
+                    "signal_contrast_retention": 0.0,
+                },
+            },
+        ],
+        "checks": [
+            {"id": "latent_high_frequency_detail_loss", "status": "pass"},
+            {"id": "cfa_chroma_alias_color_confidence_drop", "status": "pass"},
+            {"id": "subpixel_signal_fill_factor_loss", "status": "pass"},
+        ],
+    }
+    (path / "scene_information_stress_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

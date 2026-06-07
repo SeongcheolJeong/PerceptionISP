@@ -24,6 +24,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
             summary = build_protocol_coverage(
@@ -37,6 +38,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
             )
@@ -50,6 +52,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(rows["front_end_mechanism_validation"]["status"], "covered")
             self.assertEqual(rows["cfa_stress_sweep"]["status"], "covered")
             self.assertEqual(rows["edge_confidence_suite"]["status"], "covered")
+            self.assertEqual(rows["scene_information_stress"]["status"], "covered")
             self.assertEqual(rows["aux_contribution_audit"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
             self.assertIn("naive_raw_baseline", summary["missing_raw_claim"])
@@ -73,6 +76,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
             summary = build_protocol_coverage(
@@ -87,6 +91,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
             )
@@ -110,6 +115,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -133,6 +139,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(cfa_stress),
                         "--edge-confidence-suite",
                         str(edge_confidence),
+                        "--scene-information-stress",
+                        str(scene_information),
                         "--aux-contribution-audit",
                         str(aux_contribution),
                         "--min-samples",
@@ -327,6 +335,52 @@ def _write_edge_confidence_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_scene_information_stress(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "sensor_width": 160,
+        "sensor_height": 96,
+        "scene_width": 1280,
+        "scene_height": 768,
+        "cfa_pattern": "RGGB",
+        "cases": [
+            {
+                "id": "supersampled_thin_detail",
+                "sample_mode": "box",
+                "metrics": {
+                    "scene_luma_gradient_p90": 0.44,
+                    "sensor_luma_gradient_p90": 0.0,
+                    "luma_detail_retention_p90": 0.0,
+                    "scene_chroma_gradient_p90": 0.0,
+                    "color_confidence_mean": 0.85,
+                    "signal_contrast_retention": 0.0,
+                },
+            },
+            {
+                "id": "cfa_chroma_alias",
+                "sample_mode": "point",
+                "metrics": {
+                    "scene_luma_gradient_p90": 0.0,
+                    "sensor_luma_gradient_p90": 0.0,
+                    "luma_detail_retention_p90": 0.0,
+                    "scene_chroma_gradient_p90": 0.86,
+                    "color_confidence_mean": 0.0,
+                    "signal_contrast_retention": 0.0,
+                },
+            },
+        ],
+        "checks": [
+            {"id": "latent_high_frequency_detail_loss", "status": "pass"},
+            {"id": "cfa_chroma_alias_color_confidence_drop", "status": "pass"},
+            {"id": "subpixel_signal_fill_factor_loss", "status": "pass"},
+        ],
+    }
+    (path / "scene_information_stress_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

@@ -52,14 +52,18 @@ include these rows under a fixed detector and training recipe:
 12. Aux contribution ablations should separate score-only, score+label, and
     score+label+aux calibration so aux-map value is not confused with class
     priors or threshold tuning.
+13. High-information scene stress tests should separate scene
+    resolution/spectral/chroma content from sensor sampling so RGB-scene
+    pass-through tests are not overclaimed as RAW/perception-ISP evidence.
 
 The current project now covers rows 1-4 at the software-reference level on
 KITTI-derived evidence, exercises row 8 through auxiliary-map tensor export,
 training, and direct dense evaluation, covers row 9 with a synthetic front-end
 mechanism report, covers row 10 with a synthetic CFA stress sweep, and covers
 row 11 with a synthetic edge-confidence suite. It covers row 12 with a
-proposal-calibration aux contribution audit. It does not yet cover claim-quality
-RAW-domain pretraining or large adverse-condition RAW datasets.
+proposal-calibration aux contribution audit. It covers row 13 with a synthetic
+scene-information stress suite. It does not yet cover claim-quality RAW-domain
+pretraining or large adverse-condition RAW datasets.
 
 ## Dataset Direction
 

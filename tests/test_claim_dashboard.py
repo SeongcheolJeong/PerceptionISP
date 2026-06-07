@@ -22,6 +22,7 @@ class ClaimDashboardTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             comparison = _write_comparison_rollup(root / "rollup")
 
@@ -33,6 +34,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
             )
@@ -47,6 +49,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
             self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
@@ -63,6 +66,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Edge-confidence suite passed; PerceptionISP confidence maps respond to difficult-edge stressors, but this is not detector-performance evidence.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Scene-information stress suite passed; high-information scene loss and CFA/color uncertainty are covered as diagnostic evidence, not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -87,6 +94,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
+            self.assertIn("Scene Information Stress", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
             self.assertTrue((html_path.parent / "claim_dashboard_summary.json").exists())
@@ -100,6 +108,7 @@ class ClaimDashboardTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -117,6 +126,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(cfa_stress),
                         "--edge-confidence-suite",
                         str(edge_confidence),
+                        "--scene-information-stress",
+                        str(scene_information),
                         "--aux-contribution-audit",
                         str(aux_contribution),
                         "--output-dir",
@@ -132,6 +143,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["mechanism_validation"]["pass"])
             self.assertTrue(summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
 
@@ -451,6 +463,70 @@ def _write_edge_confidence_suite(path: Path) -> Path:
                     },
                 ],
                 "interpretation": "unit edge confidence suite",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_scene_information_stress(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "scene_information_stress_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "sensor_width": 160,
+                "sensor_height": 96,
+                "scene_width": 1280,
+                "scene_height": 768,
+                "cfa_pattern": "RGGB",
+                "cases": [
+                    {
+                        "id": "supersampled_thin_detail",
+                        "sample_mode": "box",
+                        "metrics": {
+                            "scene_luma_gradient_p90": 0.44,
+                            "sensor_luma_gradient_p90": 0.0,
+                            "luma_detail_retention_p90": 0.0,
+                            "scene_chroma_gradient_p90": 0.0,
+                            "color_confidence_mean": 0.85,
+                            "signal_contrast_retention": 0.0,
+                        },
+                    },
+                    {
+                        "id": "cfa_chroma_alias",
+                        "sample_mode": "point",
+                        "metrics": {
+                            "scene_luma_gradient_p90": 0.0,
+                            "sensor_luma_gradient_p90": 0.0,
+                            "luma_detail_retention_p90": 0.0,
+                            "scene_chroma_gradient_p90": 0.86,
+                            "color_confidence_mean": 0.0,
+                            "signal_contrast_retention": 0.0,
+                        },
+                    },
+                    {
+                        "id": "subpixel_signal",
+                        "sample_mode": "box",
+                        "metrics": {
+                            "scene_luma_gradient_p90": 0.0,
+                            "sensor_luma_gradient_p90": 0.0,
+                            "luma_detail_retention_p90": 0.0,
+                            "scene_chroma_gradient_p90": 0.0,
+                            "color_confidence_mean": 0.52,
+                            "signal_contrast_retention": 0.09,
+                        },
+                    },
+                ],
+                "checks": [
+                    {"id": "latent_high_frequency_detail_loss", "status": "pass"},
+                    {"id": "cfa_chroma_alias_color_confidence_drop", "status": "pass"},
+                    {"id": "subpixel_signal_fill_factor_loss", "status": "pass"},
+                ],
+                "interpretation": "unit scene-information stress",
+                "claim_boundary": "unit diagnostic boundary",
             }
         )
         + "\n"

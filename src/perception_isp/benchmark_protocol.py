@@ -23,6 +23,7 @@ CONDITION_GATE_SUMMARY = "condition_gate_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
+SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 
 HUMAN_INPUTS = {"human_rgb"}
@@ -56,6 +57,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--mechanism-validation", default=None, help="mechanism_validation_summary.json path/dir.")
     parser.add_argument("--cfa-stress-sweep", default=None, help="cfa_stress_sweep_summary.json path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="edge_confidence_suite_summary.json path/dir.")
+    parser.add_argument("--scene-information-stress", default=None, help="scene_information_stress_summary.json path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="aux_contribution_audit_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
     parser.add_argument("--output-dir", default="reports/perception_benchmark_protocol")
@@ -73,6 +75,7 @@ def main(argv: Any = None) -> int:
         mechanism_validation=args.mechanism_validation,
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
+        scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         min_samples=int(args.min_samples),
     )
@@ -108,6 +111,7 @@ def build_protocol_coverage(
     mechanism_validation: str | Path | None = None,
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
+    scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     min_samples: int = 1000,
 ) -> Dict[str, Any]:
@@ -123,6 +127,7 @@ def build_protocol_coverage(
         mechanism_validation=mechanism_validation,
         cfa_stress_sweep=cfa_stress_sweep,
         edge_confidence_suite=edge_confidence_suite,
+        scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
     )
     requirements = _requirements(evidence, min_samples=int(min_samples))
@@ -175,6 +180,7 @@ def _collect_evidence(
     mechanism_validation: str | Path | None,
     cfa_stress_sweep: str | Path | None,
     edge_confidence_suite: str | Path | None,
+    scene_information_stress: str | Path | None,
     aux_contribution_audit: str | Path | None,
 ) -> Dict[str, Any]:
     input_names: set[str] = set()
@@ -220,6 +226,7 @@ def _collect_evidence(
     mechanism = _load_mechanism_validation(mechanism_validation)
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep)
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite)
+    scene_information = _load_scene_information_stress(scene_information_stress)
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit)
 
     return {
@@ -241,6 +248,7 @@ def _collect_evidence(
         "mechanism_validation": mechanism,
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
+        "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
     }
 
@@ -258,6 +266,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
     cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     edge_confidence = evidence.get("edge_confidence_suite", {}) if isinstance(evidence.get("edge_confidence_suite"), Mapping) else {}
+    scene_information = evidence.get("scene_information_stress", {}) if isinstance(evidence.get("scene_information_stress"), Mapping) else {}
     aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
 
     return [
@@ -396,6 +405,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(edge_confidence.get("available")) and bool(edge_confidence.get("pass")),
             str(edge_confidence.get("summary", "missing")),
             "An edge-confidence suite helps show confidence maps react to low light, glare, and low-MTF stress before detector fine-tuning.",
+        ),
+        _row(
+            "scene_information_stress",
+            "High-information scene stress suite available",
+            "recommended",
+            bool(scene_information.get("available")) and bool(scene_information.get("pass")),
+            str(scene_information.get("summary", "missing")),
+            "A scene-information stress suite verifies scene-to-sensor information loss and prevents overclaiming RGB-scene pass-through tests.",
         ),
         _row(
             "aux_contribution_audit",
@@ -609,6 +626,36 @@ def _load_edge_confidence_suite(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _load_scene_information_stress(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, SCENE_INFORMATION_STRESS_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    status = str(data.get("status", ""))
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass" and not failed,
+        "status": status,
+        "case_count": len(data.get("cases", ())),
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "scene_width": int(data.get("scene_width", 0)),
+        "scene_height": int(data.get("scene_height", 0)),
+        "sensor_width": int(data.get("sensor_width", 0)),
+        "sensor_height": int(data.get("sensor_height", 0)),
+        "cfa_pattern": str(data.get("cfa_pattern", "")),
+        "summary": (
+            f"{status}, scene={int(data.get('scene_width', 0))}x{int(data.get('scene_height', 0))}, "
+            f"sensor={int(data.get('sensor_width', 0))}x{int(data.get('sensor_height', 0))}, "
+            f"cases={len(data.get('cases', ()))}, checks={len(checks)}, failed={len(failed)}"
+        ),
+    }
+
+
 def _load_aux_contribution_audit(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"available": False, "pass": False, "summary": "missing"}
@@ -794,6 +841,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     mechanism = evidence.get("mechanism_validation", {}) if isinstance(evidence.get("mechanism_validation"), Mapping) else {}
     cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     edge_confidence = evidence.get("edge_confidence_suite", {}) if isinstance(evidence.get("edge_confidence_suite"), Mapping) else {}
+    scene_information = evidence.get("scene_information_stress", {}) if isinstance(evidence.get("scene_information_stress"), Mapping) else {}
     aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
     return f"""<!doctype html>
 <html lang=\"en\">
@@ -837,6 +885,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Mechanism validation</th><td>{_optional_link(mechanism, destination)} {html_lib.escape(str(mechanism.get('summary', 'missing')))}</td></tr>
       <tr><th>CFA stress sweep</th><td>{_optional_link(cfa_stress, destination)} {html_lib.escape(str(cfa_stress.get('summary', 'missing')))}</td></tr>
       <tr><th>Edge-confidence suite</th><td>{_optional_link(edge_confidence, destination)} {html_lib.escape(str(edge_confidence.get('summary', 'missing')))}</td></tr>
+      <tr><th>Scene-information stress</th><td>{_optional_link(scene_information, destination)} {html_lib.escape(str(scene_information.get('summary', 'missing')))}</td></tr>
       <tr><th>Aux contribution audit</th><td>{_optional_link(aux_contribution, destination)} {html_lib.escape(str(aux_contribution.get('summary', 'missing')))}</td></tr>
     </tbody>
   </table>

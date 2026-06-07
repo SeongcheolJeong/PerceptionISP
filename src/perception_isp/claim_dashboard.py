@@ -21,6 +21,7 @@ PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
+SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 
 
@@ -34,6 +35,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir.")
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
+    parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness_dashboard")
@@ -48,6 +50,7 @@ def main(argv: Any = None) -> int:
         mechanism_validation=args.mechanism_validation,
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
+        scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         comparison_rollup_specs=args.comparison_rollup,
     )
@@ -78,6 +81,7 @@ def build_claim_dashboard(
     mechanism_validation: str | Path | None = None,
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
+    scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
 ) -> Dict[str, Any]:
@@ -89,9 +93,21 @@ def build_claim_dashboard(
     mechanism = _load_mechanism_validation(mechanism_validation) if mechanism_validation is not None else None
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
+    scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
-    decisions = _claim_decisions(claims, training, task, task_gate_data, protocol, mechanism, cfa_stress, edge_confidence, aux_contribution)
+    decisions = _claim_decisions(
+        claims,
+        training,
+        task,
+        task_gate_data,
+        protocol,
+        mechanism,
+        cfa_stress,
+        edge_confidence,
+        scene_information,
+        aux_contribution,
+    )
     return {
         "claims": claims,
         "training": training,
@@ -101,6 +117,7 @@ def build_claim_dashboard(
         "mechanism_validation": mechanism,
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
+        "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
         "comparison_rollups": comparison_rollups,
         "decisions": decisions,
@@ -350,6 +367,50 @@ def _load_edge_confidence_suite(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_scene_information_stress(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, SCENE_INFORMATION_STRESS_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    cases = []
+    for row in data.get("cases", ()):
+        if not isinstance(row, Mapping):
+            continue
+        metrics = row.get("metrics", {}) if isinstance(row.get("metrics"), Mapping) else {}
+        cases.append(
+            {
+                "id": str(row.get("id", "")),
+                "sample_mode": str(row.get("sample_mode", "")),
+                "scene_luma_gradient_p90": _maybe_float(metrics.get("scene_luma_gradient_p90")),
+                "sensor_luma_gradient_p90": _maybe_float(metrics.get("sensor_luma_gradient_p90")),
+                "luma_detail_retention_p90": _maybe_float(metrics.get("luma_detail_retention_p90")),
+                "scene_chroma_gradient_p90": _maybe_float(metrics.get("scene_chroma_gradient_p90")),
+                "color_confidence_mean": _maybe_float(metrics.get("color_confidence_mean")),
+                "signal_contrast_retention": _maybe_float(metrics.get("signal_contrast_retention")),
+            }
+        )
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "check_count": len(checks),
+        "case_count": len(data.get("cases", ())),
+        "failed_checks": failed,
+        "sensor_width": int(data.get("sensor_width", 0)),
+        "sensor_height": int(data.get("sensor_height", 0)),
+        "scene_width": int(data.get("scene_width", 0)),
+        "scene_height": int(data.get("scene_height", 0)),
+        "cfa_pattern": str(data.get("cfa_pattern", "")),
+        "cases": cases,
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
 def _load_aux_contribution_audit(spec: str | Path) -> Dict[str, Any]:
     label, path = _split_named_path(spec)
     summary_path = _summary_path(path, AUX_CONTRIBUTION_AUDIT_SUMMARY)
@@ -473,6 +534,7 @@ def _claim_decisions(
     mechanism_validation: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
     edge_confidence_suite: Mapping[str, Any] | None,
+    scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     decisions: list[Dict[str, Any]] = []
@@ -514,6 +576,17 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in edge_confidence_suite.get("failed_checks", ())) or "configured edge-confidence checks"
             decisions.append({"status": "not_supported", "claim": f"Edge-confidence suite failed for {failed}; do not use edge confidence as feasibility evidence yet."})
+    if scene_information_stress is not None:
+        if bool(scene_information_stress.get("pass")):
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": "Scene-information stress suite passed; high-information scene loss and CFA/color uncertainty are covered as diagnostic evidence, not detector-performance evidence.",
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in scene_information_stress.get("failed_checks", ())) or "configured scene-information checks"
+            decisions.append({"status": "not_supported", "claim": f"Scene-information stress suite failed for {failed}; do not use RGB-scene pass-through tests as feasibility evidence."})
     if aux_contribution_audit is not None:
         if bool(aux_contribution_audit.get("pass")):
             decisions.append({"status": "diagnostic", "claim": "Aux contribution audit passed; aux features add proposal-scoring FP reduction within the recall budget, but this is calibration evidence rather than DNN performance."})
@@ -695,6 +768,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     cfa_stress_html = _cfa_stress_html(cfa_stress, destination) if isinstance(cfa_stress, Mapping) else "<p>No CFA stress sweep summary was provided.</p>"
     edge_confidence = dashboard.get("edge_confidence_suite")
     edge_confidence_html = _edge_confidence_html(edge_confidence, destination) if isinstance(edge_confidence, Mapping) else "<p>No edge-confidence suite summary was provided.</p>"
+    scene_information = dashboard.get("scene_information_stress")
+    scene_information_html = (
+        _scene_information_html(scene_information, destination)
+        if isinstance(scene_information, Mapping)
+        else "<p>No scene-information stress summary was provided.</p>"
+    )
     protocol = dashboard.get("protocol_coverage")
     protocol_html = _protocol_html(protocol, destination) if isinstance(protocol, Mapping) else "<p>No benchmark protocol coverage summary was provided.</p>"
     comparison_rows = "".join(_comparison_row(item, destination) for item in dashboard.get("comparison_rollups", ()))
@@ -747,6 +826,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {cfa_stress_html}
   <h2>Edge Confidence Suite</h2>
   {edge_confidence_html}
+  <h2>Scene Information Stress</h2>
+  {scene_information_html}
   <h2>Benchmark Protocol Coverage</h2>
   {protocol_html}
   <h2>Supporting Rollups</h2>
@@ -996,6 +1077,48 @@ def _edge_confidence_delta_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('delta'))}</td>"
         f"<td>{_fmt(row.get('threshold'))}</td>"
         f"<td class=\"{status_class}\">{html_lib.escape(str(bool(row.get('pass'))))}</td>"
+        "</tr>"
+    )
+
+
+def _scene_information_html(scene_information: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(scene_information.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in scene_information.get("failed_checks", ())) or "none"
+    rows = "".join(_scene_information_case_row(row) for row in scene_information.get("cases", ()))
+    if not rows:
+        rows = '<tr><td colspan="8">No scene-information cases were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(scene_information.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(scene_information.get('interpretation', '')))} "
+        f"{html_lib.escape(str(scene_information.get('claim_boundary', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Scene</th><th>Sensor</th><th>CFA</th><th>Cases</th><th>Checks</th><th>Failed</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(scene_information, destination)}</td>"
+        f"<td>{int(scene_information.get('scene_width', 0))} x {int(scene_information.get('scene_height', 0))}</td>"
+        f"<td>{int(scene_information.get('sensor_width', 0))} x {int(scene_information.get('sensor_height', 0))}</td>"
+        f"<td><code>{html_lib.escape(str(scene_information.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{int(scene_information.get('case_count', 0))}</td>"
+        f"<td>{int(scene_information.get('check_count', 0))}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>Case</th><th>Sample</th><th>Scene Luma P90</th><th>Sensor Luma P90</th><th>Retention</th><th>Scene Chroma P90</th><th>Color Conf</th><th>Signal Retention</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _scene_information_case_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('sample_mode', '')))}</code></td>"
+        f"<td>{_fmt(row.get('scene_luma_gradient_p90'))}</td>"
+        f"<td>{_fmt(row.get('sensor_luma_gradient_p90'))}</td>"
+        f"<td>{_fmt(row.get('luma_detail_retention_p90'))}</td>"
+        f"<td>{_fmt(row.get('scene_chroma_gradient_p90'))}</td>"
+        f"<td>{_fmt(row.get('color_confidence_mean'))}</td>"
+        f"<td>{_fmt(row.get('signal_contrast_retention'))}</td>"
         "</tr>"
     )
 
