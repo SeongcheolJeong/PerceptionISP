@@ -42,6 +42,8 @@ AODRAW_DOWNSAMPLED_RAW_ARCHIVES = {
     },
 }
 
+RAW_DOWNLOAD_HEADROOM_GIB = 10.0
+
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Create an AODRaw partial-download plan.")
@@ -93,7 +95,7 @@ def build_aodraw_download_plan(
     checks = _checks(manifest_rows, raw_files, srgb_files, availability, disk)
     return {
         "name": "AODRaw partial-download plan",
-        "status": "ready_for_manual_download" if all(row["status"] == "pass" for row in checks[:3]) else "blocked",
+        "status": "ready_for_manual_download" if _ready_for_raw_download(checks) else "blocked",
         "dataset_root": str(root),
         "manifest_source": str(manifest) if not isinstance(manifest, Sequence) or isinstance(manifest, (str, bytes, Path)) else "in_memory",
         "availability_source": "" if availability_summary is None else str(availability_summary),
@@ -160,6 +162,9 @@ def _disk_summary(root: Path) -> Dict[str, Any]:
         "available_gib": _bytes_to_gib(usage.free),
         "fits_downsampled_srgb_4p3gb": bool(usage.free >= int(4.3 * 1024**3)),
         "fits_downsampled_raw_test_zip_58p9gb": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"])),
+        "fits_downsampled_raw_test_zip_with_headroom": bool(
+            usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"]) + int(RAW_DOWNLOAD_HEADROOM_GIB * 1024**3)
+        ),
         "fits_downsampled_raw_train_zip_137p2gb": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["train"]["size_bytes"])),
         "fits_downsampled_raw_all_zips_196p1gb": bool(
             usage.free
@@ -167,6 +172,7 @@ def _disk_summary(root: Path) -> Dict[str, Any]:
         ),
         "fits_downsampled_raw_223gb": bool(usage.free >= int(223.0 * 1024**3)),
         "fits_downsampled_srgb_plus_raw_test_zip": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"]) + int(4.3 * 1024**3)),
+        "raw_test_zip_download_headroom_gib": float(RAW_DOWNLOAD_HEADROOM_GIB),
     }
 
 
@@ -190,8 +196,11 @@ def _download_steps(
             "source_urls": [AODRAW_OFFICIAL_URLS["downsampled_raw_baidu"]],
             "archive_filename": AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["filename"],
             "required_for_subset_files": [path for path in raw_files],
-            "status": "recommended_now" if disk.get("fits_downsampled_raw_test_zip_58p9gb") else "disk_blocked",
-            "why": "This is the first real RAW archive to acquire; the importer can extract only the selected subset .npy files from this zip.",
+            "status": "recommended_now" if disk.get("fits_downsampled_raw_test_zip_with_headroom") else "disk_blocked",
+            "why": (
+                "This is the first real RAW archive to acquire; the importer can extract only the selected subset .npy files from this zip. "
+                f"Keep at least {RAW_DOWNLOAD_HEADROOM_GIB:.0f} GiB free beyond the zip size to avoid incomplete browser downloads."
+            ),
         },
         {
             "priority": "P0",
@@ -228,10 +237,10 @@ def _download_steps(
 
 
 def _recommended_first(disk: Mapping[str, Any]) -> str:
-    if disk.get("fits_downsampled_raw_test_zip_58p9gb"):
+    if disk.get("fits_downsampled_raw_test_zip_with_headroom"):
         return "AODRaw_test_downsampled_raw.zip 58.94GB via Baidu"
     if disk.get("fits_downsampled_srgb_4p3gb"):
-        return "AODRaw images_downsampled_srgb 4.3GB via Baidu/TeraBox"
+        return f"Free at least {RAW_DOWNLOAD_HEADROOM_GIB:.0f} GiB more headroom, then download AODRaw_test_downsampled_raw.zip"
     return "Free disk space before downloading AODRaw images"
 
 
@@ -257,6 +266,14 @@ def _checks(
             "evidence": f"available_gib={disk.get('available_gib')} raw_test_gb={AODRAW_DOWNSAMPLED_RAW_ARCHIVES['test']['size_gb']}",
         },
         {
+            "id": "sufficient_disk_for_test_raw_zip_with_headroom",
+            "status": "pass" if disk.get("fits_downsampled_raw_test_zip_with_headroom") else "fail",
+            "evidence": (
+                f"available_gib={disk.get('available_gib')} raw_test_gb={AODRAW_DOWNSAMPLED_RAW_ARCHIVES['test']['size_gb']} "
+                f"required_headroom_gib={RAW_DOWNLOAD_HEADROOM_GIB:.0f}"
+            ),
+        },
+        {
             "id": "sufficient_disk_for_train_raw_zip",
             "status": "pass" if disk.get("fits_downsampled_raw_train_zip_137p2gb") else "warning",
             "evidence": f"available_gib={disk.get('available_gib')} raw_train_gb={AODRAW_DOWNSAMPLED_RAW_ARCHIVES['train']['size_gb']}",
@@ -274,8 +291,9 @@ def _post_download_commands() -> list[str]:
         (
             "PYTHONPATH=src python3 -m perception_isp.aodraw_image_availability "
             "reports/perception_aodraw_subset_plan_test_downsample_adverse_24_v1/aodraw_subset_manifest.json "
+            "--kind raw "
             "--dataset-root data/raw_datasets/aodraw "
-            "--output-dir reports/perception_aodraw_image_availability_test_downsample_adverse_24_v1"
+            "--output-dir reports/perception_aodraw_image_availability_test_downsample_adverse_24_raw_only_v1"
         ),
         (
             "PYTHONPATH=src python3 -m perception_isp.eval_cli "
@@ -288,6 +306,17 @@ def _post_download_commands() -> list[str]:
             "--output-dir reports/perception_aodraw_compare_test_downsample_adverse_24_v1"
         ),
     ]
+
+
+def _ready_for_raw_download(checks: Sequence[Mapping[str, Any]]) -> bool:
+    statuses = {str(row.get("id", "")): str(row.get("status", "")) for row in checks}
+    required = (
+        "manifest_loaded",
+        "subset_raw_targets_listed",
+        "sufficient_disk_for_test_raw_zip",
+        "sufficient_disk_for_test_raw_zip_with_headroom",
+    )
+    return all(statuses.get(item) == "pass" for item in required)
 
 
 def _render_checklist(summary: Mapping[str, Any]) -> str:
