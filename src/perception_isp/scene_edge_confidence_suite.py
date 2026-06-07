@@ -379,6 +379,10 @@ def _case_metrics(
         metrics[f"{prefix}_scene_edge_separation"] = float(on - off)
         metrics[f"{prefix}_source_edge_correlation"] = _correlation(signal, source_strength)
         metrics[f"{prefix}_source_edge_f1"] = _f1_metrics(edge, source_edge)["f1"]
+    human_f1 = float(metrics["human_rgb_proxy_source_edge_f1"])
+    metrics["perception_rgb_minus_human_source_edge_f1"] = float(metrics["perception_rgb_proxy_source_edge_f1"] - human_f1)
+    metrics["perception_aux_strength_minus_human_source_edge_f1"] = float(metrics["perception_aux_strength_source_edge_f1"] - human_f1)
+    metrics["perception_aux_confidence_minus_human_source_edge_f1"] = float(metrics["perception_aux_confidence_source_edge_f1"] - human_f1)
     metrics["aux_confidence_minus_human_proxy_separation"] = float(
         metrics["perception_aux_confidence_scene_edge_separation"] - metrics["human_rgb_proxy_scene_edge_separation"]
     )
@@ -392,6 +396,9 @@ def _checks(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
     aux_separations = [float(row.get("perception_aux_confidence_scene_edge_separation", 0.0)) for row in metrics_rows]
     human_separations = [float(row.get("human_rgb_proxy_scene_edge_separation", 0.0)) for row in metrics_rows]
     perception_separations = [float(row.get("perception_rgb_proxy_scene_edge_separation", 0.0)) for row in metrics_rows]
+    perception_rgb_f1_deltas = [float(row.get("perception_rgb_minus_human_source_edge_f1", 0.0)) for row in metrics_rows]
+    aux_strength_f1_deltas = [float(row.get("perception_aux_strength_minus_human_source_edge_f1", 0.0)) for row in metrics_rows]
+    f1_deltas_finite = bool(np.isfinite(perception_rgb_f1_deltas).all() and np.isfinite(aux_strength_f1_deltas).all())
     raw_remaps = [bool(row.get("raw_pattern_remapped")) for row in metrics_rows]
     bounded = all(
         0.0 <= float(row.get(name, 0.0)) <= 1.0
@@ -435,6 +442,33 @@ def _checks(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
             ],
         },
         {
+            "id": "scene_edge_f1_delta_metrics_computable",
+            "description": "Perception-minus-Human source-edge F1 deltas and win rates are finite and can be used as diagnostic claim evidence.",
+            "status": "pass" if f1_deltas_finite else "fail",
+            "criteria": [
+                {
+                    "metric": "perception_rgb_minus_human_source_edge_f1_mean",
+                    "value": _mean(perception_rgb_f1_deltas),
+                    "pass": bool(np.isfinite(_mean(perception_rgb_f1_deltas))),
+                },
+                {
+                    "metric": "perception_rgb_source_edge_f1_win_rate",
+                    "value": _win_rate_from_deltas(perception_rgb_f1_deltas),
+                    "pass": bool(np.isfinite(_win_rate_from_deltas(perception_rgb_f1_deltas))),
+                },
+                {
+                    "metric": "perception_aux_strength_minus_human_source_edge_f1_mean",
+                    "value": _mean(aux_strength_f1_deltas),
+                    "pass": bool(np.isfinite(_mean(aux_strength_f1_deltas))),
+                },
+                {
+                    "metric": "perception_aux_strength_source_edge_f1_win_rate",
+                    "value": _win_rate_from_deltas(aux_strength_f1_deltas),
+                    "pass": bool(np.isfinite(_win_rate_from_deltas(aux_strength_f1_deltas))),
+                },
+            ],
+        },
+        {
             "id": "camerae2e_cfa_pattern_preserved",
             "description": "CameraE2E true CFA mosaic evidence should avoid source/target CFA remapping.",
             "status": "pass" if not any(raw_remaps) else "fail",
@@ -475,10 +509,17 @@ def _aggregate(cases: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         "perception_rgb_proxy_source_edge_f1",
         "perception_aux_confidence_source_edge_f1",
         "perception_aux_strength_source_edge_f1",
+        "perception_rgb_minus_human_source_edge_f1",
+        "perception_aux_strength_minus_human_source_edge_f1",
+        "perception_aux_confidence_minus_human_source_edge_f1",
         "perception_aux_confidence_mean",
         "psf_blur_confidence_mean",
     )
-    return {f"{key}_mean": _mean([float(row.get(key, 0.0)) for row in metrics_rows]) for key in keys}
+    aggregate = {f"{key}_mean": _mean([float(row.get(key, 0.0)) for row in metrics_rows]) for key in keys}
+    aggregate["perception_rgb_source_edge_f1_win_rate"] = _win_rate(metrics_rows, "perception_rgb_minus_human_source_edge_f1")
+    aggregate["perception_aux_strength_source_edge_f1_win_rate"] = _win_rate(metrics_rows, "perception_aux_strength_minus_human_source_edge_f1")
+    aggregate["perception_aux_confidence_source_edge_f1_win_rate"] = _win_rate(metrics_rows, "perception_aux_confidence_minus_human_source_edge_f1")
+    return aggregate
 
 
 def _cfa_rankings(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
@@ -497,6 +538,8 @@ def _cfa_rankings(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
             aux_strength_f1 = _mean([float(row.get("perception_aux_strength_source_edge_f1", 0.0)) for row in metrics_rows])
             perception_f1 = _mean([float(row.get("perception_rgb_proxy_source_edge_f1", 0.0)) for row in metrics_rows])
             human_f1 = _mean([float(row.get("human_rgb_proxy_source_edge_f1", 0.0)) for row in metrics_rows])
+            perception_delta = _mean([float(row.get("perception_rgb_minus_human_source_edge_f1", 0.0)) for row in metrics_rows])
+            aux_strength_delta = _mean([float(row.get("perception_aux_strength_minus_human_source_edge_f1", 0.0)) for row in metrics_rows])
             ranked.append(
                 {
                     "cfa_pattern": cfa,
@@ -504,6 +547,8 @@ def _cfa_rankings(cases: Sequence[Mapping[str, Any]]) -> list[Dict[str, Any]]:
                     "human_rgb_proxy_source_edge_f1": human_f1,
                     "perception_rgb_proxy_source_edge_f1": perception_f1,
                     "perception_aux_strength_source_edge_f1": aux_strength_f1,
+                    "perception_rgb_minus_human_source_edge_f1": perception_delta,
+                    "perception_aux_strength_minus_human_source_edge_f1": aux_strength_delta,
                     "score": float(aux_strength_f1 + 0.25 * perception_f1),
                 }
             )
@@ -576,7 +621,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   </table>
   <h2>Cases</h2>
   <table>
-    <thead><tr><th>Sample</th><th>Visuals</th><th>Human Sep</th><th>Perception RGB Sep</th><th>Aux Conf Sep</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Conf F1</th><th>CFA</th><th>LensPSF</th></tr></thead>
+    <thead><tr><th>Sample</th><th>Visuals</th><th>Human Sep</th><th>Perception RGB Sep</th><th>Aux Conf Sep</th><th>Human F1</th><th>Perception RGB F1</th><th>RGB Delta</th><th>Aux Strength F1</th><th>Aux Strength Delta</th><th>Aux Conf F1</th><th>CFA</th><th>LensPSF</th></tr></thead>
     <tbody>{case_rows}</tbody>
   </table>
   <p>Raw JSON: <code>{SCENE_EDGE_CONFIDENCE_SUMMARY}</code></p>
@@ -620,7 +665,8 @@ def _ranking_row(row: Mapping[str, Any]) -> str:
         ranked.append(
             f"{int(item.get('rank', 0))}. {html_lib.escape(str(item.get('cfa_pattern', '')))} "
             f"auxStrengthF1={_fmt(item.get('perception_aux_strength_source_edge_f1'))} "
-            f"perRgbF1={_fmt(item.get('perception_rgb_proxy_source_edge_f1'))}"
+            f"perRgbF1={_fmt(item.get('perception_rgb_proxy_source_edge_f1'))} "
+            f"rgbDelta={_fmt(item.get('perception_rgb_minus_human_source_edge_f1'), signed=True)}"
         )
     return f"<tr><td>{_fmt(row.get('psf_sigma'))}</td><td>{' | '.join(ranked) or 'none'}</td></tr>"
 
@@ -651,7 +697,9 @@ def _case_row(row: Mapping[str, Any], destination: Path) -> str:
         f"<td>{_fmt(metrics.get('perception_aux_confidence_scene_edge_separation'), signed=True)}</td>"
         f"<td>{_fmt(metrics.get('human_rgb_proxy_source_edge_f1'))}</td>"
         f"<td>{_fmt(metrics.get('perception_rgb_proxy_source_edge_f1'))}</td>"
+        f"<td>{_fmt(metrics.get('perception_rgb_minus_human_source_edge_f1'), signed=True)}</td>"
         f"<td>{_fmt(metrics.get('perception_aux_strength_source_edge_f1'))}</td>"
+        f"<td>{_fmt(metrics.get('perception_aux_strength_minus_human_source_edge_f1'), signed=True)}</td>"
         f"<td>{_fmt(metrics.get('perception_aux_confidence_source_edge_f1'))}</td>"
         f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
         f"<td>{_fmt(row.get('psf_sigma'))}</td>"
@@ -823,6 +871,16 @@ def _mean(values: Any) -> float:
     if finite.size == 0:
         return 0.0
     return float(np.mean(finite))
+
+
+def _win_rate(rows: Sequence[Mapping[str, Any]], key: str) -> float:
+    return _win_rate_from_deltas([float(row.get(key, 0.0)) for row in rows])
+
+
+def _win_rate_from_deltas(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    return float(sum(1 for value in values if float(value) >= 0.0) / len(values))
 
 
 def _psf_sigma(map_value: Any) -> float:

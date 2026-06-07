@@ -1028,13 +1028,17 @@ pixels. The high-resolution scene edge map is downsampled as the proxy oracle.
 Across those PSF conditions, HumanISP RGB edge-proxy F1 is `0.6519`,
 PerceptionISP RGB edge-proxy F1 is `0.6650`, PerceptionISP aux edge-strength F1
 is `0.7473`, and PerceptionISP aux edge-confidence F1 is `0.3727`. The
-LensPSF confidence-response check also passes, so increasing PSF reduces
-PerceptionISP edge-confidence as expected.
+PerceptionISP RGB minus HumanISP RGB source-edge F1 delta is `+0.0131`, the aux
+edge-strength delta is `+0.0954`, and both win rates are `1.0000` across the
+three LensPSF cases. The LensPSF confidence-response check also passes, so
+increasing PSF reduces PerceptionISP edge-confidence as expected.
 
 The separate `bus_cfa_psf_sweep` report intentionally uses direct RGB-to-RAW
 remosaicing rather than CameraE2E true-CFA output so CFA patterns can be swept
 without source/target CFA remapping. It covers `BGGR`, `GBRG`, `GRBG`, and
-`RGGB` at the same PSF sigmas. Treat both reports as front-end scene-edge
+`RGGB` at the same PSF sigmas. Across the 12 CFA/PSF cases, PerceptionISP RGB
+source-edge F1 delta is `+0.0122`, aux edge-strength delta is `+0.2049`, and
+both win rates are `1.0000`. Treat both reports as front-end scene-edge
 evidence, not object-boundary ground truth or detector-performance evidence.
 
 To verify that the test is not merely passing an RGB scene through both ISPs,

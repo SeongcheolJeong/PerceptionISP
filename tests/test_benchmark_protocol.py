@@ -114,6 +114,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(summary["evidence"]["scene_edge_confidence"]["report_count"], 2)
             self.assertEqual(summary["evidence"]["scene_edge_confidence"]["case_count"], 2)
             self.assertEqual(summary["evidence"]["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
+            self.assertAlmostEqual(summary["evidence"]["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
+            self.assertAlmostEqual(summary["evidence"]["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
             self.assertFalse(summary["claim_gate_outcomes"]["broad_superiority_pass"])
             self.assertEqual(summary["missing_required"], [])
             self.assertEqual(summary["missing_raw_claim"], [])
@@ -405,8 +407,11 @@ def _write_scene_edge_confidence(path: Path, *, cfa_pattern: str = "GRBG", psf_s
                 "metrics": {
                     "human_rgb_proxy_source_edge_f1": 0.66,
                     "perception_rgb_proxy_source_edge_f1": 0.67,
+                    "perception_rgb_minus_human_source_edge_f1": 0.01,
                     "perception_aux_strength_source_edge_f1": 0.75,
+                    "perception_aux_strength_minus_human_source_edge_f1": 0.09,
                     "perception_aux_confidence_source_edge_f1": 0.37,
+                    "perception_aux_confidence_minus_human_source_edge_f1": -0.29,
                 },
             }
         ],
@@ -415,13 +420,20 @@ def _write_scene_edge_confidence(path: Path, *, cfa_pattern: str = "GRBG", psf_s
             {"id": "reference_scene_edges_present", "status": "pass"},
             {"id": "scene_edge_metrics_bounded", "status": "pass"},
             {"id": "human_and_perception_edges_track_scene_edges", "status": "pass"},
+            {"id": "scene_edge_f1_delta_metrics_computable", "status": "pass"},
             {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
         ],
         "aggregate": {
             "human_rgb_proxy_source_edge_f1_mean": 0.66,
             "perception_rgb_proxy_source_edge_f1_mean": 0.67,
+            "perception_rgb_minus_human_source_edge_f1_mean": 0.01,
+            "perception_rgb_source_edge_f1_win_rate": 1.0,
             "perception_aux_strength_source_edge_f1_mean": 0.75,
+            "perception_aux_strength_minus_human_source_edge_f1_mean": 0.09,
+            "perception_aux_strength_source_edge_f1_win_rate": 1.0,
             "perception_aux_confidence_source_edge_f1_mean": 0.37,
+            "perception_aux_confidence_minus_human_source_edge_f1_mean": -0.29,
+            "perception_aux_confidence_source_edge_f1_win_rate": 0.0,
         },
         "cfa_patterns": [cfa_pattern],
         "psf_sigmas": list(psf_sigmas),

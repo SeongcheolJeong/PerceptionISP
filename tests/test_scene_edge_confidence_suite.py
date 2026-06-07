@@ -39,11 +39,15 @@ class SceneEdgeConfidenceSuiteTest(unittest.TestCase):
         self.assertEqual(checks["finite_scene_edge_outputs"]["status"], "pass")
         self.assertEqual(checks["reference_scene_edges_present"]["status"], "pass")
         self.assertEqual(checks["human_and_perception_edges_track_scene_edges"]["status"], "pass")
+        self.assertEqual(checks["scene_edge_f1_delta_metrics_computable"]["status"], "pass")
         case = summary["cases"][0]
         metrics = case["metrics"]
         self.assertGreater(metrics["source_edge_fraction"], 0.005)
         self.assertGreater(metrics["human_rgb_proxy_scene_edge_separation"], 0.0)
         self.assertGreater(metrics["perception_aux_confidence_scene_edge_separation"], 0.0)
+        self.assertIn("perception_rgb_minus_human_source_edge_f1", metrics)
+        self.assertIn("perception_aux_strength_minus_human_source_edge_f1", metrics)
+        self.assertIn("perception_rgb_source_edge_f1_win_rate", summary["aggregate"])
 
     def test_write_scene_edge_confidence_suite_outputs_report_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -137,6 +141,8 @@ class SceneEdgeConfidenceSuiteTest(unittest.TestCase):
             self.assertEqual(persisted["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertEqual(persisted["psf_sigmas"], [0.0, 1.0])
             self.assertEqual({row["id"]: row["status"] for row in persisted["checks"]}["lens_psf_confidence_response"], "pass")
+            self.assertEqual({row["id"]: row["status"] for row in persisted["checks"]}["scene_edge_f1_delta_metrics_computable"], "pass")
+            self.assertIn("perception_aux_strength_source_edge_f1_win_rate", persisted["aggregate"])
             self.assertEqual(len(persisted["cfa_rankings"]), 2)
 
 

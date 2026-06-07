@@ -467,6 +467,10 @@ def _load_scene_edge_confidence(spec: str | Path | Sequence[str | Path]) -> Dict
         "perception_rgb_proxy_source_edge_f1_mean": _weighted_report_mean(reports, "perception_rgb_proxy_source_edge_f1_mean"),
         "perception_aux_strength_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_mean"),
         "perception_aux_confidence_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_mean"),
+        "perception_rgb_minus_human_source_edge_f1_mean": _weighted_report_mean(reports, "perception_rgb_minus_human_source_edge_f1_mean"),
+        "perception_aux_strength_minus_human_source_edge_f1_mean": _weighted_report_mean(reports, "perception_aux_strength_minus_human_source_edge_f1_mean"),
+        "perception_rgb_source_edge_f1_win_rate": _weighted_report_mean(reports, "perception_rgb_source_edge_f1_win_rate"),
+        "perception_aux_strength_source_edge_f1_win_rate": _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_win_rate"),
         "cases": cases[:12],
         "reports": reports,
         "interpretation": "Multiple scene edge-confidence summaries are aggregated here.",
@@ -493,7 +497,9 @@ def _load_scene_edge_confidence_one(spec: str | Path) -> Dict[str, Any]:
                 "cfa_pattern": str(row.get("cfa_pattern", "")),
                 "human_rgb_proxy_source_edge_f1": _maybe_float(metrics.get("human_rgb_proxy_source_edge_f1")),
                 "perception_rgb_proxy_source_edge_f1": _maybe_float(metrics.get("perception_rgb_proxy_source_edge_f1")),
+                "perception_rgb_minus_human_source_edge_f1": _maybe_float(metrics.get("perception_rgb_minus_human_source_edge_f1")),
                 "perception_aux_strength_source_edge_f1": _maybe_float(metrics.get("perception_aux_strength_source_edge_f1")),
+                "perception_aux_strength_minus_human_source_edge_f1": _maybe_float(metrics.get("perception_aux_strength_minus_human_source_edge_f1")),
                 "perception_aux_confidence_source_edge_f1": _maybe_float(metrics.get("perception_aux_confidence_source_edge_f1")),
             }
         )
@@ -513,6 +519,10 @@ def _load_scene_edge_confidence_one(spec: str | Path) -> Dict[str, Any]:
         "perception_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
         "perception_aux_strength_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),
         "perception_aux_confidence_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_confidence_source_edge_f1_mean")),
+        "perception_rgb_minus_human_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_minus_human_source_edge_f1_mean")),
+        "perception_aux_strength_minus_human_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_minus_human_source_edge_f1_mean")),
+        "perception_rgb_source_edge_f1_win_rate": _maybe_float(aggregate.get("perception_rgb_source_edge_f1_win_rate")),
+        "perception_aux_strength_source_edge_f1_win_rate": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_win_rate")),
         "cases": cases[:12],
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
@@ -1331,13 +1341,13 @@ def _scene_edge_html(scene_edge: Mapping[str, Any], destination: Path) -> str:
         report_rows = _scene_edge_report_row(scene_edge, destination)
     case_rows = "".join(_scene_edge_case_row(row) for row in scene_edge.get("cases", ()))
     if not case_rows:
-        case_rows = '<tr><td colspan="7">No scene edge-confidence case rows were available.</td></tr>'
+        case_rows = '<tr><td colspan="9">No scene edge-confidence case rows were available.</td></tr>'
     return (
         f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(scene_edge.get('status', '')))}</code>. "
         f"{html_lib.escape(str(scene_edge.get('interpretation', '')))} "
         f"{html_lib.escape(str(scene_edge.get('claim_boundary', '')))}</p>"
         "<table>"
-        "<thead><tr><th>Report</th><th>Cases</th><th>Checks</th><th>CFA</th><th>LensPSF</th><th>Failed</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th></tr></thead>"
+        "<thead><tr><th>Report</th><th>Cases</th><th>Checks</th><th>CFA</th><th>LensPSF</th><th>Failed</th><th>Human F1</th><th>Perception RGB F1</th><th>RGB Delta</th><th>RGB Win Rate</th><th>Aux Strength F1</th><th>Aux Strength Delta</th><th>Aux Strength Win Rate</th><th>Aux Confidence F1</th></tr></thead>"
         "<tbody><tr>"
         f"<td>{_report_link(scene_edge, destination)}</td>"
         f"<td>{int(scene_edge.get('case_count', 0))}</td>"
@@ -1347,14 +1357,18 @@ def _scene_edge_html(scene_edge: Mapping[str, Any], destination: Path) -> str:
         f"<td>{html_lib.escape(failed)}</td>"
         f"<td>{_fmt(scene_edge.get('human_rgb_proxy_source_edge_f1_mean'))}</td>"
         f"<td>{_fmt(scene_edge.get('perception_rgb_proxy_source_edge_f1_mean'))}</td>"
+        f"<td>{_fmt(scene_edge.get('perception_rgb_minus_human_source_edge_f1_mean'), signed=True)}</td>"
+        f"<td>{_fmt(scene_edge.get('perception_rgb_source_edge_f1_win_rate'))}</td>"
         f"<td>{_fmt(scene_edge.get('perception_aux_strength_source_edge_f1_mean'))}</td>"
+        f"<td>{_fmt(scene_edge.get('perception_aux_strength_minus_human_source_edge_f1_mean'), signed=True)}</td>"
+        f"<td>{_fmt(scene_edge.get('perception_aux_strength_source_edge_f1_win_rate'))}</td>"
         f"<td>{_fmt(scene_edge.get('perception_aux_confidence_source_edge_f1_mean'))}</td>"
         "</tr></tbody></table>"
         "<table>"
-        "<thead><tr><th>Evidence Report</th><th>Report</th><th>Cases</th><th>Checks</th><th>CFA</th><th>LensPSF</th><th>Status</th></tr></thead>"
+        "<thead><tr><th>Evidence Report</th><th>Report</th><th>Cases</th><th>Checks</th><th>CFA</th><th>LensPSF</th><th>RGB Delta</th><th>Aux Strength Delta</th><th>Status</th></tr></thead>"
         f"<tbody>{report_rows}</tbody></table>"
         "<table>"
-        "<thead><tr><th>Case</th><th>Source</th><th>CFA</th><th>Human F1</th><th>Perception RGB F1</th><th>Aux Strength F1</th><th>Aux Confidence F1</th></tr></thead>"
+        "<thead><tr><th>Case</th><th>Source</th><th>CFA</th><th>Human F1</th><th>Perception RGB F1</th><th>RGB Delta</th><th>Aux Strength F1</th><th>Aux Strength Delta</th><th>Aux Confidence F1</th></tr></thead>"
         f"<tbody>{case_rows}</tbody></table>"
     )
 
@@ -1369,6 +1383,8 @@ def _scene_edge_report_row(row: Mapping[str, Any], destination: Path) -> str:
         f"<td>{int(row.get('check_count', 0))}</td>"
         f"<td>{html_lib.escape(', '.join(str(value) for value in row.get('cfa_patterns', ())) or 'none')}</td>"
         f"<td>{html_lib.escape(', '.join(_fmt(value) for value in row.get('psf_sigmas', ()) if value is not None) or 'none')}</td>"
+        f"<td>{_fmt(row.get('perception_rgb_minus_human_source_edge_f1_mean'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('perception_aux_strength_minus_human_source_edge_f1_mean'), signed=True)}</td>"
         f"<td class=\"{status_class}\">{html_lib.escape(str(row.get('status', '')))}</td>"
         "</tr>"
     )
@@ -1382,7 +1398,9 @@ def _scene_edge_case_row(row: Mapping[str, Any]) -> str:
         f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
         f"<td>{_fmt(row.get('human_rgb_proxy_source_edge_f1'))}</td>"
         f"<td>{_fmt(row.get('perception_rgb_proxy_source_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('perception_rgb_minus_human_source_edge_f1'), signed=True)}</td>"
         f"<td>{_fmt(row.get('perception_aux_strength_source_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('perception_aux_strength_minus_human_source_edge_f1'), signed=True)}</td>"
         f"<td>{_fmt(row.get('perception_aux_confidence_source_edge_f1'))}</td>"
         "</tr>"
     )

@@ -58,6 +58,8 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["scene_edge_confidence"]["pass"])
             self.assertEqual(dashboard["scene_edge_confidence"]["report_count"], 2)
             self.assertEqual(dashboard["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
+            self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
+            self.assertAlmostEqual(dashboard["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
@@ -114,6 +116,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Object Edge Fidelity", html)
             self.assertIn("Scene Edge Confidence", html)
             self.assertIn("Evidence Report", html)
+            self.assertIn("RGB Delta", html)
             self.assertIn("Scene Information Stress", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
@@ -568,8 +571,11 @@ def _write_scene_edge_confidence(path: Path, *, cfa_pattern: str = "GRBG", psf_s
                         "metrics": {
                             "human_rgb_proxy_source_edge_f1": 0.66,
                             "perception_rgb_proxy_source_edge_f1": 0.67,
+                            "perception_rgb_minus_human_source_edge_f1": 0.01,
                             "perception_aux_strength_source_edge_f1": 0.75,
+                            "perception_aux_strength_minus_human_source_edge_f1": 0.09,
                             "perception_aux_confidence_source_edge_f1": 0.37,
+                            "perception_aux_confidence_minus_human_source_edge_f1": -0.29,
                         },
                     }
                 ],
@@ -578,13 +584,20 @@ def _write_scene_edge_confidence(path: Path, *, cfa_pattern: str = "GRBG", psf_s
                     {"id": "reference_scene_edges_present", "status": "pass"},
                     {"id": "scene_edge_metrics_bounded", "status": "pass"},
                     {"id": "human_and_perception_edges_track_scene_edges", "status": "pass"},
+                    {"id": "scene_edge_f1_delta_metrics_computable", "status": "pass"},
                     {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
                 ],
                 "aggregate": {
                     "human_rgb_proxy_source_edge_f1_mean": 0.66,
                     "perception_rgb_proxy_source_edge_f1_mean": 0.67,
+                    "perception_rgb_minus_human_source_edge_f1_mean": 0.01,
+                    "perception_rgb_source_edge_f1_win_rate": 1.0,
                     "perception_aux_strength_source_edge_f1_mean": 0.75,
+                    "perception_aux_strength_minus_human_source_edge_f1_mean": 0.09,
+                    "perception_aux_strength_source_edge_f1_win_rate": 1.0,
                     "perception_aux_confidence_source_edge_f1_mean": 0.37,
+                    "perception_aux_confidence_minus_human_source_edge_f1_mean": -0.29,
+                    "perception_aux_confidence_source_edge_f1_win_rate": 0.0,
                 },
                 "cfa_patterns": [cfa_pattern],
                 "psf_sigmas": list(psf_sigmas),

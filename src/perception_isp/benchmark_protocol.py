@@ -703,6 +703,10 @@ def _load_scene_edge_confidence(path: str | Path | Sequence[str | Path] | None) 
     perception_f1 = _weighted_report_mean(reports, "perception_rgb_proxy_source_edge_f1_mean")
     aux_strength_f1 = _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_mean")
     aux_confidence_f1 = _weighted_report_mean(reports, "perception_aux_confidence_source_edge_f1_mean")
+    perception_delta = _weighted_report_mean(reports, "perception_rgb_minus_human_source_edge_f1_mean")
+    aux_strength_delta = _weighted_report_mean(reports, "perception_aux_strength_minus_human_source_edge_f1_mean")
+    perception_win_rate = _weighted_report_mean(reports, "perception_rgb_source_edge_f1_win_rate")
+    aux_strength_win_rate = _weighted_report_mean(reports, "perception_aux_strength_source_edge_f1_win_rate")
     first = reports[0]
     return {
         "available": True,
@@ -720,6 +724,10 @@ def _load_scene_edge_confidence(path: str | Path | Sequence[str | Path] | None) 
         "perception_rgb_proxy_source_edge_f1_mean": perception_f1,
         "perception_aux_strength_source_edge_f1_mean": aux_strength_f1,
         "perception_aux_confidence_source_edge_f1_mean": aux_confidence_f1,
+        "perception_rgb_minus_human_source_edge_f1_mean": perception_delta,
+        "perception_aux_strength_minus_human_source_edge_f1_mean": aux_strength_delta,
+        "perception_rgb_source_edge_f1_win_rate": perception_win_rate,
+        "perception_aux_strength_source_edge_f1_win_rate": aux_strength_win_rate,
         "reports": reports,
         "summary": (
             f"{status}, reports={len(reports)}, cases={case_count}, checks={check_count}, failed={len(failed)}, "
@@ -727,7 +735,9 @@ def _load_scene_edge_confidence(path: str | Path | Sequence[str | Path] | None) 
             f"psf={', '.join(str(value) for value in psf_sigmas) or 'none'}, "
             f"humanF1={_fmt_optional(human_f1)}, "
             f"perRgbF1={_fmt_optional(perception_f1)}, "
-            f"auxStrengthF1={_fmt_optional(aux_strength_f1)}"
+            f"rgbDelta={_fmt_optional(perception_delta)}, "
+            f"auxStrengthF1={_fmt_optional(aux_strength_f1)}, "
+            f"auxDelta={_fmt_optional(aux_strength_delta)}"
         ),
     }
 
@@ -754,13 +764,19 @@ def _load_scene_edge_confidence_one(path: str | Path) -> Dict[str, Any]:
         "perception_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
         "perception_aux_strength_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),
         "perception_aux_confidence_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_confidence_source_edge_f1_mean")),
+        "perception_rgb_minus_human_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_minus_human_source_edge_f1_mean")),
+        "perception_aux_strength_minus_human_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_minus_human_source_edge_f1_mean")),
+        "perception_rgb_source_edge_f1_win_rate": _maybe_float(aggregate.get("perception_rgb_source_edge_f1_win_rate")),
+        "perception_aux_strength_source_edge_f1_win_rate": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_win_rate")),
         "summary": (
             f"{status}, cases={len(data.get('cases', ()))}, checks={len(checks)}, failed={len(failed)}, "
             f"cfa={', '.join(str(value) for value in data.get('cfa_patterns', ())) or 'none'}, "
             f"psf={', '.join(str(value) for value in data.get('psf_sigmas', ())) or 'none'}, "
             f"humanF1={_fmt_optional(aggregate.get('human_rgb_proxy_source_edge_f1_mean'))}, "
             f"perRgbF1={_fmt_optional(aggregate.get('perception_rgb_proxy_source_edge_f1_mean'))}, "
-            f"auxStrengthF1={_fmt_optional(aggregate.get('perception_aux_strength_source_edge_f1_mean'))}"
+            f"rgbDelta={_fmt_optional(aggregate.get('perception_rgb_minus_human_source_edge_f1_mean'))}, "
+            f"auxStrengthF1={_fmt_optional(aggregate.get('perception_aux_strength_source_edge_f1_mean'))}, "
+            f"auxDelta={_fmt_optional(aggregate.get('perception_aux_strength_minus_human_source_edge_f1_mean'))}"
         ),
     }
 
