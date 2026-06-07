@@ -1091,11 +1091,23 @@ def _aux_contribution_evidence(aux_contribution: Mapping[str, Any]) -> str:
             feature="edge_support",
             comparison="removed_fp_vs_kept_tp",
         )
+        scene_edge_correlation = _proposal_correlation_lookup(
+            bridge.get("proposal_correlation"),
+            feature="scene_edge_support",
+            comparison="removed_fp_vs_kept_tp",
+        )
         edge_auc = _maybe_float_or_none(edge_correlation.get("auc_low_feature_predicts_positive")) if isinstance(edge_correlation, Mapping) else None
+        scene_edge_delta = _maybe_float_or_none(scene_edge_correlation.get("delta")) if isinstance(scene_edge_correlation, Mapping) else None
+        scene_edge_auc = (
+            _maybe_float_or_none(scene_edge_correlation.get("auc_low_feature_predicts_positive"))
+            if isinstance(scene_edge_correlation, Mapping)
+            else None
+        )
         bridge_text = (
             f"; same-sample removed_fp={int(bridge.get('removed_fp_count', 0))}, removed_tp={int(bridge.get('removed_tp_count', 0))}, "
             f"fp_delta_count={int(bridge.get('fp_delta_count', 0))}, removed_fp_fraction={_fmt(bridge.get('removed_fp_fraction'))}, "
-            f"removedFP-edge-vs-keptTP={_fmt(edge_delta, signed=True)}, edgeAUC_low={_fmt(edge_auc)}"
+            f"removedFP-edge-vs-keptTP={_fmt(edge_delta, signed=True)}, edgeAUC_low={_fmt(edge_auc)}, "
+            f"sourceSceneEdgeDelta={_fmt(scene_edge_delta, signed=True)}, sourceSceneEdgeAUC_low={_fmt(scene_edge_auc)}"
         )
     return (
         f"aux_features={int(aux_contribution.get('aux_feature_count', 0))}; "
@@ -1124,8 +1136,12 @@ def _future_evidence_rows(
     training: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
+    scene_edge_correlation = _sample_bridge_scene_edge_correlation(aux_contribution_audit)
     has_edge_correlation = isinstance(edge_correlation, Mapping) and bool(edge_correlation.get("lower_feature_predicts_positive"))
-    if has_edge_correlation:
+    has_scene_edge_correlation = isinstance(scene_edge_correlation, Mapping) and bool(scene_edge_correlation.get("lower_feature_predicts_positive"))
+    if has_scene_edge_correlation:
+        scene_aux_gap = "Same-sample source scene-edge proposal correlation exists; it is not yet swept across CFA/LensPSF conditions."
+    elif has_edge_correlation:
         scene_aux_gap = "Proposal-level aux edge correlation exists; high-information scene-edge oracle is not yet joined to each detector box."
     elif scene_edge_confidence is not None and aux_contribution_audit is not None:
         scene_aux_gap = "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
@@ -1140,10 +1156,10 @@ def _future_evidence_rows(
     return [
         {
             "priority": "P0",
-            "evidence": "Scene-edge oracle to proposal correlation",
-            "why": "Extends the new aux-edge proposal correlation by using the high-information scene-edge proxy inside detector boxes.",
+            "evidence": "Scene-edge proposal correlation across CFA/LensPSF",
+            "why": "Tests whether the new same-sample scene-edge proposal evidence holds when CFA pattern and optical blur change.",
             "current_gap": scene_aux_gap,
-            "implementation_path": "Join proposal TP/FP/kept/removed flags with high-information scene-edge pixels, aux-edge support, reliability, and saturation support inside each box.",
+            "implementation_path": "Run matched CFA/LensPSF cases and keep the same proposal-level source scene-edge, aux-edge, reliability, and TP/FP/removed flags.",
         },
         {
             "priority": "P0",
@@ -1185,6 +1201,19 @@ def _sample_bridge_edge_correlation(aux_contribution_audit: Mapping[str, Any] | 
     return _proposal_correlation_lookup(
         sample_bridge.get("proposal_correlation"),
         feature="edge_support",
+        comparison="removed_fp_vs_kept_tp",
+    )
+
+
+def _sample_bridge_scene_edge_correlation(aux_contribution_audit: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if aux_contribution_audit is None:
+        return None
+    sample_bridge = aux_contribution_audit.get("sample_bridge")
+    if not isinstance(sample_bridge, Mapping):
+        return None
+    return _proposal_correlation_lookup(
+        sample_bridge.get("proposal_correlation"),
+        feature="scene_edge_support",
         comparison="removed_fp_vs_kept_tp",
     )
 
@@ -1300,7 +1329,18 @@ def _claim_decisions(
                     comparison="removed_fp_vs_kept_tp",
                 )
                 edge_auc = _maybe_float_or_none(edge_correlation.get("auc_low_feature_predicts_positive")) if isinstance(edge_correlation, Mapping) else None
+                scene_edge_correlation = _proposal_correlation_lookup(
+                    sample_bridge.get("proposal_correlation"),
+                    feature="scene_edge_support",
+                    comparison="removed_fp_vs_kept_tp",
+                )
+                scene_edge_auc = (
+                    _maybe_float_or_none(scene_edge_correlation.get("auc_low_feature_predicts_positive"))
+                    if isinstance(scene_edge_correlation, Mapping)
+                    else None
+                )
                 edge_auc_clause = "" if edge_auc is None else f" Low-edge AUC for removed FP vs kept TP {_fmt(edge_auc)}."
+                scene_edge_clause = "" if scene_edge_auc is None else f" Source scene-edge AUC {_fmt(scene_edge_auc)}."
                 decisions.append(
                     {
                         "status": "diagnostic",
@@ -1309,7 +1349,7 @@ def _claim_decisions(
                             f"{int(sample_bridge.get('removed_fp_count', 0))} FP and "
                             f"{int(sample_bridge.get('removed_tp_count', 0))} TP proposals "
                             f"with net FP delta {int(sample_bridge.get('fp_delta_count', 0))}."
-                            f"{edge_clause}{edge_auc_clause} "
+                            f"{edge_clause}{edge_auc_clause}{scene_edge_clause} "
                             "This is proposal-level evidence, not a trained DNN detector claim."
                         ),
                     }
@@ -1776,12 +1816,23 @@ def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         feature="edge_support",
         comparison="removed_fp_vs_kept_tp",
     )
+    scene_edge_correlation = _proposal_correlation_lookup(
+        sample_bridge.get("proposal_correlation"),
+        feature="scene_edge_support",
+        comparison="removed_fp_vs_kept_tp",
+    )
     edge_auc = _maybe_float_or_none(edge_correlation.get("auc_low_feature_predicts_positive")) if isinstance(edge_correlation, Mapping) else None
     edge_point_biserial = _maybe_float_or_none(edge_correlation.get("point_biserial")) if isinstance(edge_correlation, Mapping) else None
+    scene_edge_delta = _maybe_float_or_none(scene_edge_correlation.get("delta")) if isinstance(scene_edge_correlation, Mapping) else None
+    scene_edge_auc = (
+        _maybe_float_or_none(scene_edge_correlation.get("auc_low_feature_predicts_positive"))
+        if isinstance(scene_edge_correlation, Mapping)
+        else None
+    )
     return (
         f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
         "<table>"
-        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th><th>Removed FP Edge Delta vs Kept TP</th><th>Low-Edge AUC</th><th>Edge Point-Biserial</th></tr></thead>"
+        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th><th>Removed FP Edge Delta vs Kept TP</th><th>Low-Edge AUC</th><th>Edge Point-Biserial</th><th>Source Scene Edge Delta</th><th>Source Scene Edge AUC</th></tr></thead>"
         "<tbody><tr>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('baseline_input', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('target_input', '')))}</code></td>"
@@ -1794,6 +1845,8 @@ def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         f"<td>{_fmt(support_deltas.get('removed_fp_minus_kept_tp_edge_support_mean'), signed=True)}</td>"
         f"<td>{_fmt(edge_auc)}</td>"
         f"<td>{_fmt(edge_point_biserial, signed=True)}</td>"
+        f"<td>{_fmt(scene_edge_delta, signed=True)}</td>"
+        f"<td>{_fmt(scene_edge_auc)}</td>"
         "</tr></tbody></table>"
     )
 

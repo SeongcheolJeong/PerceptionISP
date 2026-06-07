@@ -9,6 +9,10 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
 
+import numpy as np
+from PIL import Image
+
+from .numeric import gradient_xy, normalize_image
 from .types import json_ready
 
 
@@ -34,6 +38,16 @@ AUX_FEATURE_NAMES = {
     "score_x_aux",
     "score_x_reliability",
 }
+SUPPORT_FEATURES = (
+    "score",
+    "aux_support",
+    "edge_support",
+    "saturation_support",
+    "reliability_support",
+    "aux_box_iou",
+    "scene_edge_support",
+    "scene_edge_fraction",
+)
 
 
 def main(argv: Any = None) -> int:
@@ -374,12 +388,14 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
         "added_tp": [],
     }
     baseline_proposal_rows: list[Dict[str, Any]] = []
+    scene_edge_cache: Dict[str, Dict[str, Any] | None] = {}
     examples: list[Dict[str, Any]] = []
     for index, baseline_sample in enumerate(baseline_samples):
         sample_id = str(baseline_sample.get("sample_id", index))
         target_sample = target_by_id.get(sample_id)
         if target_sample is None:
             continue
+        scene_edge_context = _scene_edge_context_for_sample(baseline_sample, scene_edge_cache)
         baseline_detections = _detections_for_sample(baseline_sample, baseline_input)
         target_detections = _detections_for_sample(target_sample, target_input)
         ground_truth = _ground_truth_for_sample(baseline_sample)
@@ -396,7 +412,7 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
         for detection_index, detection in enumerate(baseline_detections):
             target_index = _matching_detection_index(detection, target_detections)
             is_tp = detection_index in baseline_positive
-            support = _support_values(detection)
+            support = _support_values(detection, scene_edge_context=scene_edge_context)
             label = str((detection.get("box", {}) if isinstance(detection.get("box"), Mapping) else {}).get("label", "object"))
             if target_index >= 0:
                 counts["common_detection_count"] += 1
@@ -449,13 +465,14 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
             if target_index in matched_targets:
                 continue
             is_tp = target_index in target_positive
+            support = _support_values(detection, scene_edge_context=scene_edge_context)
             counts["target_only_detection_count"] += 1
             if is_tp:
                 counts["added_tp_count"] += 1
-                support_groups["added_tp"].append(_support_values(detection))
+                support_groups["added_tp"].append(support)
             else:
                 counts["added_fp_count"] += 1
-                support_groups["added_fp"].append(_support_values(detection))
+                support_groups["added_fp"].append(support)
     if counts["compared_sample_count"] <= 0:
         return None
     removed_count = counts["baseline_only_detection_count"]
@@ -493,6 +510,7 @@ def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, An
     edge_delta = _maybe_float(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
     proposal_correlation = sample_bridge.get("proposal_correlation", {}) if isinstance(sample_bridge.get("proposal_correlation"), Mapping) else {}
     edge_correlation = _proposal_correlation_lookup(proposal_correlation, feature="edge_support", comparison="removed_fp_vs_kept_tp")
+    scene_edge_correlation = _proposal_correlation_lookup(proposal_correlation, feature="scene_edge_support", comparison="removed_fp_vs_kept_tp")
     checks = [
         {
             "id": "same_sample_aux_bridge_available",
@@ -558,6 +576,51 @@ def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, An
                     },
                 ],
             }
+        )
+    if scene_edge_correlation is not None:
+        scene_edge_auc = _maybe_float(scene_edge_correlation.get("auc_low_feature_predicts_positive"))
+        scene_edge_delta = _maybe_float(scene_edge_correlation.get("delta"))
+        checks.extend(
+            [
+                {
+                    "id": "source_scene_edge_oracle_available_for_same_sample_proposals",
+                    "description": "Same-sample proposal rows should include source-scene edge support measured inside detector boxes.",
+                    "status": "pass",
+                    "criteria": [
+                        {
+                            "metric": "removed_fp_vs_kept_tp_scene_edge_positive_count",
+                            "value": int(scene_edge_correlation.get("positive_count", 0)),
+                            "threshold": 1,
+                            "pass": int(scene_edge_correlation.get("positive_count", 0)) > 0,
+                        },
+                        {
+                            "metric": "removed_fp_vs_kept_tp_scene_edge_negative_count",
+                            "value": int(scene_edge_correlation.get("negative_count", 0)),
+                            "threshold": 1,
+                            "pass": int(scene_edge_correlation.get("negative_count", 0)) > 0,
+                        },
+                    ],
+                },
+                {
+                    "id": "source_scene_edge_oracle_correlates_with_removed_fp",
+                    "description": "At proposal level, low source-scene edge support should identify false positives removed by incremental aux scoring.",
+                    "status": "pass" if scene_edge_delta < 0.0 and scene_edge_auc > 0.5 else "fail",
+                    "criteria": [
+                        {
+                            "metric": "removed_fp_vs_kept_tp_scene_edge_support_delta",
+                            "value": scene_edge_delta,
+                            "threshold": 0.0,
+                            "pass": scene_edge_delta < 0.0,
+                        },
+                        {
+                            "metric": "removed_fp_vs_kept_tp_auc_low_scene_edge_support",
+                            "value": scene_edge_auc,
+                            "threshold": 0.5,
+                            "pass": scene_edge_auc > 0.5,
+                        },
+                    ],
+                },
+            ]
         )
     return checks
 
@@ -652,10 +715,78 @@ def _box_area(box: Mapping[str, Any]) -> float:
     return max(x2 - x1, 0.0) * max(y2 - y1, 0.0)
 
 
-def _support_values(detection: Mapping[str, Any]) -> Dict[str, float]:
+def _scene_edge_context_for_sample(sample: Mapping[str, Any], cache: Dict[str, Dict[str, Any] | None]) -> Dict[str, Any] | None:
+    metadata = sample.get("metadata", {}) if isinstance(sample.get("metadata"), Mapping) else {}
+    image_path = str(metadata.get("image_path", ""))
+    if not image_path:
+        return None
+    target_width = int(metadata.get("width", 0))
+    target_height = int(metadata.get("height", 0))
+    cache_key = f"{image_path}|{target_width}x{target_height}"
+    if cache_key in cache:
+        return cache[cache_key]
+    path = Path(image_path).expanduser()
+    if not path.exists():
+        cache[cache_key] = None
+        return None
+    try:
+        with Image.open(path) as image:
+            rgb = np.asarray(image.convert("RGB"), dtype=np.float64) / 255.0
+    except OSError:
+        cache[cache_key] = None
+        return None
+    luma = 0.2126 * rgb[:, :, 0] + 0.7152 * rgb[:, :, 1] + 0.0722 * rgb[:, :, 2]
+    gx, gy = gradient_xy(luma)
+    edge = normalize_image(np.sqrt(gx * gx + gy * gy))
+    threshold = float(np.percentile(edge.reshape(-1), 90.0)) if edge.size else 1.0
+    target_width = target_width or int(edge.shape[1])
+    target_height = target_height or int(edge.shape[0])
+    context = {
+        "edge": edge,
+        "threshold": threshold,
+        "source_width": int(edge.shape[1]),
+        "source_height": int(edge.shape[0]),
+        "target_width": max(target_width, 1),
+        "target_height": max(target_height, 1),
+    }
+    cache[cache_key] = context
+    return context
+
+
+def _scene_edge_support(detection: Mapping[str, Any], scene_edge_context: Mapping[str, Any] | None) -> Dict[str, float]:
+    if scene_edge_context is None:
+        return {}
+    edge = scene_edge_context.get("edge")
+    if not isinstance(edge, np.ndarray) or edge.ndim != 2 or edge.size == 0:
+        return {}
+    box = _box_payload(detection)
+    x1, y1, x2, y2 = tuple(float(value) for value in box.get("xyxy", (0.0, 0.0, 0.0, 0.0)))
+    sx = float(scene_edge_context.get("source_width", edge.shape[1])) / max(float(scene_edge_context.get("target_width", edge.shape[1])), 1.0)
+    sy = float(scene_edge_context.get("source_height", edge.shape[0])) / max(float(scene_edge_context.get("target_height", edge.shape[0])), 1.0)
+    col0 = int(np.floor(min(x1, x2) * sx))
+    row0 = int(np.floor(min(y1, y2) * sy))
+    col1 = int(np.ceil(max(x1, x2) * sx))
+    row1 = int(np.ceil(max(y1, y2) * sy))
+    col0 = int(np.clip(col0, 0, edge.shape[1]))
+    col1 = int(np.clip(col1, 0, edge.shape[1]))
+    row0 = int(np.clip(row0, 0, edge.shape[0]))
+    row1 = int(np.clip(row1, 0, edge.shape[0]))
+    if row1 <= row0 or col1 <= col0:
+        return {}
+    region = np.asarray(edge[row0:row1, col0:col1], dtype=np.float64)
+    if region.size == 0:
+        return {}
+    threshold = float(scene_edge_context.get("threshold", 1.0))
+    return {
+        "scene_edge_support": float(np.mean(region)),
+        "scene_edge_fraction": float(np.mean(region >= threshold)) if threshold > 0.0 else 0.0,
+    }
+
+
+def _support_values(detection: Mapping[str, Any], *, scene_edge_context: Mapping[str, Any] | None = None) -> Dict[str, float]:
     metadata = detection.get("metadata", {}) if isinstance(detection.get("metadata"), Mapping) else {}
     fusion = metadata.get("fusion", {}) if isinstance(metadata.get("fusion"), Mapping) else {}
-    return {
+    values = {
         "score": _maybe_float(detection.get("score")),
         "aux_support": _maybe_float(fusion.get("aux_support")),
         "edge_support": _maybe_float(fusion.get("edge_support")),
@@ -663,13 +794,19 @@ def _support_values(detection: Mapping[str, Any]) -> Dict[str, float]:
         "reliability_support": _maybe_float(fusion.get("reliability_support")),
         "aux_box_iou": _maybe_float(fusion.get("aux_box_iou")),
     }
+    values.update(_scene_edge_support(detection, scene_edge_context))
+    return values
 
 
 def _support_mean(rows: Sequence[Mapping[str, float]]) -> Dict[str, float | int]:
     if not rows:
         return {"count": 0}
-    keys = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
-    return {"count": len(rows), **{f"{key}_mean": sum(float(row.get(key, 0.0)) for row in rows) / len(rows) for key in keys}}
+    means: Dict[str, float | int] = {"count": len(rows)}
+    for key in SUPPORT_FEATURES:
+        values = [float(row[key]) for row in rows if key in row]
+        if values:
+            means[f"{key}_mean"] = sum(values) / len(values)
+    return means
 
 
 def _support_deltas(support_means: Mapping[str, Mapping[str, Any]]) -> Dict[str, float]:
@@ -679,16 +816,16 @@ def _support_deltas(support_means: Mapping[str, Mapping[str, Any]]) -> Dict[str,
         return {}
     if int(removed_fp.get("count", 0)) <= 0 or int(kept_tp.get("count", 0)) <= 0:
         return {}
-    keys = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
     return {
         f"removed_fp_minus_kept_tp_{key}_mean": _maybe_float(removed_fp.get(f"{key}_mean")) - _maybe_float(kept_tp.get(f"{key}_mean"))
-        for key in keys
+        for key in SUPPORT_FEATURES
+        if removed_fp.get(f"{key}_mean") is not None and kept_tp.get(f"{key}_mean") is not None
     }
 
 
 def _proposal_correlation(rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     baseline_rows = [row for row in rows if isinstance(row, Mapping)]
-    feature_names = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
+    feature_names = SUPPORT_FEATURES
     comparisons = (
         ("removed_fp_vs_kept_tp", "removed_fp", "kept_tp"),
         ("removed_fp_vs_kept_fp", "removed_fp", "kept_fp"),
@@ -733,8 +870,8 @@ def _proposal_correlation_row(
     positive_status: str,
     negative_status: str,
 ) -> Dict[str, Any] | None:
-    positives = [_maybe_float(row.get(feature)) for row in rows if _proposal_status_matches(row, positive_status)]
-    negatives = [_maybe_float(row.get(feature)) for row in rows if _proposal_status_matches(row, negative_status)]
+    positives = [_maybe_float(row.get(feature)) for row in rows if feature in row and _proposal_status_matches(row, positive_status)]
+    negatives = [_maybe_float(row.get(feature)) for row in rows if feature in row and _proposal_status_matches(row, negative_status)]
     if not positives or not negatives:
         return None
     positive_mean = sum(positives) / len(positives)
@@ -925,10 +1062,10 @@ def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         if isinstance(values, Mapping)
     )
     if not support_rows:
-        support_rows = '<tr><td colspan="7">No support means were available.</td></tr>'
+        support_rows = '<tr><td colspan="9">No support means were available.</td></tr>'
     example_rows = "".join(_sample_bridge_example_row(row) for row in sample_bridge.get("examples", ()) if isinstance(row, Mapping))
     if not example_rows:
-        example_rows = '<tr><td colspan="7">No removed detection examples were available.</td></tr>'
+        example_rows = '<tr><td colspan="8">No removed detection examples were available.</td></tr>'
     support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
     proposal_correlation = sample_bridge.get("proposal_correlation")
     correlation_html = _proposal_correlation_html(proposal_correlation) if isinstance(proposal_correlation, Mapping) else "<p>No proposal correlation rows were available.</p>"
@@ -949,10 +1086,10 @@ def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         f"<td>{_fmt(support_deltas.get('removed_fp_minus_kept_tp_edge_support_mean'), signed=True)}</td>"
         "</tr></tbody></table>"
         "<table>"
-        "<thead><tr><th>Group</th><th>Count</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th><th>Aux Box IoU</th></tr></thead>"
+        "<thead><tr><th>Group</th><th>Count</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th><th>Aux Box IoU</th><th>Scene Edge</th><th>Scene Edge Fraction</th></tr></thead>"
         f"<tbody>{support_rows}</tbody></table>"
         "<table>"
-        "<thead><tr><th>Sample</th><th>Status</th><th>Label</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th></tr></thead>"
+        "<thead><tr><th>Sample</th><th>Status</th><th>Label</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th><th>Scene Edge</th></tr></thead>"
         f"<tbody>{example_rows}</tbody></table>"
         "<h3>Proposal Support Correlation</h3>"
         f"{correlation_html}"
@@ -1004,6 +1141,8 @@ def _sample_bridge_support_row(name: str, values: Mapping[str, Any]) -> str:
         f"<td>{_fmt(values.get('edge_support_mean'))}</td>"
         f"<td>{_fmt(values.get('reliability_support_mean'))}</td>"
         f"<td>{_fmt(values.get('aux_box_iou_mean'))}</td>"
+        f"<td>{_fmt(values.get('scene_edge_support_mean'))}</td>"
+        f"<td>{_fmt(values.get('scene_edge_fraction_mean'))}</td>"
         "</tr>"
     )
 
@@ -1018,6 +1157,7 @@ def _sample_bridge_example_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('aux_support'))}</td>"
         f"<td>{_fmt(row.get('edge_support'))}</td>"
         f"<td>{_fmt(row.get('reliability_support'))}</td>"
+        f"<td>{_fmt(row.get('scene_edge_support'))}</td>"
         "</tr>"
     )
 

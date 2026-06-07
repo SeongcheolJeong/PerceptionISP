@@ -7,6 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
+from PIL import Image
+
 from perception_isp.aux_contribution_audit import (
     build_aux_contribution_audit,
     build_aux_contribution_audit_from_paths,
@@ -68,6 +71,19 @@ class AuxContributionAuditTest(unittest.TestCase):
     def test_sample_bridge_audits_incremental_aux_removed_false_positives(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            scene_path = root / "scene.png"
+            scene = np.full((200, 200, 3), 120, dtype=np.uint8)
+            scene[:70, :70, :] = 40
+            scene[:70:4, :70, :] = 230
+            scene[:70, :70:4, :] = 230
+            Image.fromarray(scene).save(scene_path)
+            sample_metadata = {
+                "image_path": str(scene_path),
+                "width": 100,
+                "height": 100,
+                "original_width": 200,
+                "original_height": 200,
+            }
             score_label = root / "score_label"
             score_label_aux = root / "score_label_aux"
             score_label.mkdir()
@@ -76,16 +92,26 @@ class AuxContributionAuditTest(unittest.TestCase):
                 score_label / "comparison_summary.json",
                 input_name="perception_calibrated_score_label_fusion_rgb_aux",
                 samples=[
-                    _sample("a", [_det("person", 10, 10, 30, 30, 0.90), _det("car", 50, 50, 70, 70, 0.45, aux=0.10, edge=0.05)], [_gt("person", 10, 10, 30, 30)]),
-                    _sample("b", [_det("car", 4, 4, 20, 20, 0.80), _det("truck", 60, 60, 80, 80, 0.40, aux=0.15, edge=0.08)], [_gt("car", 4, 4, 20, 20)]),
+                    _sample(
+                        "a",
+                        [_det("person", 10, 10, 30, 30, 0.90), _det("car", 70, 70, 90, 90, 0.45, aux=0.10, edge=0.05)],
+                        [_gt("person", 10, 10, 30, 30)],
+                        metadata=sample_metadata,
+                    ),
+                    _sample(
+                        "b",
+                        [_det("car", 4, 4, 20, 20, 0.80), _det("truck", 72, 72, 92, 92, 0.40, aux=0.15, edge=0.08)],
+                        [_gt("car", 4, 4, 20, 20)],
+                        metadata=sample_metadata,
+                    ),
                 ],
             )
             _write_comparison_summary(
                 score_label_aux / "comparison_summary.json",
                 input_name="perception_calibrated_score_label_aux_fusion_rgb_aux",
                 samples=[
-                    _sample("a", [_det("person", 10, 10, 30, 30, 0.91, aux=0.60, edge=0.50)], [_gt("person", 10, 10, 30, 30)]),
-                    _sample("b", [_det("car", 4, 4, 20, 20, 0.82, aux=0.60, edge=0.50)], [_gt("car", 4, 4, 20, 20)]),
+                    _sample("a", [_det("person", 10, 10, 30, 30, 0.91, aux=0.60, edge=0.50)], [_gt("person", 10, 10, 30, 30)], metadata=sample_metadata),
+                    _sample("b", [_det("car", 4, 4, 20, 20, 0.82, aux=0.60, edge=0.50)], [_gt("car", 4, 4, 20, 20)], metadata=sample_metadata),
                 ],
             )
             rollup = _rollup(
@@ -106,17 +132,23 @@ class AuxContributionAuditTest(unittest.TestCase):
                 for row in bridge["proposal_correlation"]["rows"]
             }
             edge_row = correlation_rows[("removed_fp_vs_kept_tp", "edge_support")]
+            scene_edge_row = correlation_rows[("removed_fp_vs_kept_tp", "scene_edge_support")]
             self.assertEqual(edge_row["positive_count"], 2)
             self.assertEqual(edge_row["negative_count"], 2)
             self.assertLess(edge_row["delta"], 0.0)
             self.assertEqual(edge_row["auc_low_feature_predicts_positive"], 1.0)
             self.assertTrue(edge_row["lower_feature_predicts_positive"])
+            self.assertLess(scene_edge_row["delta"], 0.0)
+            self.assertEqual(scene_edge_row["auc_low_feature_predicts_positive"], 1.0)
+            self.assertTrue(scene_edge_row["lower_feature_predicts_positive"])
             checks = {row["id"]: row for row in summary["checks"]}
             self.assertEqual(checks["same_sample_aux_bridge_available"]["status"], "pass")
             self.assertEqual(checks["incremental_aux_removes_more_fp_than_tp"]["status"], "pass")
             self.assertEqual(checks["incremental_aux_net_fp_reduction_same_sample"]["status"], "pass")
             self.assertEqual(checks["removed_fp_has_lower_edge_support_than_kept_tp"]["status"], "pass")
             self.assertEqual(checks["edge_support_correlates_with_same_sample_removed_fp"]["status"], "pass")
+            self.assertEqual(checks["source_scene_edge_oracle_available_for_same_sample_proposals"]["status"], "pass")
+            self.assertEqual(checks["source_scene_edge_oracle_correlates_with_removed_fp"]["status"], "pass")
 
             html_path = write_aux_contribution_audit(summary, root / "audit")
             html = html_path.read_text()
@@ -124,6 +156,7 @@ class AuxContributionAuditTest(unittest.TestCase):
             self.assertIn("Removed FP Edge Delta vs Kept TP", html)
             self.assertIn("Proposal Support Correlation", html)
             self.assertIn("AUC Low Feature", html)
+            self.assertIn("scene_edge_support", html)
 
 
 def _rollup(score_label_summary: Path | None = None, score_label_aux_summary: Path | None = None) -> dict:
@@ -206,8 +239,8 @@ def _write_comparison_summary(path: Path, *, input_name: str, samples: list[dict
     )
 
 
-def _sample(sample_id: str, detections: list[dict], ground_truth: list[dict]) -> dict:
-    return {"sample_id": sample_id, "ground_truth": ground_truth, "detections": detections}
+def _sample(sample_id: str, detections: list[dict], ground_truth: list[dict], *, metadata: dict | None = None) -> dict:
+    return {"sample_id": sample_id, "ground_truth": ground_truth, "detections": detections, "metadata": metadata or {}}
 
 
 def _gt(label: str, x1: float, y1: float, x2: float, y2: float) -> dict:

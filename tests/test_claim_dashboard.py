@@ -78,7 +78,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 )
             )
             future_evidence = [row["evidence"] for row in dashboard["evidence_map"]["future_evidence"]]
-            self.assertIn("Scene-edge oracle to proposal correlation", future_evidence)
+            self.assertIn("Scene-edge proposal correlation across CFA/LensPSF", future_evidence)
             self.assertIn("CFA/LensPSF detector sweep", future_evidence)
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
@@ -127,6 +127,7 @@ class ClaimDashboardTest(unittest.TestCase):
                     and item["status"] == "diagnostic"
                     and "edge support delta" in item["claim"]
                     and "Low-edge AUC" in item["claim"]
+                    and "Source scene-edge AUC" in item["claim"]
                     for item in dashboard["decisions"]
                 )
             )
@@ -146,12 +147,13 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Performance Evidence Map", html)
             self.assertIn("What More Evidence To Build", html)
             self.assertIn("Do not claim broad HumanISP superiority", html)
-            self.assertIn("Scene-edge oracle to proposal correlation", html)
+            self.assertIn("Scene-edge proposal correlation across CFA/LensPSF", html)
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
             self.assertIn("Removed FP Edge Delta vs Kept TP", html)
             self.assertIn("Low-Edge AUC", html)
+            self.assertIn("Source Scene Edge AUC", html)
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
@@ -771,6 +773,20 @@ def _write_aux_contribution_audit(path: Path) -> Path:
                                 "delta": -0.2,
                                 "point_biserial": -0.4,
                                 "auc_low_feature_predicts_positive": 0.8,
+                                "lower_feature_predicts_positive": True,
+                            },
+                            {
+                                "comparison": "removed_fp_vs_kept_tp",
+                                "feature": "scene_edge_support",
+                                "positive_status": "removed_fp",
+                                "negative_status": "kept_tp",
+                                "positive_count": 2,
+                                "negative_count": 6,
+                                "positive_mean": 0.12,
+                                "negative_mean": 0.28,
+                                "delta": -0.16,
+                                "point_biserial": -0.35,
+                                "auc_low_feature_predicts_positive": 0.75,
                                 "lower_feature_predicts_positive": True,
                             }
                         ],

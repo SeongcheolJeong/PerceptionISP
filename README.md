@@ -1114,9 +1114,13 @@ positives also have lower edge support than kept true positives
 (`removed_fp_minus_kept_tp_edge_support_mean=-0.0596`), and low edge support
 identifies removed FP proposals versus kept TP proposals with AUC `0.6904`
 (`0.7701` versus kept FP proposals).
+The source scene-edge oracle measured inside the same proposal boxes shows the
+same direction: removed FP proposals have lower source scene-edge support than
+kept TP proposals (`delta=-0.0302`), with low-scene-edge AUC `0.6681` versus
+kept TP and `0.7894` versus kept FP.
 This still does not prove a trained RGB+aux DNN detector claim or same-sample
 causality, but it is same-sample proposal-level evidence that aux edge support
-is connected to the FP proposals being removed.
+and source scene-edge evidence are connected to the FP proposals being removed.
 
 Make that task-level decision reproducible with the task gate:
 
@@ -1243,15 +1247,17 @@ recall-budgeted FP reduction versus HumanISP is supported. It also reports a
 diagnostic front-end/downstream bridge between positive scene-edge deltas and
 downstream FP reduction, plus a same-sample aux proposal bridge where
 incremental aux scoring removes 95 FP and 16 TP proposals and those removed FP
-have lower edge support than kept TP with low-edge AUC `0.6904`, without
-treating that as a trained-DNN or broad-superiority proof. The condition gate passes the
+have lower edge support than kept TP with low-edge AUC `0.6904` and lower
+source scene-edge support with low-scene-edge AUC `0.6681`, without treating
+that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
 The same dashboard's `Performance Evidence Map` lists 12 current evidence rows
-and five next evidence targets: scene-edge oracle to proposal correlation,
-CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune gate, high-information
-real-scene expansion, and a failure/slice casebook. The previous aux-edge
-same-sample proposal correlation is now part of the current evidence row.
+and five next evidence targets: scene-edge proposal correlation across
+CFA/LensPSF, CFA/LensPSF detector sweep, RGB+Aux DNN fine-tune gate,
+high-information real-scene expansion, and a failure/slice casebook. The
+previous aux-edge and source scene-edge same-sample proposal correlations are
+now part of the current evidence row.
 
 The current 1496-image naive RAW-like baseline is:
 
