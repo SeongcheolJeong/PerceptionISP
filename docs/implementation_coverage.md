@@ -79,6 +79,12 @@ Known limits:
   remapped rows for `RGGB`, `GRBG`, `BGGR`, and `GBRG`. The older val32
   `bayer_psf` report predates `native_bayer_v1`; its non-GRBG rows remain
   historical bridge/remap sensitivity evidence only.
+- `cfa_lenspsf_casebook` builds a visual condition-slice casebook over the same
+  native CFA/LensPSF detector sweep. The current KITTI val64 casebook covers
+  12/12 native CFA/LensPSF conditions, selects 26 review cases, and includes 24
+  selected FP-reduction successes plus 2 selected recall-loss counterexamples.
+  It is qualitative review evidence, not a metric gate or trained RGB+aux DNN
+  proof.
 - The scene edge-confidence suite compares HumanISP RGB edge proxies,
   PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
   against a higher-resolution real-scene edge proxy after CameraE2E sensor

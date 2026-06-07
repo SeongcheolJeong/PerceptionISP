@@ -838,6 +838,30 @@ delta/AUC is `-0.0087`/`0.5298`. This is a post-hoc proposal bridge for the
 calibrated path, not an incremental aux-only ablation and not a trained RGB+Aux
 DNN result.
 
+Build a visual casebook over the same native CFA/LensPSF sweep when the
+condition-level detector/proposal results need reviewable examples:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.cfa_lenspsf_casebook \
+  reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
+  --baseline-input perception_fusion_rgb_aux \
+  --target-input perception_calibrated_score_label_aux_fusion_rgb_aux_t001 \
+  --max-cases-per-category 2 \
+  --max-showcase-cases 48 \
+  --output-dir reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1
+```
+
+The current CFA/LensPSF visual casebook report is:
+
+```text
+reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1/index.html
+```
+
+It covers 12/12 native CFA/LensPSF conditions, selects 26 review cases, and keeps
+both wins and failures visible: 24 selected FP-reduction successes and 2 selected
+recall-loss counterexamples. This is qualitative condition-slice evidence, not a
+metric gate or broad-superiority proof.
+
 For stricter evidence, train the proposal calibrator on a KITTI train report and
 apply it to the KITTI val report. An earlier comparison branch uses a
 512-sample train subset and writes:
@@ -987,6 +1011,7 @@ PYTHONPATH=src \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-casebook reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1 \
   --casebook reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
@@ -1366,6 +1391,7 @@ PYTHONPATH=src \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-casebook reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
@@ -1384,8 +1410,8 @@ remapping. Missing rows are blockers for broad HumanISP or RAW/sensor-native
 superiority claims. Recommended diagnostic rows, such as the CFA stress sweep,
 edge-confidence suite, object edge-fidelity suite, scene edge-confidence suite,
 scene-information stress suite, aux contribution audit, and CFA/LensPSF
-proposal bridge, help interpret sensor-native signals but do not create a
-detector-performance claim.
+proposal bridge/visual casebook, help interpret sensor-native signals but do not
+create a detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -1412,6 +1438,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
   --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1 \
   --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-casebook reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1 \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -1431,6 +1458,7 @@ reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1/index.html
 reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
@@ -1453,16 +1481,19 @@ source scene-edge support with low-scene-edge AUC `0.6681`, without treating
 that as a trained-DNN or broad-superiority proof. The condition gate passes the
 `fp_reducer` profile on 8 evaluated condition slices; the
 `warning:over_exposure` slice is skipped because it has only 7 samples.
-The same dashboard's `Performance Evidence Map` now includes a diagnostic
-CFA/LensPSF detector condition sweep row and a CFA/LensPSF proposal-edge bridge
-row, plus a visual success/failure casebook row. The native_bayer_v1 proposal
+The same dashboard's `Performance Evidence Map` now includes diagnostic
+CFA/LensPSF detector condition sweep, native-CFA separation, proposal-edge bridge,
+and visual casebook rows, plus the 1496-image visual success/failure casebook
+row. The native_bayer_v1 proposal
 bridge removes 197 FP and 0 TP proposals across the val64 condition sweep;
 source scene-edge evidence is directionally positive in 12/12 conditions, while
 aux-edge evidence is positive in 10/12. Mean source scene-edge delta/AUC is
 `-0.0184`/`0.5933`, and mean aux-edge delta/AUC is `-0.0087`/`0.5298`. The
 native-CFA audit has 12 native rows, 768 samples, and 0 remapped rows. The
-casebook selects
-32 review images and keeps both wins and counterexamples visible. It lists five
+native CFA/LensPSF casebook selects 26 review cases with 24 FP-reduction
+successes and 2 recall-loss counterexamples; the 1496-image HumanISP-relative
+casebook selects 32 review images and keeps both wins and counterexamples
+visible. It lists five
 next evidence targets: larger/native CFA-separated scene-edge proposal
 correlation across CFA/LensPSF, a larger CFA/LensPSF detector sweep, RGB+Aux DNN
 fine-tune gate, high-information real-scene expansion, and native/adverse

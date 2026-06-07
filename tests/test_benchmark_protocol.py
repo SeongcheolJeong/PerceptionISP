@@ -32,6 +32,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
+            cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
 
             summary = build_protocol_coverage(
                 comparison_reports=[report],
@@ -51,6 +52,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
+                cfa_lenspsf_casebook=cfa_lenspsf_casebook,
                 min_samples=3,
             )
 
@@ -70,6 +72,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(rows["native_cfa_lenspsf_detector_sweep"]["status"], "covered")
             self.assertEqual(rows["native_cfa_lenspsf_audit"]["status"], "covered")
             self.assertEqual(rows["cfa_lenspsf_proposal_bridge"]["status"], "covered")
+            self.assertEqual(rows["cfa_lenspsf_visual_casebook"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
             self.assertIn("naive_raw_baseline", summary["missing_raw_claim"])
 
@@ -100,6 +103,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
+            cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
 
             summary = build_protocol_coverage(
                 comparison_reports=[classical, naive],
@@ -120,6 +124,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
+                cfa_lenspsf_casebook=cfa_lenspsf_casebook,
                 min_samples=3,
             )
 
@@ -134,6 +139,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertTrue(summary["evidence"]["cfa_lenspsf_detector_sweep"]["native_clean"])
             self.assertTrue(summary["evidence"]["cfa_lenspsf_native_audit"]["all_native"])
             self.assertTrue(summary["evidence"]["cfa_lenspsf_proposal_audit"]["pass"])
+            self.assertTrue(summary["evidence"]["cfa_lenspsf_casebook"]["pass"])
+            self.assertEqual(summary["evidence"]["cfa_lenspsf_casebook"]["selected_case_count"], 5)
             self.assertFalse(summary["claim_gate_outcomes"]["broad_superiority_pass"])
             self.assertEqual(summary["missing_required"], [])
             self.assertEqual(summary["missing_raw_claim"], [])
@@ -157,6 +164,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
+            cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = protocol_main(
@@ -193,6 +201,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(cfa_lenspsf_proposal),
                         "--cfa-lenspsf-native-audit",
                         str(cfa_lenspsf_native),
+                        "--cfa-lenspsf-casebook",
+                        str(cfa_lenspsf_casebook),
                         "--min-samples",
                         "3",
                         "--output-dir",
@@ -629,6 +639,53 @@ def _write_cfa_lenspsf_native_audit(path: Path) -> Path:
         },
     }
     (path / "cfa_lenspsf_native_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_casebook(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "condition_count": 2,
+        "expected_condition_count": 2,
+        "selected_case_count": 5,
+        "cfa_patterns": ["GRBG", "RGGB"],
+        "psf_sigmas": [0.0],
+        "checks": [
+            {"id": "condition_casebooks_available", "status": "pass", "evidence": "conditions=2 expected=2"},
+            {"id": "casebook_covers_cfa_psf_grid", "status": "pass", "evidence": "cfa=GRBG,RGGB psf=0.0000"},
+            {"id": "casebook_uses_native_cfa_rows", "status": "pass", "evidence": "native=2/2"},
+            {"id": "casebook_has_selected_cases", "status": "pass", "evidence": "selected_cases=5"},
+            {"id": "casebook_includes_fp_reduction_successes", "status": "pass", "evidence": "selected_successes=3"},
+            {"id": "casebook_includes_counterexamples", "status": "pass", "evidence": "selected_counterexamples=2"},
+        ],
+        "category_totals": {
+            "fp_reduction_success": {"case_count": 8, "selected_case_count": 3},
+            "recall_tradeoff": {"case_count": 1, "selected_case_count": 1},
+            "recall_loss_failure": {"case_count": 1, "selected_case_count": 1},
+            "fp_regression_failure": {"case_count": 0, "selected_case_count": 0},
+        },
+        "conditions": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "selected_case_count": 3,
+                "pattern_remapped_fraction": 0.0,
+                "true_sensor_cfa_mosaic_fraction": 1.0,
+            },
+            {
+                "run_id": "cfa-rggb_psf-0p00",
+                "cfa_pattern": "RGGB",
+                "psf_sigma": 0.0,
+                "selected_case_count": 2,
+                "pattern_remapped_fraction": 0.0,
+                "true_sensor_cfa_mosaic_fraction": 1.0,
+            },
+        ],
+    }
+    (path / "cfa_lenspsf_casebook_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

@@ -48,6 +48,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="CFA/LensPSF detector sweep summary path/dir used as condition detector evidence.")
     parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="CFA/LensPSF proposal-edge audit summary path/dir used as condition proposal bridge evidence.")
     parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="CFA/LensPSF native-CFA separation audit summary path/dir used as native/remap boundary evidence.")
+    parser.add_argument("--cfa-lenspsf-casebook", default=None, help="CFA/LensPSF visual casebook summary path/dir used as condition review evidence.")
     parser.add_argument("--casebook", default=None, help="Success/failure casebook summary path/dir used as qualitative review evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
     args = parser.parse_args(argv)
@@ -76,6 +77,7 @@ def main(argv: Any = None) -> int:
         cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
+        cfa_lenspsf_casebook=args.cfa_lenspsf_casebook,
         casebook=args.casebook,
         output_dir=args.output_dir,
     )
@@ -108,6 +110,7 @@ def run_claim_readiness(
     cfa_lenspsf_detector_sweep: str | Path | None = None,
     cfa_lenspsf_proposal_audit: str | Path | None = None,
     cfa_lenspsf_native_audit: str | Path | None = None,
+    cfa_lenspsf_casebook: str | Path | None = None,
     casebook: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
 ) -> Dict[str, Any]:
@@ -221,6 +224,7 @@ def run_claim_readiness(
         cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
+        cfa_lenspsf_casebook=cfa_lenspsf_casebook,
         min_samples=int(min_samples),
     )
     protocol_html = write_protocol_coverage(protocol_summary, protocol_dir)
@@ -245,6 +249,7 @@ def run_claim_readiness(
         cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
         cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
         cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
+        cfa_lenspsf_casebook=cfa_lenspsf_casebook,
         casebook=casebook,
         comparison_rollup_specs=comparison_rollups,
     )
@@ -321,6 +326,7 @@ def run_claim_readiness(
         "cfa_lenspsf_detector_sweep": _cfa_lenspsf_detector_sweep_summary(cfa_lenspsf_detector_sweep),
         "cfa_lenspsf_proposal_audit": _cfa_lenspsf_proposal_audit_summary(cfa_lenspsf_proposal_audit),
         "cfa_lenspsf_native_audit": _cfa_lenspsf_native_audit_summary(cfa_lenspsf_native_audit),
+        "cfa_lenspsf_casebook": _cfa_lenspsf_casebook_summary(cfa_lenspsf_casebook),
         "casebook": _casebook_summary(casebook),
         "benchmark_protocol": {
             "report": str(protocol_html),
@@ -674,6 +680,46 @@ def _cfa_lenspsf_native_audit_summary(path: str | Path | None) -> Dict[str, Any]
     }
 
 
+def _cfa_lenspsf_casebook_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "cfa_lenspsf_casebook_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"CFA/LensPSF casebook summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) != "pass"]
+    category_totals = data.get("category_totals", {}) if isinstance(data.get("category_totals"), Mapping) else {}
+    success = category_totals.get("fp_reduction_success", {}) if isinstance(category_totals.get("fp_reduction_success"), Mapping) else {}
+    counterexamples = sum(
+        int((category_totals.get(name, {}) if isinstance(category_totals.get(name), Mapping) else {}).get("selected_case_count", 0))
+        for name in ("recall_tradeoff", "recall_loss_failure", "fp_regression_failure")
+    )
+    native_condition_count = sum(
+        1
+        for row in data.get("conditions", ())
+        if isinstance(row, Mapping)
+        and row.get("pattern_remapped_fraction") == 0.0
+        and row.get("true_sensor_cfa_mosaic_fraction") == 1.0
+    )
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "failed_checks": failed,
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "selected_case_count": int(data.get("selected_case_count", 0)),
+        "selected_fp_reduction_success_count": int(success.get("selected_case_count", 0)),
+        "selected_counterexample_count": counterexamples,
+        "native_condition_count": native_condition_count,
+    }
+
+
 def _casebook_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -722,6 +768,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
         "cfa_lenspsf_proposal_audit": summary.get("cfa_lenspsf_proposal_audit"),
         "cfa_lenspsf_native_audit": summary.get("cfa_lenspsf_native_audit"),
+        "cfa_lenspsf_casebook": summary.get("cfa_lenspsf_casebook"),
         "casebook": summary.get("casebook"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),

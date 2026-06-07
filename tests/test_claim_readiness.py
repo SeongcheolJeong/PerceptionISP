@@ -28,6 +28,7 @@ class ClaimReadinessTest(unittest.TestCase):
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
+            cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
             casebook = _write_casebook(root / "casebook")
 
             summary = run_claim_readiness(
@@ -46,6 +47,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 aux_contribution_audit=aux_contribution,
                 cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
+                cfa_lenspsf_casebook=cfa_lenspsf_casebook,
                 casebook=casebook,
                 output_dir=root / "readiness",
             )
@@ -74,6 +76,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("cfa_lenspsf_proposal_audit", summary)
             self.assertIn("cfa_lenspsf_native_audit", summary)
+            self.assertIn("cfa_lenspsf_casebook", summary)
             self.assertIn("casebook", summary)
             self.assertIn("benchmark_protocol", summary)
             self.assertEqual(summary["benchmark_protocol"]["status"], "not_claim_ready")
@@ -86,6 +89,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["cfa_lenspsf_proposal_audit"]["removed_fp_count"], 5)
             self.assertTrue(summary["cfa_lenspsf_native_audit"]["pass"])
             self.assertEqual(summary["cfa_lenspsf_native_audit"]["native_run_count"], 1)
+            self.assertTrue(summary["cfa_lenspsf_casebook"]["pass"])
+            self.assertEqual(summary["cfa_lenspsf_casebook"]["selected_case_count"], 5)
             self.assertTrue(summary["casebook"]["pass"])
             self.assertEqual(summary["casebook"]["selected_case_count"], 4)
             self.assertEqual(summary["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
@@ -119,6 +124,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_native_audit"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_lenspsf_casebook"]["pass"])
             self.assertTrue(dashboard_summary["casebook"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
             self.assertEqual(dashboard_summary["protocol_coverage"]["coverage_status"], "coverage_incomplete")
@@ -170,6 +176,7 @@ class ClaimReadinessTest(unittest.TestCase):
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
             cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native", all_native=True)
+            cfa_lenspsf_casebook = _write_cfa_lenspsf_casebook(root / "cfa_lenspsf_casebook")
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -187,6 +194,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 aux_contribution_audit=aux_contribution,
                 cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
                 cfa_lenspsf_native_audit=cfa_lenspsf_native,
+                cfa_lenspsf_casebook=cfa_lenspsf_casebook,
                 output_dir=root / "readiness",
             )
 
@@ -210,6 +218,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_detector_sweep"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_native_audit"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_lenspsf_casebook"]["pass"])
 
 
 def _write_comparison_report(
@@ -696,6 +705,53 @@ def _write_cfa_lenspsf_native_audit(path: Path, *, all_native: bool = False) -> 
         "claim_boundary": "unit native boundary",
     }
     (path / "cfa_lenspsf_native_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_casebook(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "condition_count": 2,
+        "expected_condition_count": 2,
+        "selected_case_count": 5,
+        "cfa_patterns": ["GRBG", "RGGB"],
+        "psf_sigmas": [0.0],
+        "checks": [
+            {"id": "condition_casebooks_available", "status": "pass", "evidence": "conditions=2 expected=2"},
+            {"id": "casebook_covers_cfa_psf_grid", "status": "pass", "evidence": "cfa=GRBG,RGGB psf=0.0000"},
+            {"id": "casebook_uses_native_cfa_rows", "status": "pass", "evidence": "native=2/2"},
+            {"id": "casebook_has_selected_cases", "status": "pass", "evidence": "selected_cases=5"},
+            {"id": "casebook_includes_fp_reduction_successes", "status": "pass", "evidence": "selected_successes=3"},
+            {"id": "casebook_includes_counterexamples", "status": "pass", "evidence": "selected_counterexamples=2"},
+        ],
+        "category_totals": {
+            "fp_reduction_success": {"case_count": 8, "selected_case_count": 3},
+            "recall_tradeoff": {"case_count": 1, "selected_case_count": 1},
+            "recall_loss_failure": {"case_count": 1, "selected_case_count": 1},
+            "fp_regression_failure": {"case_count": 0, "selected_case_count": 0},
+        },
+        "conditions": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "cfa_pattern": "GRBG",
+                "psf_sigma": 0.0,
+                "selected_case_count": 3,
+                "pattern_remapped_fraction": 0.0,
+                "true_sensor_cfa_mosaic_fraction": 1.0,
+            },
+            {
+                "run_id": "cfa-rggb_psf-0p00",
+                "cfa_pattern": "RGGB",
+                "psf_sigma": 0.0,
+                "selected_case_count": 2,
+                "pattern_remapped_fraction": 0.0,
+                "true_sensor_cfa_mosaic_fraction": 1.0,
+            },
+        ],
+    }
+    (path / "cfa_lenspsf_casebook_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

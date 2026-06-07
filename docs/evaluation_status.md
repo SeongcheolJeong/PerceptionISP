@@ -629,6 +629,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | CFA/LensPSF detector sweep | `pass` as diagnostic condition evidence; `reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1` covers GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6`, 64 KITTI val samples per condition at `640 x 192`, fixed YOLO11n recipe, and calibrated score-label-aux proposals. PSF provenance is recorded for `768/768` samples. All rows use `native_bayer_v1`, have source CFA equal to target CFA, `max_remap=0.0`, and `min_true_cfa=1.0`. Best calibrated downstream FP delta is `-0.3281` at BGGR/PSF `0.0`. This is condition sensitivity evidence, not broad superiority |
 | CFA/LensPSF proposal-edge bridge | `pass` as diagnostic proposal bridge evidence; `reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1` joins the same 12 native CFA/LensPSF detector conditions to same-sample proposal edge and source-scene-edge support. The calibrated proposal path removes 197 FP and 0 TP proposals versus RGB+Aux fusion, with net `dFP=-195` and `dTP=-2`. Source scene-edge support is directionally positive in 12/12 conditions and passes all-condition consistency, best low-scene-edge AUC `0.6825` at BGGR/PSF `0.8`, mean delta/AUC `-0.0184`/`0.5933`; aux-edge support is positive in 10/12 and passes majority-condition consistency, best low-edge AUC `0.5794` at BGGR/PSF `0.8`, mean delta/AUC `-0.0087`/`0.5298`. This is post-hoc calibrated proposal evidence, not incremental aux-only ablation, trained-DNN proof, or broad superiority |
 | CFA/LensPSF native-CFA separation | `pass` as a claim-boundary guardrail; `reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1` separates the same detector sweep into 12 native rows with 768 samples and 0 remapped rows. Native rows cover BGGR/GBRG/GRBG/RGGB, have mean dFP `-0.2813`, mean dR50 `-0.0014`, mean small dR50 `+0.0009`, and best native dFP `-0.3281` at BGGR/PSF `0.0`. This supports native-CFA condition discussion, not a broad HumanISP superiority claim |
+| CFA/LensPSF visual casebook | `pass` as qualitative condition-slice evidence; `reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1` covers the same 12 native CFA/LensPSF conditions and selects 26 review cases: 24 selected FP-reduction successes and 2 selected recall-loss counterexamples. It keeps visual wins and failures inspectable by CFA/PSF condition, but it is not a metric gate, larger held-out benchmark, or trained RGB+Aux DNN result |
 | Scene edge-confidence suite | `pass`; a `640 x 480` real sample image is fed through CameraE2E to a `320 x 240` `GRBG` sensor target with no CFA remap. Against the high-resolution scene-edge proxy, HumanISP RGB proxy F1 is `0.6644`, PerceptionISP RGB proxy F1 is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and aux edge-confidence F1 is `0.3727`. This is front-end scene-edge evidence, not object-boundary or detector performance evidence |
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622`. In the same-sample bridge, incremental aux scoring removes 95 FP and 16 TP proposals; removed FP has lower aux edge support than kept TP (`delta=-0.0596`, low-edge AUC `0.6904`) and lower source scene-edge support (`delta=-0.0302`, low-scene-edge AUC `0.6681`) |
@@ -1022,6 +1023,17 @@ aux-edge support is positive in 10/12. Mean source scene-edge delta/AUC is
 step is to increase sample scale
 and add native/adverse-condition slices rather than relying on bridge-remap
 sensitivity.
+
+The matching visual condition casebook is:
+
+```text
+reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_casebook_kitti_val64_native_bayer_v1/cfa_lenspsf_casebook_summary.json
+```
+
+It selects 26 review cases across the same 12 native CFA/LensPSF conditions,
+including 24 selected FP-reduction successes and 2 selected recall-loss
+counterexamples.
 
 The qualitative success/failure casebook for the current HumanISP-relative
 claim is:
