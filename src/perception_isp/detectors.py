@@ -385,6 +385,12 @@ def fuse_rgb_aux_results(
     low_support_threshold: float = 0.16,
     score_gain: float = 0.08,
     score_penalty: float = 0.06,
+    refine_boxes: bool = False,
+    refine_max_shift: float = 0.08,
+    refine_max_shift_px: float = 12.0,
+    refine_min_edge: float = 0.18,
+    refine_min_gain: float = 0.03,
+    refine_allow_shrink: bool = False,
 ) -> DetectorResult:
     """Fuse RGB detector boxes with PerceptionISP auxiliary-map evidence.
 
@@ -404,6 +410,18 @@ def fuse_rgb_aux_results(
         suppressed = rgb_score < float(low_score_threshold) and combined < float(low_support_threshold)
         if suppressed:
             continue
+        box = detection.box
+        refinement: Dict[str, Any] = {"enabled": bool(refine_boxes), "changed": False}
+        if refine_boxes:
+            box, refinement = _refine_box_with_aux_edges(
+                detection.box,
+                aux,
+                max_shift_fraction=float(refine_max_shift),
+                max_shift_px=float(refine_max_shift_px),
+                min_edge=float(refine_min_edge),
+                min_gain=float(refine_min_gain),
+                allow_shrink=bool(refine_allow_shrink),
+            )
         if combined >= 0.35:
             score = rgb_score + float(score_gain) * min((combined - 0.35) / 0.65, 1.0)
         elif rgb_score < 0.55:
@@ -420,10 +438,11 @@ def fuse_rgb_aux_results(
             "aux_box_iou": float(support["aux_box_iou"]),
             "rgb_detector": rgb_result.detector_name,
             "aux_detector": aux_result.detector_name,
+            "box_refinement": refinement,
         }
         fused.append(
             Detection(
-                box=detection.box,
+                box=box,
                 score=float(np.clip(score, 0.0, 1.0)),
                 metadata=metadata,
             )
@@ -516,6 +535,179 @@ def _aux_support_for_box(box: BoundingBox, aux: np.ndarray, aux_boxes: Sequence[
         "aux_box_iou": float(np.clip(aux_iou, 0.0, 1.0)),
         "combined": float(np.clip(combined, 0.0, 1.0)),
     }
+
+
+def _refine_box_with_aux_edges(
+    box: BoundingBox,
+    aux: np.ndarray,
+    *,
+    max_shift_fraction: float,
+    max_shift_px: float,
+    min_edge: float,
+    min_gain: float,
+    allow_shrink: bool,
+) -> Tuple[BoundingBox, Dict[str, Any]]:
+    rows, cols = aux.shape[:2]
+    x1, y1, x2, y2 = [float(value) for value in box.xyxy]
+    width = max(x2 - x1, 1.0)
+    height = max(y2 - y1, 1.0)
+    x_shift = int(max(1.0, min(float(max_shift_px), width * max(float(max_shift_fraction), 0.0))))
+    y_shift = int(max(1.0, min(float(max_shift_px), height * max(float(max_shift_fraction), 0.0))))
+    edge = np.asarray(aux[:, :, 0], dtype=np.float64)
+    reliability = np.asarray(aux[:, :, 2], dtype=np.float64) if aux.shape[2] >= 3 else np.ones_like(edge)
+    evidence = np.clip(edge, 0.0, 1.0) * np.clip(0.5 + 0.5 * reliability, 0.0, 1.0)
+
+    left, left_meta = _snap_vertical_edge(evidence, x1, y1, y2, x_shift, min_edge=min_edge, min_gain=min_gain)
+    right, right_meta = _snap_vertical_edge(evidence, x2, y1, y2, x_shift, min_edge=min_edge, min_gain=min_gain)
+    top, top_meta = _snap_horizontal_edge(evidence, y1, x1, x2, y_shift, min_edge=min_edge, min_gain=min_gain)
+    bottom, bottom_meta = _snap_horizontal_edge(evidence, y2, x1, x2, y_shift, min_edge=min_edge, min_gain=min_gain)
+
+    refined = [
+        float(np.clip(left, 0.0, max(float(cols - 1), 0.0))),
+        float(np.clip(top, 0.0, max(float(rows - 1), 0.0))),
+        float(np.clip(right, 1.0, float(cols))),
+        float(np.clip(bottom, 1.0, float(rows))),
+    ]
+    if not allow_shrink:
+        refined = [
+            min(refined[0], x1),
+            min(refined[1], y1),
+            max(refined[2], x2),
+            max(refined[3], y2),
+        ]
+    refined = _constrain_refined_box(tuple(refined), box.xyxy, image_shape=(rows, cols))
+    changed = any(abs(float(a) - float(b)) > 0.25 for a, b in zip(refined, box.xyxy))
+    metadata = {
+        "enabled": True,
+        "changed": bool(changed),
+        "original_xyxy": [float(value) for value in box.xyxy],
+        "refined_xyxy": [float(value) for value in refined],
+        "shifts": [float(refined[index] - box.xyxy[index]) for index in range(4)],
+        "allow_shrink": bool(allow_shrink),
+        "left": left_meta,
+        "right": right_meta,
+        "top": top_meta,
+        "bottom": bottom_meta,
+    }
+    if not changed:
+        return box, metadata
+    return BoundingBox(tuple(refined), label=box.label), metadata
+
+
+def _snap_vertical_edge(
+    evidence: np.ndarray,
+    boundary_x: float,
+    y1: float,
+    y2: float,
+    max_shift: int,
+    *,
+    min_edge: float,
+    min_gain: float,
+) -> Tuple[float, Dict[str, Any]]:
+    rows, cols = evidence.shape
+    row0, row1 = _trimmed_span(y1, y2, limit=rows)
+    col_center = int(np.clip(round(float(boundary_x)), 0, max(cols - 1, 0)))
+    col0 = max(0, col_center - int(max_shift))
+    col1 = min(cols, col_center + int(max_shift) + 1)
+    if row1 <= row0 or col1 <= col0:
+        return float(boundary_x), {"snapped": False, "reason": "empty_window"}
+    profile = np.mean(evidence[row0:row1, col0:col1], axis=0)
+    current_index = int(np.clip(col_center - col0, 0, len(profile) - 1))
+    peak_index = int(np.argmax(profile))
+    current = float(profile[current_index])
+    peak = float(profile[peak_index])
+    snapped = bool(peak >= float(min_edge) and peak >= current + float(min_gain))
+    snapped_x = float(col0 + peak_index) if snapped else float(boundary_x)
+    return snapped_x, {
+        "snapped": snapped,
+        "current": current,
+        "peak": peak,
+        "shift": float(snapped_x - float(boundary_x)),
+    }
+
+
+def _snap_horizontal_edge(
+    evidence: np.ndarray,
+    boundary_y: float,
+    x1: float,
+    x2: float,
+    max_shift: int,
+    *,
+    min_edge: float,
+    min_gain: float,
+) -> Tuple[float, Dict[str, Any]]:
+    rows, cols = evidence.shape
+    col0, col1 = _trimmed_span(x1, x2, limit=cols)
+    row_center = int(np.clip(round(float(boundary_y)), 0, max(rows - 1, 0)))
+    row0 = max(0, row_center - int(max_shift))
+    row1 = min(rows, row_center + int(max_shift) + 1)
+    if row1 <= row0 or col1 <= col0:
+        return float(boundary_y), {"snapped": False, "reason": "empty_window"}
+    profile = np.mean(evidence[row0:row1, col0:col1], axis=1)
+    current_index = int(np.clip(row_center - row0, 0, len(profile) - 1))
+    peak_index = int(np.argmax(profile))
+    current = float(profile[current_index])
+    peak = float(profile[peak_index])
+    snapped = bool(peak >= float(min_edge) and peak >= current + float(min_gain))
+    snapped_y = float(row0 + peak_index) if snapped else float(boundary_y)
+    return snapped_y, {
+        "snapped": snapped,
+        "current": current,
+        "peak": peak,
+        "shift": float(snapped_y - float(boundary_y)),
+    }
+
+
+def _trimmed_span(start: float, stop: float, *, limit: int) -> Tuple[int, int]:
+    lo = float(min(start, stop))
+    hi = float(max(start, stop))
+    size = max(hi - lo, 1.0)
+    trim = 0.12 * size if size >= 12.0 else 0.0
+    first = int(np.clip(np.floor(lo + trim), 0, max(limit - 1, 0)))
+    last = int(np.clip(np.ceil(hi - trim), first + 1, limit))
+    return first, last
+
+
+def _constrain_refined_box(
+    refined_xyxy: Tuple[float, float, float, float],
+    original_xyxy: Tuple[float, float, float, float],
+    *,
+    image_shape: Tuple[int, int],
+) -> Tuple[float, float, float, float]:
+    rows, cols = image_shape
+    ox1, oy1, ox2, oy2 = original_xyxy
+    x1, y1, x2, y2 = refined_xyxy
+    original_width = max(float(ox2 - ox1), 1.0)
+    original_height = max(float(oy2 - oy1), 1.0)
+    min_width = max(2.0, 0.75 * original_width)
+    max_width = min(float(cols), 1.25 * original_width)
+    min_height = max(2.0, 0.75 * original_height)
+    max_height = min(float(rows), 1.25 * original_height)
+    x1, x2 = _constrain_axis(x1, x2, ox1, ox2, min_size=min_width, max_size=max_width, limit=float(cols))
+    y1, y2 = _constrain_axis(y1, y2, oy1, oy2, min_size=min_height, max_size=max_height, limit=float(rows))
+    return (float(x1), float(y1), float(x2), float(y2))
+
+
+def _constrain_axis(
+    start: float,
+    stop: float,
+    original_start: float,
+    original_stop: float,
+    *,
+    min_size: float,
+    max_size: float,
+    limit: float,
+) -> Tuple[float, float]:
+    center = 0.5 * (float(start) + float(stop))
+    original_center = 0.5 * (float(original_start) + float(original_stop))
+    size = float(stop) - float(start)
+    if size < float(min_size) or size > float(max_size):
+        size = float(np.clip(size, float(min_size), float(max_size)))
+        center = original_center
+    half = 0.5 * size
+    lo = float(np.clip(center - half, 0.0, max(limit - size, 0.0)))
+    hi = float(np.clip(lo + size, lo + 1.0, limit))
+    return lo, hi
 
 
 def _box_iou(a: BoundingBox, b: BoundingBox) -> float:

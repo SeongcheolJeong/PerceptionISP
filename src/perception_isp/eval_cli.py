@@ -78,6 +78,12 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--fusion-low-support-threshold", type=float, default=0.16, help="Weak aux support threshold for low-score RGB suppression.")
     parser.add_argument("--fusion-score-gain", type=float, default=0.08, help="Score gain for detections with strong aux support.")
     parser.add_argument("--fusion-score-penalty", type=float, default=0.06, help="Score penalty for low-score detections with weak aux support.")
+    parser.add_argument("--fusion-refine-boxes", action="store_true", help="Snap fused RGB boxes to nearby aux-edge evidence.")
+    parser.add_argument("--fusion-refine-max-shift", type=float, default=0.08, help="Max aux-edge box snap as a fraction of box width/height.")
+    parser.add_argument("--fusion-refine-max-shift-px", type=float, default=12.0, help="Absolute max aux-edge box snap in pixels.")
+    parser.add_argument("--fusion-refine-min-edge", type=float, default=0.18, help="Minimum aux-edge evidence for a box side snap.")
+    parser.add_argument("--fusion-refine-min-gain", type=float, default=0.03, help="Minimum edge gain over the current side before snapping.")
+    parser.add_argument("--fusion-refine-allow-shrink", action="store_true", help="Allow aux-edge refinement to shrink boxes inward. Off by default because this can hurt IoU@0.75.")
     parser.add_argument("--progress-interval", type=int, default=0, help="Print progress every N samples to stderr; 0 disables progress logging.")
     parser.add_argument("--load-progress-interval", type=int, default=0, help="Print dataset loading progress every N samples; 0 disables progress logging.")
     parser.add_argument("--raw-cache-dir", default=None, help="Optional directory for cached dataset RAW samples.")
@@ -249,6 +255,12 @@ def main(argv: Any = None) -> int:
         "low_support_threshold": float(args.fusion_low_support_threshold),
         "score_gain": float(args.fusion_score_gain),
         "score_penalty": float(args.fusion_score_penalty),
+        "refine_boxes": bool(args.fusion_refine_boxes),
+        "refine_max_shift": float(args.fusion_refine_max_shift),
+        "refine_max_shift_px": float(args.fusion_refine_max_shift_px),
+        "refine_min_edge": float(args.fusion_refine_min_edge),
+        "refine_min_gain": float(args.fusion_refine_min_gain),
+        "refine_allow_shrink": bool(args.fusion_refine_allow_shrink),
     }
     result = compare_dataset(
         samples,

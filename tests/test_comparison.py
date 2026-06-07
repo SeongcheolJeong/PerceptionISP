@@ -52,6 +52,42 @@ class ComparisonHarnessTest(unittest.TestCase):
         self.assertIn("fusion", fused.detections[0].metadata)
         self.assertGreater(fused.detections[0].metadata["fusion"]["aux_support"], 0.3)
 
+    def test_rgb_aux_fusion_can_refine_boxes_to_aux_edges(self) -> None:
+        aux = np.zeros((48, 64, 3), dtype=np.float64)
+        aux[:, :, 2] = 1.0
+        aux[10:30, 10, 0] = 1.0
+        aux[10:30, 30, 0] = 1.0
+        aux[10, 10:31, 0] = 1.0
+        aux[30, 10:31, 0] = 1.0
+        rgb_result = DetectorResult(
+            "rgb",
+            "perception_rgb",
+            (Detection(BoundingBox((12, 12, 28, 28), label="car"), score=0.80),),
+            1.0,
+        )
+        aux_result = DetectorResult("aux", "perception_aux_rgb", (), 1.0)
+
+        fused = fuse_rgb_aux_results(
+            rgb_result,
+            aux_result,
+            aux,
+            refine_boxes=True,
+            refine_max_shift=0.25,
+            refine_max_shift_px=4.0,
+            refine_min_edge=0.20,
+            refine_min_gain=0.05,
+        )
+
+        self.assertEqual(len(fused.detections), 1)
+        refined = fused.detections[0].box.xyxy
+        self.assertLess(refined[0], 12.0)
+        self.assertLess(refined[1], 12.0)
+        self.assertGreater(refined[2], 28.0)
+        self.assertGreater(refined[3], 28.0)
+        metadata = fused.detections[0].metadata["fusion"]["box_refinement"]
+        self.assertTrue(metadata["enabled"])
+        self.assertTrue(metadata["changed"])
+
     def test_comparison_can_apply_proposal_calibration_artifact(self) -> None:
         artifact = {
             "model_type": "proposal_calibration_v1",
