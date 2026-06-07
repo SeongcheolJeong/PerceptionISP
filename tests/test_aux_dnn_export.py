@@ -326,6 +326,28 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertGreaterEqual(direct["aggregate"]["det_count_mean"], capped["aggregate"]["det_count_mean"])
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_hash_split_is_not_sequential_tail(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=8, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp, include_extended=False, include_preview=False, compress=False)
+            summary = train_dense(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                eval_fraction=0.5,
+                split_strategy="hash",
+                include_labels=("car", "person"),
+                output_dir=Path(tmp) / "dense_hash",
+            )
+            self.assertEqual(summary["split_strategy"], "hash")
+            self.assertEqual(summary["train_sample_count"], 4)
+            self.assertEqual(summary["eval_sample_count"], 4)
+            self.assertNotEqual(summary["train_indices"], [0, 1, 2, 3])
+            self.assertEqual(summary["missing_eval_class_names"], [])
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_extended_dense_detector_trains_and_evaluates(self) -> None:
         samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
         with tempfile.TemporaryDirectory() as tmp:

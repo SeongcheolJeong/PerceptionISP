@@ -8,6 +8,7 @@ box coordinates, and class labels on a fixed grid over the RGB+aux tensor.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from pathlib import Path
@@ -41,7 +42,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--tensor-key", default=RGB_AUX_TENSOR_KEY, help="Tensor key to train on: rgb_aux_chw or rgb_aux_extended_chw.")
     parser.add_argument("--channel-mode", default="rgb_aux", choices=["rgb_aux", "rgb_only", "aux_only"], help="Input ablation mode.")
     parser.add_argument("--eval-fraction", type=float, default=0.25)
-    parser.add_argument("--split-strategy", default="coverage", choices=["coverage", "sequential"])
+    parser.add_argument("--split-strategy", default="coverage", choices=["coverage", "hash", "sequential"])
     parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to train/evaluate; default uses all labels.")
     parser.add_argument("--no-object-weight", type=float, default=0.15)
     parser.add_argument("--box-weight", type=float, default=5.0)
@@ -509,9 +510,17 @@ def _split_indices(
     if count <= 1 or fraction <= 0.0:
         return indices, ()
     eval_count = min(max(int(round(count * min(fraction, 0.9))), 1), count - 1)
-    if str(strategy).lower() == "coverage":
+    normalized_strategy = str(strategy).lower()
+    if normalized_strategy == "coverage":
         return _coverage_split_indices(dataset, indices, eval_count, allowed_labels=allowed_labels)
+    if normalized_strategy == "hash":
+        hash_order = tuple(sorted(indices, key=_stable_index_hash))
+        return _coverage_split_indices(dataset, hash_order, eval_count, allowed_labels=allowed_labels)
     return indices[:-eval_count], indices[-eval_count:]
+
+
+def _stable_index_hash(index: int) -> str:
+    return hashlib.sha1(str(int(index)).encode("utf-8")).hexdigest()
 
 
 def _coverage_split_indices(
