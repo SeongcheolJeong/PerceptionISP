@@ -225,6 +225,7 @@ def _cleanup_candidates(project_root: Path) -> list[Dict[str, Any]]:
                 "label": str(item["label"]),
                 "risk": str(item["risk"]),
                 "why": str(item["why"]),
+                "verification": _cleanup_candidate_verification(project_root, relative),
                 "size_gib": _bytes_to_gib(size_bytes),
                 "size_bytes": int(size_bytes),
                 "manual_action": f"Move or delete {relative} after confirming it is no longer needed.",
@@ -270,6 +271,29 @@ def _stat_disk_bytes(path: Path) -> int:
         return 0
     blocks = getattr(stat, "st_blocks", 0)
     return int(blocks) * 512 if blocks else int(stat.st_size)
+
+
+def _cleanup_candidate_verification(project_root: Path, relative: Path) -> str:
+    if str(relative) != "data/raw_datasets/pascalraw_full_archive":
+        return "Regenerable experiment artifact; no dataset source files are deleted by this candidate."
+    extract_root = project_root / "data/raw_datasets/pascalraw_full_extract" / "PASCALRAW" / "original"
+    raw_count = _count_suffixes(extract_root / "raw", (".nef",))
+    jpg_count = _count_suffixes(extract_root / "jpg", (".jpg", ".jpeg"))
+    if raw_count and jpg_count:
+        return (
+            "Extracted PASCALRAW copy present under data/raw_datasets/pascalraw_full_extract: "
+            f"raw_nef={raw_count}, jpg={jpg_count}."
+        )
+    return (
+        "Could not verify the extracted PASCALRAW NEF/JPG copy. Treat this archive candidate as higher risk until extraction is checked."
+    )
+
+
+def _count_suffixes(root: Path, suffixes: Sequence[str]) -> int:
+    if not root.exists():
+        return 0
+    normalized = tuple(item.lower() for item in suffixes)
+    return sum(1 for path in root.rglob("*") if path.is_file() and path.suffix.lower() in normalized)
 
 
 def _bytes_to_gib(value: int) -> float:
@@ -437,7 +461,10 @@ def _render_checklist(summary: Mapping[str, Any]) -> str:
     )
     for row in summary.get("cleanup_candidates", ()):
         if isinstance(row, Mapping):
-            lines.append(f"- `{row.get('path')}`: {row.get('size_gib')} GiB, risk={row.get('risk')}, {row.get('why')}")
+            lines.append(
+                f"- `{row.get('path')}`: {row.get('size_gib')} GiB, risk={row.get('risk')}, "
+                f"{row.get('why')} Verification: {row.get('verification', '')}"
+            )
     lines.extend(["", "## Subset Files"])
     for path in summary.get("required_subset_files", ()):
         lines.append(f"- `{path}`")
@@ -487,7 +514,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <table><thead><tr><th>Priority</th><th>Name</th><th>Status</th><th>Target</th><th>Size GB</th><th>Why</th></tr></thead><tbody>{steps}</tbody></table>
   <h2>Storage Cleanup Candidates</h2>
   <div class="note">{html_lib.escape(str(summary.get('cleanup', {}).get('note', '')))}</div>
-  <table><thead><tr><th>Path</th><th>Size GiB</th><th>Risk</th><th>Why</th><th>Manual Action</th></tr></thead><tbody>{cleanup_rows}</tbody></table>
+  <table><thead><tr><th>Path</th><th>Size GiB</th><th>Risk</th><th>Why</th><th>Verification</th><th>Manual Action</th></tr></thead><tbody>{cleanup_rows}</tbody></table>
   <h2>Checks</h2>
   <table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{checks}</tbody></table>
   <h2>Post-download Commands</h2>
@@ -530,6 +557,7 @@ def _cleanup_row(row: Mapping[str, Any]) -> str:
         f"<td>{html_lib.escape(str(row.get('size_gib', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('risk', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('why', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('verification', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('manual_action', '')))}</td>"
         "</tr>"
     )

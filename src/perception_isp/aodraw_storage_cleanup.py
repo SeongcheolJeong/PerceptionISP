@@ -239,7 +239,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <h2>Execute Command</h2>
   <pre>{html_lib.escape(str(summary.get('execute_command', '')))}</pre>
   <h2>Available Candidates</h2>
-  <table><thead><tr><th>Path</th><th>Size GiB</th><th>Risk</th><th>Why</th></tr></thead><tbody>{available_rows}</tbody></table>
+  <table><thead><tr><th>Path</th><th>Size GiB</th><th>Risk</th><th>Why</th><th>Verification</th></tr></thead><tbody>{available_rows}</tbody></table>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code></p>
 </body>
 </html>
@@ -253,6 +253,7 @@ def _candidate_row(row: Mapping[str, Any]) -> str:
         f"<td>{html_lib.escape(str(row.get('size_gib', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('risk', '')))}</td>"
         f"<td>{html_lib.escape(str(row.get('why', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('verification', '')))}</td>"
         "</tr>"
     )
 

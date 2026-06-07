@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from perception_isp.aodraw_download_plan import (
+    _cleanup_candidates as _build_cleanup_candidates,
     build_aodraw_download_plan,
     main as aodraw_download_plan_main,
     write_aodraw_download_plan,
@@ -16,6 +17,19 @@ from perception_isp.aodraw_download_plan import (
 
 
 class AODRawDownloadPlanTest(unittest.TestCase):
+    def test_cleanup_candidate_records_pascalraw_extract_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write(root / "data/raw_datasets/pascalraw_full_archive/PASCALRAW.tar.gzaa", b"archive")
+            _write(root / "data/raw_datasets/pascalraw_full_extract/PASCALRAW/original/raw/2014_000001.NEF", b"raw")
+            _write(root / "data/raw_datasets/pascalraw_full_extract/PASCALRAW/original/jpg/2014_000001.jpg", b"jpg")
+
+            candidates = _build_cleanup_candidates(root)
+
+            self.assertEqual(candidates[0]["path"], "data/raw_datasets/pascalraw_full_archive")
+            self.assertIn("raw_nef=1", candidates[0]["verification"])
+            self.assertIn("jpg=1", candidates[0]["verification"])
+
     def test_build_plan_prioritizes_downsampled_srgb_and_subset_raw(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -188,6 +202,11 @@ def _cleanup_candidates() -> list[dict]:
             "manual_action": "Move or delete after confirmation.",
         },
     ]
+
+
+def _write(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
 
 
 if __name__ == "__main__":
