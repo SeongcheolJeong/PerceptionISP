@@ -89,6 +89,25 @@ class AODRawDownloadImporterTest(unittest.TestCase):
             self.assertEqual(summary["status"], "blocked")
             self.assertEqual(summary["missing_file_count"], 2)
 
+    def test_raw_only_import_command_uses_raw_availability_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            downloads = root / "Downloads"
+            _write(downloads / "images_downsampled_raw" / "00000001.npy", b"raw")
+
+            summary = import_aodraw_downloads(
+                manifest=_manifest(),
+                download_roots=(downloads,),
+                dataset_root=root / "aodraw",
+                kind="raw",
+                dry_run=True,
+            )
+
+            self.assertEqual(summary["status"], "ready_to_import")
+            self.assertEqual(summary["required_file_count"], 1)
+            self.assertIn("--kind raw", summary["post_import_command"])
+            self.assertIn("raw_only", summary["post_import_command"])
+
     def test_bad_zip_is_reported_as_source_scan_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

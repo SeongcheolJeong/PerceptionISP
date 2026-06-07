@@ -93,6 +93,9 @@ class AODRawDownloadWatchTest(unittest.TestCase):
             self.assertEqual(summary["missing_file_count"], 0)
             self.assertTrue((root / "aodraw" / "images_downsampled_raw" / "00000001.npy").exists())
             self.assertFalse((root / "aodraw" / "images_downsampled_srgb" / "00000001.JPG").exists())
+            self.assertIn("perception_isp.aodraw_pipeline", summary["evaluation_command"])
+            self.assertIn("--kind raw", summary["evaluation_command"])
+            self.assertIn("raw_only", summary["evaluation_command"])
 
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -134,6 +137,10 @@ class AODRawDownloadWatchTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(printed["status"], "waiting_for_files")
             self.assertTrue((root / "availability" / "aodraw_image_availability_summary.json").exists())
+            cli_summary = json.loads((root / "cli" / "aodraw_download_watch_summary.json").read_text())
+            self.assertIn("perception_isp.aodraw_pipeline", cli_summary["evaluation_command"])
+            self.assertIn("--kind all", cli_summary["evaluation_command"])
+            self.assertNotIn("raw_only", cli_summary["evaluation_command"])
 
 
 def _manifest() -> list[dict]:

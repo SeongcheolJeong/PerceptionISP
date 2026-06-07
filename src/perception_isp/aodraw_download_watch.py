@@ -127,16 +127,7 @@ def watch_aodraw_downloads(
         "iterations": iterations,
         "next_action": _next_action(ready=ready, dry_run=bool(dry_run)),
         "availability_output_dir": "" if availability_output_dir is None else str(availability_output_dir),
-        "evaluation_command": (
-            "PYTHONPATH=src python3 -m perception_isp.eval_cli "
-            "--source aodraw-dataset "
-            "--dataset data/raw_datasets/aodraw "
-            "--aodraw-manifest reports/perception_aodraw_subset_plan_test_downsample_adverse_24_v1/aodraw_subset_manifest.json "
-            "--count 24 --width 768 --height 512 --aodraw-cfa RGGB "
-            "--rgb-detector yolo --rgb-detector-model yolo11n.pt --label-aware "
-            "--ground-truth-label-map aodraw-coco --ground-truth-label-keep aodraw-coco-overlap "
-            "--output-dir reports/perception_aodraw_compare_test_downsample_adverse_24_v1"
-        ),
+        "evaluation_command": _pipeline_command(kind=kind),
         "claim_boundary": (
             "This watcher only automates local file import and availability checks. It does not download Baidu/TeraBox files or prove PerceptionISP performance."
         ),
@@ -158,6 +149,19 @@ def _next_action(*, ready: bool, dry_run: bool) -> str:
     if dry_run:
         return "Dry-run only. Download files or rerun without --dry-run to import resolved files."
     return "Keep the watcher running while Baidu/TeraBox downloads finish, or rerun after files land in the download directory."
+
+
+def _pipeline_command(*, kind: str) -> str:
+    suffix = "_raw_only" if str(kind) == "raw" else ""
+    return (
+        "PYTHONPATH=src python3 -m perception_isp.aodraw_pipeline "
+        f"--kind {kind} "
+        "--download-root ~/Downloads "
+        "--dataset-root data/raw_datasets/aodraw "
+        f"--output-dir reports/perception_aodraw_pipeline_test_downsample_adverse_24{suffix}_v1 "
+        "--count 24 --width 768 --height 512 "
+        "--rgb-detector yolo --rgb-detector-model yolo11n.pt --label-aware --no-visuals"
+    )
 
 
 def _render_html(summary: Mapping[str, Any]) -> str:

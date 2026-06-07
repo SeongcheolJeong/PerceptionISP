@@ -119,12 +119,7 @@ def import_aodraw_downloads(
         "source_scan_error_count": len(source_scan_errors),
         "source_scan_errors": source_scan_errors,
         "next_action": _next_action(dry_run=bool(dry_run), missing_count=len(missing), imported_count=len(imported)),
-        "post_import_command": (
-            "PYTHONPATH=src python3 -m perception_isp.aodraw_image_availability "
-            "reports/perception_aodraw_subset_plan_test_downsample_adverse_24_v1/aodraw_subset_manifest.json "
-            "--dataset-root data/raw_datasets/aodraw "
-            "--output-dir reports/perception_aodraw_image_availability_test_downsample_adverse_24_v1"
-        ),
+        "post_import_command": _post_import_command(kind=str(kind)),
         "claim_boundary": (
             "This importer only copies/extracts files into the expected local layout. It does not prove RAW decoding or detector performance until the availability and evaluation gates pass."
         ),
@@ -265,6 +260,17 @@ def _next_action(*, dry_run: bool, missing_count: int, imported_count: int) -> s
     if imported_count:
         return "Files were imported. Rerun the AODRaw image availability gate."
     return "All required files were already present. Run the AODRaw image availability gate."
+
+
+def _post_import_command(*, kind: str) -> str:
+    suffix = "_raw_only" if str(kind) == "raw" else ""
+    return (
+        "PYTHONPATH=src python3 -m perception_isp.aodraw_image_availability "
+        "reports/perception_aodraw_subset_plan_test_downsample_adverse_24_v1/aodraw_subset_manifest.json "
+        f"--kind {kind} "
+        "--dataset-root data/raw_datasets/aodraw "
+        f"--output-dir reports/perception_aodraw_image_availability_test_downsample_adverse_24{suffix}_v1"
+    )
 
 
 def _render_html(summary: Mapping[str, Any]) -> str:
