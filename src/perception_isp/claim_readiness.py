@@ -218,6 +218,9 @@ def run_claim_readiness(
         scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
+        cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
+        cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
+        cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
         min_samples=int(min_samples),
     )
     protocol_html = write_protocol_coverage(protocol_summary, protocol_dir)

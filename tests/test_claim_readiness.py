@@ -168,6 +168,8 @@ class ClaimReadinessTest(unittest.TestCase):
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native", all_native=True)
 
             summary = run_claim_readiness(
                 comparison_report=report_dir,
@@ -183,6 +185,8 @@ class ClaimReadinessTest(unittest.TestCase):
                 scene_edge_confidence=scene_edge,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
+                cfa_lenspsf_native_audit=cfa_lenspsf_native,
                 output_dir=root / "readiness",
             )
 
@@ -204,6 +208,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["scene_edge_confidence"]["pass"])
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_lenspsf_detector_sweep"]["pass"])
+            self.assertTrue(dashboard_summary["cfa_lenspsf_native_audit"]["pass"])
 
 
 def _write_comparison_report(
@@ -559,6 +565,48 @@ def _write_aux_contribution_audit(path: Path) -> Path:
     return path
 
 
+def _write_cfa_lenspsf_detector_sweep(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "run_count": 2,
+        "expected_run_count": 2,
+        "count": 6,
+        "width": 640,
+        "height": 192,
+        "cfa_patterns": ["GRBG", "RGGB"],
+        "psf_sigmas": [0.0],
+        "checks": [
+            {"id": "condition_grid_complete", "status": "pass", "evidence": "runs=2 expected=2"},
+            {"id": "psf_sigma_recorded_in_raw_provenance", "status": "pass", "evidence": "recorded=6 samples=6"},
+            {"id": "detector_metrics_available", "status": "pass", "evidence": "metric_runs=2/2"},
+        ],
+        "runs": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "raw_condition_summary": {
+                    "pattern_remapped_fraction": 0.0,
+                    "true_sensor_cfa_mosaic_fraction": 1.0,
+                    "camerae2e_camera_types": {"bayer-grbg": 3},
+                    "camerae2e_native_cfa_bridge_versions": {"native_bayer_v1": 3},
+                },
+            },
+            {
+                "run_id": "cfa-rggb_psf-0p00",
+                "raw_condition_summary": {
+                    "pattern_remapped_fraction": 0.0,
+                    "true_sensor_cfa_mosaic_fraction": 1.0,
+                    "camerae2e_camera_types": {"bayer-rggb": 3},
+                    "camerae2e_native_cfa_bridge_versions": {"native_bayer_v1": 3},
+                },
+            },
+        ],
+    }
+    (path / "cfa_lenspsf_detector_sweep_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
 def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
@@ -618,9 +666,15 @@ def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
     return path
 
 
-def _write_cfa_lenspsf_native_audit(path: Path) -> Path:
+def _write_cfa_lenspsf_native_audit(path: Path, *, all_native: bool = False) -> Path:
     path.mkdir()
     (path / "index.html").write_text("<html></html>")
+    native_run_count = 2 if all_native else 1
+    native_sample_count = 6 if all_native else 3
+    remapped_run_count = 0 if all_native else 1
+    remapped_sample_count = 0 if all_native else 3
+    native_cfas = ["GRBG", "RGGB"] if all_native else ["GRBG"]
+    remapped_cfas = [] if all_native else ["RGGB"]
     payload = {
         "status": "pass",
         "run_count": 2,
@@ -629,13 +683,13 @@ def _write_cfa_lenspsf_native_audit(path: Path) -> Path:
         "psf_sigmas": [0.0],
         "checks": [
             {"id": "sweep_rows_available", "status": "pass", "evidence": "runs=2"},
-            {"id": "native_rows_identified", "status": "pass", "evidence": "native_runs=1"},
-            {"id": "remapped_rows_separated", "status": "pass", "evidence": "remapped_runs=1 partial_runs=0"},
+            {"id": "native_rows_identified", "status": "pass", "evidence": f"native_runs={native_run_count}"},
+            {"id": "remapped_rows_separated", "status": "pass", "evidence": f"remapped_runs={remapped_run_count} partial_runs=0"},
         ],
         "groups": {
-            "native": {"run_count": 1, "sample_count": 3, "cfa_patterns": ["GRBG"], "psf_sigmas": [0.0]},
+            "native": {"run_count": native_run_count, "sample_count": native_sample_count, "cfa_patterns": native_cfas, "psf_sigmas": [0.0]},
             "partial_remap": {"run_count": 0, "sample_count": 0, "cfa_patterns": [], "psf_sigmas": []},
-            "remapped": {"run_count": 1, "sample_count": 3, "cfa_patterns": ["RGGB"], "psf_sigmas": [0.0]},
+            "remapped": {"run_count": remapped_run_count, "sample_count": remapped_sample_count, "cfa_patterns": remapped_cfas, "psf_sigmas": [0.0]},
         },
         "runs": [],
         "interpretation": "unit native audit",

@@ -1358,6 +1358,9 @@ PYTHONPATH=src \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
+  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
@@ -1370,12 +1373,14 @@ matrix from the RAW/perception-ISP literature: paired HumanISP and
 PerceptionISP streams, enough held-out samples, fixed detector recipe,
 CI-backed claim gates, task metrics, task gate, condition-specific metrics, a
 condition robustness gate, front-end mechanism validation, naive RAW/minimal
-adaptation, classical lightweight RAW transform, and a task-aware or
-aux-assisted path. Missing rows are blockers for broad HumanISP or
-RAW/sensor-native superiority claims. Recommended diagnostic rows, such as the
-CFA stress sweep, edge-confidence suite, object edge-fidelity suite,
-scene edge-confidence suite, scene-information stress suite, and aux contribution audit, help interpret
-sensor-native signals but do not create a detector-performance claim.
+adaptation, classical lightweight RAW transform, a task-aware or aux-assisted
+path, and native CFA/LensPSF detector/native-audit evidence with no bridge
+remapping. Missing rows are blockers for broad HumanISP or RAW/sensor-native
+superiority claims. Recommended diagnostic rows, such as the CFA stress sweep,
+edge-confidence suite, object edge-fidelity suite, scene edge-confidence suite,
+scene-information stress suite, aux contribution audit, and CFA/LensPSF
+proposal bridge, help interpret sensor-native signals but do not create a
+detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -1399,6 +1404,9 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
+  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1 \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -1417,6 +1425,7 @@ reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1/index.html
 reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1/index.html
 reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html

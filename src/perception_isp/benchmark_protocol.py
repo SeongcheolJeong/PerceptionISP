@@ -27,6 +27,9 @@ EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
+CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY = "cfa_lenspsf_detector_sweep_summary.json"
+CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY = "cfa_lenspsf_proposal_audit_summary.json"
+CFA_LENSPSF_NATIVE_AUDIT_SUMMARY = "cfa_lenspsf_native_audit_summary.json"
 
 HUMAN_INPUTS = {"human_rgb"}
 PERCEPTION_INPUTS = {
@@ -63,6 +66,9 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--scene-edge-confidence", action="append", default=[], help="scene_edge_confidence_summary.json path/dir. Repeatable.")
     parser.add_argument("--scene-information-stress", default=None, help="scene_information_stress_summary.json path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="aux_contribution_audit_summary.json path/dir.")
+    parser.add_argument("--cfa-lenspsf-detector-sweep", default=None, help="cfa_lenspsf_detector_sweep_summary.json path/dir.")
+    parser.add_argument("--cfa-lenspsf-proposal-audit", default=None, help="cfa_lenspsf_proposal_audit_summary.json path/dir.")
+    parser.add_argument("--cfa-lenspsf-native-audit", default=None, help="cfa_lenspsf_native_audit_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
     parser.add_argument("--output-dir", default="reports/perception_benchmark_protocol")
     args = parser.parse_args(argv)
@@ -83,6 +89,9 @@ def main(argv: Any = None) -> int:
         scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
+        cfa_lenspsf_detector_sweep=args.cfa_lenspsf_detector_sweep,
+        cfa_lenspsf_proposal_audit=args.cfa_lenspsf_proposal_audit,
+        cfa_lenspsf_native_audit=args.cfa_lenspsf_native_audit,
         min_samples=int(args.min_samples),
     )
     html_path = write_protocol_coverage(summary, args.output_dir)
@@ -121,6 +130,9 @@ def build_protocol_coverage(
     scene_edge_confidence: str | Path | Sequence[str | Path] | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
+    cfa_lenspsf_detector_sweep: str | Path | None = None,
+    cfa_lenspsf_proposal_audit: str | Path | None = None,
+    cfa_lenspsf_native_audit: str | Path | None = None,
     min_samples: int = 1000,
 ) -> Dict[str, Any]:
     evidence = _collect_evidence(
@@ -139,6 +151,9 @@ def build_protocol_coverage(
         scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
+        cfa_lenspsf_detector_sweep=cfa_lenspsf_detector_sweep,
+        cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal_audit,
+        cfa_lenspsf_native_audit=cfa_lenspsf_native_audit,
     )
     requirements = _requirements(evidence, min_samples=int(min_samples))
     missing_required = [row["id"] for row in requirements if row["scope"] == "claim_required" and row["status"] != "covered"]
@@ -194,6 +209,9 @@ def _collect_evidence(
     scene_edge_confidence: str | Path | Sequence[str | Path] | None,
     scene_information_stress: str | Path | None,
     aux_contribution_audit: str | Path | None,
+    cfa_lenspsf_detector_sweep: str | Path | None,
+    cfa_lenspsf_proposal_audit: str | Path | None,
+    cfa_lenspsf_native_audit: str | Path | None,
 ) -> Dict[str, Any]:
     input_names: set[str] = set()
     run_configs: list[Dict[str, Any]] = []
@@ -242,6 +260,9 @@ def _collect_evidence(
     scene_edge = _load_scene_edge_confidence(scene_edge_confidence)
     scene_information = _load_scene_information_stress(scene_information_stress)
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit)
+    cfa_lenspsf_detector = _load_cfa_lenspsf_detector_sweep(cfa_lenspsf_detector_sweep)
+    cfa_lenspsf_proposal = _load_cfa_lenspsf_proposal_audit(cfa_lenspsf_proposal_audit)
+    cfa_lenspsf_native = _load_cfa_lenspsf_native_audit(cfa_lenspsf_native_audit)
 
     return {
         "comparison_reports": comparison_paths,
@@ -266,6 +287,9 @@ def _collect_evidence(
         "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
+        "cfa_lenspsf_detector_sweep": cfa_lenspsf_detector,
+        "cfa_lenspsf_proposal_audit": cfa_lenspsf_proposal,
+        "cfa_lenspsf_native_audit": cfa_lenspsf_native,
     }
 
 
@@ -286,6 +310,9 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     scene_edge = evidence.get("scene_edge_confidence", {}) if isinstance(evidence.get("scene_edge_confidence"), Mapping) else {}
     scene_information = evidence.get("scene_information_stress", {}) if isinstance(evidence.get("scene_information_stress"), Mapping) else {}
     aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
+    cfa_lenspsf_detector = evidence.get("cfa_lenspsf_detector_sweep", {}) if isinstance(evidence.get("cfa_lenspsf_detector_sweep"), Mapping) else {}
+    cfa_lenspsf_proposal = evidence.get("cfa_lenspsf_proposal_audit", {}) if isinstance(evidence.get("cfa_lenspsf_proposal_audit"), Mapping) else {}
+    cfa_lenspsf_native = evidence.get("cfa_lenspsf_native_audit", {}) if isinstance(evidence.get("cfa_lenspsf_native_audit"), Mapping) else {}
 
     return [
         _row(
@@ -447,6 +474,30 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(scene_information.get("available")) and bool(scene_information.get("pass")),
             str(scene_information.get("summary", "missing")),
             "A scene-information stress suite verifies scene-to-sensor information loss and prevents overclaiming RGB-scene pass-through tests.",
+        ),
+        _row(
+            "native_cfa_lenspsf_detector_sweep",
+            "Native CFA/LensPSF detector sweep available",
+            "raw_claim_required",
+            bool(cfa_lenspsf_detector.get("available")) and bool(cfa_lenspsf_detector.get("native_clean")),
+            str(cfa_lenspsf_detector.get("summary", "missing")),
+            "RAW/sensor-native CFA claims need detector evidence with source CFA equal to target CFA, true CFA mosaics, and no bridge remapping.",
+        ),
+        _row(
+            "native_cfa_lenspsf_audit",
+            "Native CFA/LensPSF audit passed",
+            "raw_claim_required",
+            bool(cfa_lenspsf_native.get("available")) and bool(cfa_lenspsf_native.get("all_native")),
+            str(cfa_lenspsf_native.get("summary", "missing")),
+            "Native CFA claims need an audit that separates true native rows from remapped rows.",
+        ),
+        _row(
+            "cfa_lenspsf_proposal_bridge",
+            "CFA/LensPSF proposal-edge bridge available",
+            "recommended",
+            bool(cfa_lenspsf_proposal.get("available")) and bool(cfa_lenspsf_proposal.get("pass")),
+            str(cfa_lenspsf_proposal.get("summary", "missing")),
+            "A CFA/LensPSF proposal bridge is recommended to connect condition sweeps to proposal-level edge and scene-edge support.",
         ),
         _row(
             "aux_contribution_audit",
@@ -833,6 +884,144 @@ def _load_aux_contribution_audit(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _load_cfa_lenspsf_detector_sweep(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "native_clean": False, "summary": "missing"}
+    summary_path = _summary_path(path, CFA_LENSPSF_DETECTOR_SWEEP_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    remap_values = []
+    true_cfa_values = []
+    sample_counts = []
+    bridge_versions = set()
+    camera_types = set()
+    for run in data.get("runs", ()):
+        if not isinstance(run, Mapping):
+            continue
+        raw_summary = run.get("raw_condition_summary", {}) if isinstance(run.get("raw_condition_summary"), Mapping) else {}
+        remap = _maybe_float(raw_summary.get("pattern_remapped_fraction"))
+        true_cfa = _maybe_float(raw_summary.get("true_sensor_cfa_mosaic_fraction"))
+        if remap is not None:
+            remap_values.append(remap)
+        if true_cfa is not None:
+            true_cfa_values.append(true_cfa)
+        sample_count = _maybe_float(raw_summary.get("sample_count", run.get("sample_count")))
+        if sample_count is not None:
+            sample_counts.append(int(sample_count))
+        camera_types.update(str(value) for value in (raw_summary.get("camerae2e_camera_types", {}) if isinstance(raw_summary.get("camerae2e_camera_types"), Mapping) else {}).keys())
+        bridge_versions.update(str(value) for value in (raw_summary.get("camerae2e_native_cfa_bridge_versions", {}) if isinstance(raw_summary.get("camerae2e_native_cfa_bridge_versions"), Mapping) else {}).keys())
+    max_remap = max(remap_values) if remap_values else None
+    min_true_cfa = min(true_cfa_values) if true_cfa_values else None
+    run_count = int(data.get("run_count", 0))
+    count_per_condition = int(data.get("count", 0))
+    total_samples = sum(sample_counts) if sample_counts else run_count * count_per_condition
+    native_clean = (
+        str(data.get("status", "")) == "pass"
+        and not failed
+        and max_remap == 0.0
+        and min_true_cfa == 1.0
+        and bool(bridge_versions)
+    )
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "native_clean": native_clean,
+        "status": str(data.get("status", "")),
+        "run_count": run_count,
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "count": count_per_condition,
+        "sample_count": total_samples,
+        "width": int(data.get("width", 0)),
+        "height": int(data.get("height", 0)),
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [_maybe_float(value) for value in data.get("psf_sigmas", ())],
+        "max_remap_fraction": max_remap,
+        "min_true_cfa_fraction": min_true_cfa,
+        "camerae2e_camera_types": sorted(camera_types),
+        "camerae2e_native_cfa_bridge_versions": sorted(bridge_versions),
+        "failed_checks": failed,
+        "summary": (
+            f"{str(data.get('status', ''))}, runs={run_count}/{int(data.get('expected_run_count', 0))}, "
+            f"samples={total_samples}, size={int(data.get('width', 0))}x{int(data.get('height', 0))}, "
+            f"max_remap={_fmt_optional(max_remap)}, min_true_cfa={_fmt_optional(min_true_cfa)}, "
+            f"bridge={', '.join(sorted(bridge_versions)) or 'none'}"
+        ),
+    }
+
+
+def _load_cfa_lenspsf_proposal_audit(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, CFA_LENSPSF_PROPOSAL_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    status = str(data.get("status", ""))
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass" and not failed,
+        "status": status,
+        "condition_count": int(data.get("condition_count", 0)),
+        "expected_condition_count": int(data.get("expected_condition_count", 0)),
+        "removed_fp_count": int(aggregate.get("removed_fp_count", 0)),
+        "removed_tp_count": int(aggregate.get("removed_tp_count", 0)),
+        "scene_edge_positive_condition_count": int(aggregate.get("scene_edge_positive_condition_count", 0)),
+        "edge_positive_condition_count": int(aggregate.get("edge_positive_condition_count", 0)),
+        "failed_checks": failed,
+        "summary": (
+            f"{status}, conditions={int(data.get('condition_count', 0))}/{int(data.get('expected_condition_count', 0))}, "
+            f"removedFP={int(aggregate.get('removed_fp_count', 0))}, removedTP={int(aggregate.get('removed_tp_count', 0))}, "
+            f"scenePositive={int(aggregate.get('scene_edge_positive_condition_count', 0))}, "
+            f"edgePositive={int(aggregate.get('edge_positive_condition_count', 0))}"
+        ),
+    }
+
+
+def _load_cfa_lenspsf_native_audit(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "all_native": False, "summary": "missing"}
+    summary_path = _summary_path(path, CFA_LENSPSF_NATIVE_AUDIT_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    groups = data.get("groups", {}) if isinstance(data.get("groups"), Mapping) else {}
+    native = groups.get("native", {}) if isinstance(groups.get("native"), Mapping) else {}
+    remapped = groups.get("remapped", {}) if isinstance(groups.get("remapped"), Mapping) else {}
+    partial = groups.get("partial_remap", {}) if isinstance(groups.get("partial_remap"), Mapping) else {}
+    run_count = int(data.get("run_count", 0))
+    native_run_count = int(native.get("run_count", 0))
+    remapped_run_count = int(remapped.get("run_count", 0))
+    partial_run_count = int(partial.get("run_count", 0))
+    all_native = run_count > 0 and native_run_count == run_count and remapped_run_count == 0 and partial_run_count == 0
+    status = str(data.get("status", ""))
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass" and not failed,
+        "all_native": status == "pass" and not failed and all_native,
+        "status": status,
+        "run_count": run_count,
+        "expected_run_count": int(data.get("expected_run_count", 0)),
+        "native_run_count": native_run_count,
+        "native_sample_count": int(native.get("sample_count", 0)),
+        "remapped_run_count": remapped_run_count,
+        "partial_run_count": partial_run_count,
+        "cfa_patterns": [str(value) for value in native.get("cfa_patterns", ())],
+        "failed_checks": failed,
+        "summary": (
+            f"{status}, native={native_run_count}/{run_count}, remapped={remapped_run_count}, partial={partial_run_count}, "
+            f"samples={int(native.get('sample_count', 0))}, cfa={', '.join(str(value) for value in native.get('cfa_patterns', ())) or 'none'}"
+        ),
+    }
+
+
 def _sample_count(report: Mapping[str, Any]) -> int:
     if report.get("sample_count") is not None:
         return int(report.get("sample_count", 0))
@@ -1000,6 +1189,9 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     scene_edge = evidence.get("scene_edge_confidence", {}) if isinstance(evidence.get("scene_edge_confidence"), Mapping) else {}
     scene_information = evidence.get("scene_information_stress", {}) if isinstance(evidence.get("scene_information_stress"), Mapping) else {}
     aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
+    cfa_lenspsf_detector = evidence.get("cfa_lenspsf_detector_sweep", {}) if isinstance(evidence.get("cfa_lenspsf_detector_sweep"), Mapping) else {}
+    cfa_lenspsf_proposal = evidence.get("cfa_lenspsf_proposal_audit", {}) if isinstance(evidence.get("cfa_lenspsf_proposal_audit"), Mapping) else {}
+    cfa_lenspsf_native = evidence.get("cfa_lenspsf_native_audit", {}) if isinstance(evidence.get("cfa_lenspsf_native_audit"), Mapping) else {}
     return f"""<!doctype html>
 <html lang=\"en\">
 <head>
@@ -1045,6 +1237,9 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>Object edge-fidelity suite</th><td>{_optional_link(edge_fidelity, destination)} {html_lib.escape(str(edge_fidelity.get('summary', 'missing')))}</td></tr>
       <tr><th>Scene edge-confidence suite</th><td>{_optional_link(scene_edge, destination)} {html_lib.escape(str(scene_edge.get('summary', 'missing')))}</td></tr>
       <tr><th>Scene-information stress</th><td>{_optional_link(scene_information, destination)} {html_lib.escape(str(scene_information.get('summary', 'missing')))}</td></tr>
+      <tr><th>CFA/LensPSF detector sweep</th><td>{_optional_link(cfa_lenspsf_detector, destination)} {html_lib.escape(str(cfa_lenspsf_detector.get('summary', 'missing')))}</td></tr>
+      <tr><th>CFA/LensPSF native audit</th><td>{_optional_link(cfa_lenspsf_native, destination)} {html_lib.escape(str(cfa_lenspsf_native.get('summary', 'missing')))}</td></tr>
+      <tr><th>CFA/LensPSF proposal bridge</th><td>{_optional_link(cfa_lenspsf_proposal, destination)} {html_lib.escape(str(cfa_lenspsf_proposal.get('summary', 'missing')))}</td></tr>
       <tr><th>Aux contribution audit</th><td>{_optional_link(aux_contribution, destination)} {html_lib.escape(str(aux_contribution.get('summary', 'missing')))}</td></tr>
     </tbody>
   </table>

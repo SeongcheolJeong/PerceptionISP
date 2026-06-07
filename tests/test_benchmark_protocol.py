@@ -29,6 +29,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
 
             summary = build_protocol_coverage(
                 comparison_reports=[report],
@@ -45,6 +48,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
+                cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
+                cfa_lenspsf_native_audit=cfa_lenspsf_native,
                 min_samples=3,
             )
 
@@ -61,6 +67,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(rows["scene_edge_confidence"]["status"], "covered")
             self.assertEqual(rows["scene_information_stress"]["status"], "covered")
             self.assertEqual(rows["aux_contribution_audit"]["status"], "covered")
+            self.assertEqual(rows["native_cfa_lenspsf_detector_sweep"]["status"], "covered")
+            self.assertEqual(rows["native_cfa_lenspsf_audit"]["status"], "covered")
+            self.assertEqual(rows["cfa_lenspsf_proposal_bridge"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
             self.assertIn("naive_raw_baseline", summary["missing_raw_claim"])
 
@@ -88,6 +97,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             scene_edge_sweep = _write_scene_edge_confidence(root / "scene_edge_sweep", cfa_pattern="RGGB", psf_sigmas=(0.0, 1.0))
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
 
             summary = build_protocol_coverage(
                 comparison_reports=[classical, naive],
@@ -105,6 +117,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 scene_edge_confidence=[scene_edge, scene_edge_sweep],
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
+                cfa_lenspsf_detector_sweep=cfa_lenspsf_detector,
+                cfa_lenspsf_proposal_audit=cfa_lenspsf_proposal,
+                cfa_lenspsf_native_audit=cfa_lenspsf_native,
                 min_samples=3,
             )
 
@@ -116,6 +131,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(summary["evidence"]["scene_edge_confidence"]["cfa_patterns"], ["GRBG", "RGGB"])
             self.assertAlmostEqual(summary["evidence"]["scene_edge_confidence"]["perception_rgb_minus_human_source_edge_f1_mean"], 0.01)
             self.assertAlmostEqual(summary["evidence"]["scene_edge_confidence"]["perception_aux_strength_source_edge_f1_win_rate"], 1.0)
+            self.assertTrue(summary["evidence"]["cfa_lenspsf_detector_sweep"]["native_clean"])
+            self.assertTrue(summary["evidence"]["cfa_lenspsf_native_audit"]["all_native"])
+            self.assertTrue(summary["evidence"]["cfa_lenspsf_proposal_audit"]["pass"])
             self.assertFalse(summary["claim_gate_outcomes"]["broad_superiority_pass"])
             self.assertEqual(summary["missing_required"], [])
             self.assertEqual(summary["missing_raw_claim"], [])
@@ -136,6 +154,9 @@ class BenchmarkProtocolTest(unittest.TestCase):
             scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
+            cfa_lenspsf_detector = _write_cfa_lenspsf_detector_sweep(root / "cfa_lenspsf_detector")
+            cfa_lenspsf_proposal = _write_cfa_lenspsf_proposal_audit(root / "cfa_lenspsf_proposal")
+            cfa_lenspsf_native = _write_cfa_lenspsf_native_audit(root / "cfa_lenspsf_native")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 exit_code = protocol_main(
@@ -166,6 +187,12 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(scene_information),
                         "--aux-contribution-audit",
                         str(aux_contribution),
+                        "--cfa-lenspsf-detector-sweep",
+                        str(cfa_lenspsf_detector),
+                        "--cfa-lenspsf-proposal-audit",
+                        str(cfa_lenspsf_proposal),
+                        "--cfa-lenspsf-native-audit",
+                        str(cfa_lenspsf_native),
                         "--min-samples",
                         "3",
                         "--output-dir",
@@ -508,6 +535,100 @@ def _write_aux_contribution_audit(path: Path) -> Path:
         "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},
     }
     (path / "aux_contribution_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_detector_sweep(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "run_count": 2,
+        "expected_run_count": 2,
+        "count": 16,
+        "width": 640,
+        "height": 192,
+        "cfa_patterns": ["GRBG", "RGGB"],
+        "psf_sigmas": [0.0],
+        "checks": [
+            {"id": "condition_grid_complete", "status": "pass", "evidence": "runs=2 expected=2"},
+            {"id": "psf_sigma_recorded_in_raw_provenance", "status": "pass", "evidence": "recorded=32 samples=32"},
+            {"id": "detector_metrics_available", "status": "pass", "evidence": "metric_runs=2/2"},
+        ],
+        "runs": [
+            {
+                "run_id": "cfa-grbg_psf-0p00",
+                "raw_condition_summary": {
+                    "pattern_remapped_fraction": 0.0,
+                    "true_sensor_cfa_mosaic_fraction": 1.0,
+                    "camerae2e_camera_types": {"bayer-grbg": 16},
+                    "camerae2e_native_cfa_bridge_versions": {"native_bayer_v1": 16},
+                },
+            },
+            {
+                "run_id": "cfa-rggb_psf-0p00",
+                "raw_condition_summary": {
+                    "pattern_remapped_fraction": 0.0,
+                    "true_sensor_cfa_mosaic_fraction": 1.0,
+                    "camerae2e_camera_types": {"bayer-rggb": 16},
+                    "camerae2e_native_cfa_bridge_versions": {"native_bayer_v1": 16},
+                },
+            },
+        ],
+    }
+    (path / "cfa_lenspsf_detector_sweep_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_proposal_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "condition_count": 2,
+        "expected_condition_count": 2,
+        "checks": [
+            {"id": "condition_bridges_available", "status": "pass", "evidence": "bridges=2 expected=2"},
+            {"id": "removed_fp_observed_across_conditions", "status": "pass", "evidence": "removed_fp=7 removed_tp=0"},
+            {"id": "source_scene_edge_predicts_removed_fp_in_some_conditions", "status": "pass", "evidence": "positive_conditions=2/2"},
+            {"id": "aux_edge_predicts_removed_fp_in_some_conditions", "status": "pass", "evidence": "positive_conditions=1/2"},
+        ],
+        "aggregate": {
+            "condition_count": 2,
+            "removed_fp_count": 7,
+            "removed_tp_count": 0,
+            "fp_delta_count": -7,
+            "scene_edge_positive_condition_count": 2,
+            "edge_positive_condition_count": 1,
+        },
+    }
+    (path / "cfa_lenspsf_proposal_audit_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_cfa_lenspsf_native_audit(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "run_count": 2,
+        "expected_run_count": 2,
+        "checks": [
+            {"id": "sweep_rows_available", "status": "pass", "evidence": "runs=2"},
+            {"id": "native_rows_identified", "status": "pass", "evidence": "native_runs=2"},
+            {"id": "remapped_rows_separated", "status": "pass", "evidence": "remapped_runs=0 partial_runs=0"},
+        ],
+        "groups": {
+            "native": {
+                "run_count": 2,
+                "sample_count": 32,
+                "cfa_patterns": ["GRBG", "RGGB"],
+            },
+            "partial_remap": {"run_count": 0, "sample_count": 0, "cfa_patterns": []},
+            "remapped": {"run_count": 0, "sample_count": 0, "cfa_patterns": []},
+        },
+    }
+    (path / "cfa_lenspsf_native_audit_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

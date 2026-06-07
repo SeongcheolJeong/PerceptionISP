@@ -648,11 +648,12 @@ paired HumanISP and PerceptionISP streams, sufficient held-out samples, fixed
 detector recipe, CI-backed gates, task metrics, a task gate,
 condition-specific metrics, a condition robustness gate, front-end mechanism
 validation, naive RAW/minimal adaptation, classical lightweight RAW transform,
-and task-aware/aux-assisted paths. Recommended diagnostic rows such as the CFA
+task-aware/aux-assisted paths, and native CFA/LensPSF detector/native-audit
+evidence with no bridge remapping. Recommended diagnostic rows such as the CFA
 stress sweep, edge-confidence suite, object edge-fidelity suite,
 scene-information stress suite, aux contribution audit, and CFA/LensPSF
-detector/proposal/native-CFA audits help interpret sensor-native signals but do
-not create detector performance evidence.
+proposal bridge help interpret sensor-native signals but do not create detector
+performance evidence.
 
 The current naive RAW-like KITTI val baseline is:
 
