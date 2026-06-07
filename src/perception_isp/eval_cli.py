@@ -42,6 +42,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aodraw-white-level", type=float, default=None, help="Optional AODRaw white level override.")
     parser.add_argument("--aodraw-require-srgb", action="store_true", help="Require paired AODRaw sRGB files for reference RGB metrics.")
     parser.add_argument("--pascalraw-manifest", default=None, help="PASCALRAW subset manifest JSON for --source pascalraw-dataset.")
+    parser.add_argument("--pascalraw-native-raw", action="store_true", help="Use full PASCALRAW NEF native Bayer RAW instead of downsampled PNG remosaic.")
     parser.add_argument("--no-camerae2e", action="store_true", help="Use direct RGB remosaic instead of CameraE2E for dataset sources.")
     parser.add_argument("--count", type=int, default=4)
     parser.add_argument("--offset", type=int, default=0, help="Skip this many dataset images before applying --count.")
@@ -191,20 +192,34 @@ def main(argv: Any = None) -> int:
             raise ValueError("--dataset is required when --source pascalraw-dataset")
         if not args.pascalraw_manifest:
             raise ValueError("--pascalraw-manifest is required when --source pascalraw-dataset")
-        from .pascalraw_loader import load_pascalraw_detection_samples
+        if bool(args.pascalraw_native_raw):
+            from .pascalraw_loader import load_pascalraw_native_detection_samples
 
-        samples = load_pascalraw_detection_samples(
-            args.dataset,
-            args.pascalraw_manifest,
-            limit=args.count,
-            offset=int(args.offset),
-            width=args.width,
-            height=args.height,
-            cfa_pattern=args.cfa,
-            use_camerae2e=not bool(args.no_camerae2e),
-            progress_interval=int(args.load_progress_interval),
-            progress_label=f"load:{args.source}:{args.offset}+{args.count}",
-        )
+            samples = load_pascalraw_native_detection_samples(
+                args.dataset,
+                args.pascalraw_manifest,
+                limit=args.count,
+                offset=int(args.offset),
+                width=args.width,
+                height=args.height,
+                progress_interval=int(args.load_progress_interval),
+                progress_label=f"load:{args.source}:native:{args.offset}+{args.count}",
+            )
+        else:
+            from .pascalraw_loader import load_pascalraw_detection_samples
+
+            samples = load_pascalraw_detection_samples(
+                args.dataset,
+                args.pascalraw_manifest,
+                limit=args.count,
+                offset=int(args.offset),
+                width=args.width,
+                height=args.height,
+                cfa_pattern=args.cfa,
+                use_camerae2e=not bool(args.no_camerae2e),
+                progress_interval=int(args.load_progress_interval),
+                progress_label=f"load:{args.source}:{args.offset}+{args.count}",
+            )
     else:
         samples = make_synthetic_evaluation_samples(
             count=args.count,
@@ -260,13 +275,16 @@ def main(argv: Any = None) -> int:
         "psf_sigma": None if args.psf_sigma is None else max(float(args.psf_sigma), 0.0),
         "dataset": args.dataset,
         "split": args.split,
-        "use_camerae2e": False if args.source == "aodraw-dataset" else not bool(args.no_camerae2e),
+        "use_camerae2e": False
+        if args.source == "aodraw-dataset" or (args.source == "pascalraw-dataset" and bool(args.pascalraw_native_raw))
+        else not bool(args.no_camerae2e),
         "aodraw_manifest": args.aodraw_manifest,
         "aodraw_cfa": str(args.aodraw_cfa),
         "aodraw_black_level": args.aodraw_black_level,
         "aodraw_white_level": args.aodraw_white_level,
         "aodraw_require_srgb": bool(args.aodraw_require_srgb),
         "pascalraw_manifest": args.pascalraw_manifest,
+        "pascalraw_native_raw": bool(args.pascalraw_native_raw),
         "rgb_detector": rgb_detector.name,
         "rgb_detector_model": args.rgb_detector_model,
         "rgb_detector_confidence": float(args.rgb_detector_confidence),
