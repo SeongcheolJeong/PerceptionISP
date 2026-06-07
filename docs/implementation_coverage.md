@@ -59,20 +59,20 @@ Known limits:
   `psf_sigma_map` into RAW calibration and records it in run config, sample
   metadata, and RAW provenance. `cfa_lenspsf_detector_sweep` uses that path to
   run fixed-detector CFA/LensPSF condition sweeps and report remap/provenance
-  checks. The current `native_bayer_v1` KITTI val32 sweep covers
-  GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6` at `640 x 192`, with 384/384 samples
+  checks. The current `native_bayer_v1` KITTI val64 sweep covers
+  GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6` at `640 x 192`, with 768/768 samples
   recorded as true native CFA mosaics and no bridge remapping. It is diagnostic
   condition evidence, not broad detector robustness.
-- `cfa_lenspsf_proposal_audit` joins the KITTI val32 CFA/LensPSF detector sweep
+- `cfa_lenspsf_proposal_audit` joins the KITTI val64 CFA/LensPSF detector sweep
   to same-sample proposal edge and source-scene-edge correlations. The current
-  native report removes 151 FP and 0 TP proposals across 12 conditions, with
+  native report removes 197 FP and 0 TP proposals across 12 conditions, with
   source-scene-edge support directionally positive in 12/12 conditions and
-  aux-edge support positive in 9/12. This is calibrated proposal-path bridge
+  aux-edge support positive in 10/12. This is calibrated proposal-path bridge
   evidence, not incremental aux-only ablation and not a trained RGB+aux DNN
   result.
 - `cfa_lenspsf_native_audit` separates native CameraE2E source-CFA rows from
   rows that were remapped to a requested target CFA. The current
-  `native_bayer_v1` KITTI val32 audit has 12 native rows with 384 samples and 0
+  `native_bayer_v1` KITTI val64 audit has 12 native rows with 768 samples and 0
   remapped rows for `RGGB`, `GRBG`, `BGGR`, and `GBRG`. The older val32
   `bayer_psf` report predates `native_bayer_v1`; its non-GRBG rows remain
   historical bridge/remap sensitivity evidence only.

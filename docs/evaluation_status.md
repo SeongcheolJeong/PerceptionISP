@@ -266,9 +266,9 @@ reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
-reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1/index.html
-reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1/index.html
-reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1/index.html
 ```
 
 The current condition report has 9 slices from explicit/sample-derived
@@ -284,13 +284,14 @@ HumanISP superiority, rejects task-level recall improvement through a failed
 learned RGB+aux DNN path as implemented but not claim-quality.
 
 The CFA/LensPSF detector sweep is now guarded by a native-CFA separation audit.
-The current `native_bayer_v1` val32 sweep has 12 rows and 384 samples at
+The current `native_bayer_v1` val64 sweep has 12 rows and 768 samples at
 `640 x 192`: all 12 rows are native CameraE2E Bayer rows, all have
 `pattern_remapped_fraction=0.0`, and all have
 `true_sensor_cfa_mosaic_fraction=1.0`. The native group covers `RGGB`, `GRBG`,
-`BGGR`, and `GBRG`, with mean calibrated FP delta `-0.3854` versus HumanISP,
-mean recall delta `-0.0002`, and best native dFP `-0.5000` at `RGGB`/PSF
-`1.6`. The older `perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf`
+`BGGR`, and `GBRG`, with mean calibrated FP delta `-0.2813` versus HumanISP,
+mean recall delta `-0.0014`, mean small-object recall delta `+0.0009`, and best
+native dFP `-0.3281` at `BGGR`/PSF `0.0`. The older
+`perception_cfa_lenspsf_detector_sweep_kitti_val32_bayer_psf`
 report predates `native_bayer_v1`; keep its non-GRBG rows labeled as historical
 bridge/remap sensitivity evidence.
 
@@ -625,9 +626,9 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | CFA stress sweep | Available as diagnostic evidence; `MONO` ranks highest for low-light/low-MTF synthetic scores and `RGBIR` for glare |
 | Edge-confidence suite | `pass` for synthetic low-light, glare, and low-MTF difficult-edge checks; this is front-end confidence evidence, not detector performance evidence |
 | Object edge-fidelity suite | `pass`; object/sensor edge oracles are compared against HumanISP RGB edges, PerceptionISP RGB edges, and aux edge maps across CFA/LensPSF. LensPSF sigma `0.0 -> 1.6` sensor pixels reduces absolute sensor-edge P95 `0.0546 -> 0.0362` (`ratio=0.6624`). `psf_sigma_map` now feeds PSF blur-confidence and PSF edge-likelihood aux maps. This is front-end edge evidence, not detector performance evidence |
-| CFA/LensPSF detector sweep | `pass` as diagnostic condition evidence; `reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1` covers GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6`, 32 KITTI val samples per condition at `640 x 192`, fixed YOLO11n recipe, and calibrated score-label-aux proposals. PSF provenance is recorded for `384/384` samples. All rows use `native_bayer_v1`, have source CFA equal to target CFA, `max_remap=0.0`, and `min_true_cfa=1.0`. Best calibrated downstream FP delta is `-0.5000` at RGGB/PSF `1.6`. This is condition sensitivity evidence, not broad superiority |
-| CFA/LensPSF proposal-edge bridge | `pass` as diagnostic proposal bridge evidence; `reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1` joins the same 12 native CFA/LensPSF detector conditions to same-sample proposal edge and source-scene-edge support. The calibrated proposal path removes 151 FP and 0 TP proposals versus RGB+Aux fusion, with net `dFP=-149` and `dTP=-2`. Source scene-edge support is directionally positive in 12/12 conditions, best low-scene-edge AUC `0.7222` at BGGR/PSF `0.8`; aux-edge support is positive in 9/12, best low-edge AUC `0.5808` at RGGB/PSF `1.6`. This is post-hoc calibrated proposal evidence, not incremental aux-only ablation, trained-DNN proof, or broad superiority |
-| CFA/LensPSF native-CFA separation | `pass` as a claim-boundary guardrail; `reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1` separates the same detector sweep into 12 native rows with 384 samples and 0 remapped rows. Native rows cover BGGR/GBRG/GRBG/RGGB, have mean dFP `-0.3854`, mean dR50 `-0.0002`, mean small dR50 `-0.0038`, and best native dFP `-0.5000` at RGGB/PSF `1.6`. This supports native-CFA condition discussion, not a broad HumanISP superiority claim |
+| CFA/LensPSF detector sweep | `pass` as diagnostic condition evidence; `reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1` covers GRBG/RGGB/BGGR/GBRG x PSF `0.0/0.8/1.6`, 64 KITTI val samples per condition at `640 x 192`, fixed YOLO11n recipe, and calibrated score-label-aux proposals. PSF provenance is recorded for `768/768` samples. All rows use `native_bayer_v1`, have source CFA equal to target CFA, `max_remap=0.0`, and `min_true_cfa=1.0`. Best calibrated downstream FP delta is `-0.3281` at BGGR/PSF `0.0`. This is condition sensitivity evidence, not broad superiority |
+| CFA/LensPSF proposal-edge bridge | `pass` as diagnostic proposal bridge evidence; `reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1` joins the same 12 native CFA/LensPSF detector conditions to same-sample proposal edge and source-scene-edge support. The calibrated proposal path removes 197 FP and 0 TP proposals versus RGB+Aux fusion, with net `dFP=-195` and `dTP=-2`. Source scene-edge support is directionally positive in 12/12 conditions, best low-scene-edge AUC `0.6825` at BGGR/PSF `0.8`; aux-edge support is positive in 10/12, best low-edge AUC `0.5794` at BGGR/PSF `0.8`. This is post-hoc calibrated proposal evidence, not incremental aux-only ablation, trained-DNN proof, or broad superiority |
+| CFA/LensPSF native-CFA separation | `pass` as a claim-boundary guardrail; `reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1` separates the same detector sweep into 12 native rows with 768 samples and 0 remapped rows. Native rows cover BGGR/GBRG/GRBG/RGGB, have mean dFP `-0.2813`, mean dR50 `-0.0014`, mean small dR50 `+0.0009`, and best native dFP `-0.3281` at BGGR/PSF `0.0`. This supports native-CFA condition discussion, not a broad HumanISP superiority claim |
 | Scene edge-confidence suite | `pass`; a `640 x 480` real sample image is fed through CameraE2E to a `320 x 240` `GRBG` sensor target with no CFA remap. Against the high-resolution scene-edge proxy, HumanISP RGB proxy F1 is `0.6644`, PerceptionISP RGB proxy F1 is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and aux edge-confidence F1 is `0.3727`. This is front-end scene-edge evidence, not object-boundary or detector performance evidence |
 | Scene-information stress | `pass`; high-resolution scene detail loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor loss are covered as scene-to-sensor diagnostic evidence, not detector performance evidence |
 | Aux contribution audit | `pass`; `score_aux` vs RGB+Aux fusion gives `dP=+0.0035`, `dR50=-0.0027`, `dFP=-0.0608`, and adding aux to `score_label` gives `dP=+0.0054`, `dR50=-0.0022`, `dFP=-0.0622`. In the same-sample bridge, incremental aux scoring removes 95 FP and 16 TP proposals; removed FP has lower aux edge support than kept TP (`delta=-0.0596`, low-edge AUC `0.6904`) and lower source scene-edge support (`delta=-0.0302`, low-scene-edge AUC `0.6681`) |
@@ -1000,8 +1001,8 @@ The CFA/LensPSF detector sweep runner now provides the first condition-level
 detector diagnostic:
 
 ```text
-reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1/index.html
-reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1/cfa_lenspsf_detector_sweep_summary.json
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1/cfa_lenspsf_detector_sweep_summary.json
 ```
 
 It is intentionally not claim-grade scale. It shows that the detector path can
@@ -1009,14 +1010,14 @@ be swept across CFA and LensPSF while preserving RAW provenance and PSF
 conditioning. The matching proposal-edge bridge is:
 
 ```text
-reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1/index.html
-reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1/cfa_lenspsf_proposal_audit_summary.json
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/cfa_lenspsf_proposal_audit_summary.json
 ```
 
 It links the same 12 native CFA/LensPSF conditions to proposal-level
-edge/scene-edge correlations: the calibrated proposal path removes 151 FP and 0
+edge/scene-edge correlations: the calibrated proposal path removes 197 FP and 0
 TP proposals, source scene-edge support is positive in 12/12 conditions, and
-aux-edge support is positive in 9/12. The next step is to increase sample scale
+aux-edge support is positive in 10/12. The next step is to increase sample scale
 and add native/adverse-condition slices rather than relying on bridge-remap
 sensitivity.
 

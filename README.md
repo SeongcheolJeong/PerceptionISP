@@ -727,7 +727,7 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
   --source yolo-dataset \
   --dataset data/kitti/data.yaml \
   --split val \
-  --count 32 \
+  --count 64 \
   --width 640 \
   --height 192 \
   --cfa GRBG \
@@ -751,24 +751,24 @@ PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
   --human-denoise-strength 0.18 \
   --human-demosaic-method edge_aware \
   --human-demosaic-artifact-suppression 0.20 \
-  --raw-cache-dir data/.cache/perception_isp_raw_native_bayer_v1_val32_640x192 \
+  --raw-cache-dir data/.cache/perception_isp_raw_native_bayer_v1_val64_640x192 \
   --proposal-calibration-model reports/perception_proposal_calibration_kitti_train512_score_label_aux_t001/proposal_calibration_model.json \
-  --output-dir reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1
+  --output-dir reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1
 ```
 
 The current sweep report is:
 
 ```text
-reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1/index.html
 ```
 
-It covers 12 Bayer CFA/LensPSF conditions with 32 KITTI val samples per
-condition at `640 x 192`. The PSF provenance check records `384/384` samples.
+It covers 12 Bayer CFA/LensPSF conditions with 64 KITTI val samples per
+condition at `640 x 192`. The PSF provenance check records `768/768` samples.
 All rows have `pattern_remapped_fraction=0.0`,
 `true_sensor_cfa_mosaic_fraction=1.0`, and bridge version `native_bayer_v1`;
 source CFA equals target CFA for `RGGB`, `GRBG`, `BGGR`, and `GBRG`. The best
-calibrated downstream FP delta is `-0.5000` at `RGGB`, PSF `1.6`, and the mean
-native dFP across the 12 conditions is `-0.3854`. This is condition-level
+calibrated downstream FP delta is `-0.3281` at `BGGR`, PSF `0.0`, and the mean
+native dFP across the 12 conditions is `-0.2813`. This is condition-level
 detector evidence, not broad HumanISP superiority.
 
 The older report
@@ -781,20 +781,20 @@ sweep as claim evidence:
 
 ```bash
 PYTHONPATH=src python3 -m perception_isp.cfa_lenspsf_native_audit \
-  reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
-  --output-dir reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1
+  reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
+  --output-dir reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1
 ```
 
 The current native-CFA audit report is:
 
 ```text
-reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1/index.html
 ```
 
-It separates the 12 sweep rows into 12 native rows with 384 samples and 0
+It separates the 12 sweep rows into 12 native rows with 768 samples and 0
 remapped rows. The native group covers `BGGR`, `GBRG`, `GRBG`, and `RGGB`, with
-mean calibrated FP delta `-0.3854`, mean recall delta `-0.0002`, mean small
-recall delta `-0.0038`, and best native dFP `-0.5000` at `RGGB`, PSF `1.6`.
+mean calibrated FP delta `-0.2813`, mean recall delta `-0.0014`, mean small
+recall delta `+0.0009`, and best native dFP `-0.3281` at `BGGR`, PSF `0.0`.
 
 A smaller native Bayer bridge smoke report is also available at:
 
@@ -806,7 +806,7 @@ reports/perception_cfa_lenspsf_native_audit_kitti_val4_native_bayer_smoke/index.
 It has 4 native rows and 16 samples, with source CFA equal to target CFA for
 `RGGB`, `GRBG`, `BGGR`, and `GBRG`, `pattern_remapped_fraction=0.0`, and
 `true_sensor_cfa_mosaic_fraction=1.0`. This proves the simulator/provenance
-path quickly; the val32 `640 x 192` sweep above is the stronger current
+path quickly; the val64 `640 x 192` sweep above is the stronger current
 condition-level detector evidence.
 
 Join the same condition sweep to proposal-level edge and source-scene-edge
@@ -814,23 +814,23 @@ evidence:
 
 ```bash
 PYTHONPATH=src python3 -m perception_isp.cfa_lenspsf_proposal_audit \
-  reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
-  --output-dir reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1
+  reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
+  --output-dir reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1
 ```
 
 The current proposal-edge audit report is:
 
 ```text
-reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/index.html
 ```
 
 It passes all four diagnostic checks across the same 12 conditions. The
-calibrated proposal path removes 151 FP proposals and 0 TP proposals versus the
-RGB+Aux fusion proposal baseline, with net `dFP=-149` and `dTP=-2`. Source
+calibrated proposal path removes 197 FP proposals and 0 TP proposals versus the
+RGB+Aux fusion proposal baseline, with net `dFP=-195` and `dTP=-2`. Source
 scene-edge support is directionally positive in 12/12 conditions, with best
-low-scene-edge AUC `0.7222` at `BGGR`, PSF `0.8`; aux-edge support is
-directionally positive in 9/12 conditions, with best low-edge AUC `0.5808` at
-`RGGB`, PSF `1.6`. This is a post-hoc proposal bridge for the calibrated path,
+low-scene-edge AUC `0.6825` at `BGGR`, PSF `0.8`; aux-edge support is
+directionally positive in 10/12 conditions, with best low-edge AUC `0.5794` at
+`BGGR`, PSF `0.8`. This is a post-hoc proposal bridge for the calibrated path,
 not an incremental aux-only ablation and not a trained RGB+Aux DNN result.
 
 For stricter evidence, train the proposal calibrator on a KITTI train report and
@@ -979,9 +979,9 @@ PYTHONPATH=src \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
-  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
-  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1 \
-  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1 \
   --casebook reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
   --comparison-rollup 'Calibration feature ablation=reports/perception_train512_calibration_feature_ablation_rollup' \
@@ -1010,7 +1010,7 @@ evidence rows, and the next evidence to build. For the current bundle, the
 recommended posture is a narrow recall-budgeted FP-reduction claim with
 front-end/aux feasibility support; broad HumanISP superiority remains blocked.
 The dashboard also includes the native-CFA audit as a guardrail: the current
-native_bayer_v1 val32 bundle has 12 native rows, 384 samples, remap fraction
+native_bayer_v1 val64 bundle has 12 native rows, 768 samples, remap fraction
 `0.0`, and true-CFA fraction `1.0` for `RGGB`, `GRBG`, `BGGR`, and `GBRG`.
 Treat it as condition-level CFA/LensPSF evidence only; broad HumanISP
 superiority and task-level recall improvement remain blocked by the held-out
@@ -1358,9 +1358,9 @@ PYTHONPATH=src \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
-  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
-  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1 \
-  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
 ```
 
@@ -1404,9 +1404,9 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --scene-edge-confidence reports/perception_scene_edge_confidence_bus_cfa_psf_sweep \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
-  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1 \
-  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1 \
-  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1 \
+  --cfa-lenspsf-detector-sweep reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-proposal-audit reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1 \
+  --cfa-lenspsf-native-audit reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1 \
   --min-samples 1000 \
   --output-dir reports/perception_benchmark_protocol_kitti_with_naive_extended
 ```
@@ -1423,9 +1423,9 @@ reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
-reports/perception_cfa_lenspsf_detector_sweep_kitti_val32_native_bayer_v1/index.html
-reports/perception_cfa_lenspsf_proposal_audit_kitti_val32_native_bayer_v1/index.html
-reports/perception_cfa_lenspsf_native_audit_kitti_val32_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_detector_sweep_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_proposal_audit_kitti_val64_native_bayer_v1/index.html
+reports/perception_cfa_lenspsf_native_audit_kitti_val64_native_bayer_v1/index.html
 reports/perception_casebook_kitti_train512_score_label_aux_t001_vs_human/index.html
 reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
@@ -1451,16 +1451,16 @@ that as a trained-DNN or broad-superiority proof. The condition gate passes the
 The same dashboard's `Performance Evidence Map` now includes a diagnostic
 CFA/LensPSF detector condition sweep row and a CFA/LensPSF proposal-edge bridge
 row, plus a visual success/failure casebook row. The native_bayer_v1 proposal
-bridge removes 151 FP and 0 TP proposals across the val32 condition sweep;
+bridge removes 197 FP and 0 TP proposals across the val64 condition sweep;
 source scene-edge evidence is directionally positive in 12/12 conditions, while
-aux-edge evidence is positive in 9/12. The native-CFA audit has 12 native rows,
-384 samples, and 0 remapped rows. The casebook selects
+aux-edge evidence is positive in 10/12. The native-CFA audit has 12 native rows,
+768 samples, and 0 remapped rows. The casebook selects
 32 review images and keeps both wins and counterexamples visible. It lists five
 next evidence targets: larger/native CFA-separated scene-edge proposal
 correlation across CFA/LensPSF, a larger CFA/LensPSF detector sweep, RGB+Aux DNN
 fine-tune gate, high-information real-scene expansion, and native/adverse
 condition casebook expansion. The previous aux-edge, source scene-edge
-same-sample proposal correlations, val32 CFA/LensPSF detector sweep, val32
+same-sample proposal correlations, val64 CFA/LensPSF detector sweep, val64
 CFA/LensPSF proposal-edge bridge, and visual casebook are now part of the
 current evidence rows.
 
