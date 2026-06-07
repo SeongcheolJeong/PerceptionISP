@@ -118,6 +118,7 @@ def raw_from_camerae2e_rgb(
     height: Optional[int] = None,
     cfa_pattern: str = "auto",
     scene_luminance: float = 100.0,
+    resize_scene_to_target: bool = True,
 ) -> RawFrame:
     """Run an RGB array through CameraE2E and convert the result to RAW-like HDR.
 
@@ -139,8 +140,9 @@ def raw_from_camerae2e_rgb(
             raise ValueError("rgb must be an HxWx3 array")
         target_h = int(height) if height is not None else int(source.shape[0])
         target_w = int(width) if width is not None else int(source.shape[1])
-        resized = _resize_image(source[:, :, :3], target_h, target_w)
-        uint8 = np.round(np.clip(_normalize(resized), 0.0, 1.0) * 255.0).astype(np.uint8)
+        target_rgb = _resize_image(source[:, :, :3], target_h, target_w)
+        scene_rgb = target_rgb if bool(resize_scene_to_target) else source[:, :, :3]
+        uint8 = np.round(np.clip(_normalize(scene_rgb), 0.0, 1.0) * 255.0).astype(np.uint8)
 
         store = AssetStore.default()
         scene = scene_from_file(uint8, "rgb", float(scene_luminance), "lcdExample.mat", asset_store=store)
@@ -169,7 +171,7 @@ def raw_from_camerae2e_rgb(
         image = np.asarray(raw_source, dtype=np.float64)
         source_cfa_pattern = _camerae2e_sensor_pattern_name(sensor) if sensor is not None else None
         target_cfa_pattern = _resolve_target_cfa_pattern(cfa_pattern, source_cfa_pattern)
-        resized_rgb = np.clip(_normalize(resized), 0.0, 1.0)
+        resized_rgb = np.clip(_normalize(target_rgb), 0.0, 1.0)
         if image.ndim == 2 and sensor is not None:
             mosaic = _camerae2e_sensor_mosaic_to_pattern(sensor, image, target_h, target_w, target_cfa_pattern)
         elif image.ndim == 3:
@@ -199,7 +201,7 @@ def raw_from_camerae2e_rgb(
             hdr_ratios=(1.0, 0.25, 0.0625),
             line_time_us=33333.0 / float(target_h),
         )
-        return RawFrame(
+        frame = RawFrame(
             data=raw,
             metadata=metadata,
             calibration=synthetic.calibration,
@@ -214,6 +216,9 @@ def raw_from_camerae2e_rgb(
                 scene_source="rgb_array",
             ),
         )
+        frame.provenance["scene_input_shape"] = [int(v) for v in source.shape]
+        frame.provenance["scene_resized_to_target"] = bool(resize_scene_to_target)
+        return frame
     except Exception as exc:  # pragma: no cover - environment-dependent path
         raise RuntimeError(f"CameraE2E RGB simulation failed: {exc}") from exc
 

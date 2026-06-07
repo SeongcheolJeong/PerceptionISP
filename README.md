@@ -989,6 +989,42 @@ and `psf_edge_likelihood` aux maps, including the extended RGB+aux DNN tensor.
 Treat this as front-end edge-fidelity evidence across CFA/LensPSF, not
 detector-performance evidence.
 
+To compare edge evidence on a higher-information real scene, run the scene-edge
+confidence suite:
+
+```bash
+PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
+/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
+  -m perception_isp.scene_edge_confidence_suite \
+  --source sample-image \
+  --image-path data/sample_images/bus.jpg \
+  --width 320 \
+  --height 240 \
+  --scene-scale 2 \
+  --cfa auto \
+  --tone-mapping detector_log \
+  --denoise-strength 0.30 \
+  --demosaic-method edge_aware \
+  --demosaic-artifact-suppression 0.20 \
+  --output-dir reports/perception_scene_edge_confidence_bus_highinfo
+```
+
+The current report is:
+
+```text
+reports/perception_scene_edge_confidence_bus_highinfo/index.html
+```
+
+It feeds a `640 x 480` scene image through CameraE2E and evaluates a `320 x
+240` sensor output, with source/target CFA both `GRBG` and no pattern remap.
+The high-resolution scene edge map is downsampled as the proxy oracle. On this
+sample, HumanISP RGB edge-proxy F1 is `0.6644`, PerceptionISP RGB edge-proxy F1
+is `0.6740`, PerceptionISP aux edge-strength F1 is `0.7473`, and PerceptionISP
+aux edge-confidence F1 is `0.3727`. This shows the current aux edge-strength
+map tracks scene edges strongly, while aux edge-confidence is a reliability gate
+rather than a dense edge-location map. It is front-end scene-edge evidence, not
+object-boundary ground truth or detector-performance evidence.
+
 To verify that the test is not merely passing an RGB scene through both ISPs,
 run the scene-information stress suite. It creates a higher-resolution scene
 oracle, samples it through a lower-resolution CFA sensor model, then runs

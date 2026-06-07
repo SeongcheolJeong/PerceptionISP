@@ -55,6 +55,11 @@ Known limits:
   PSF footprint is much smaller than the sensor pixel pitch or is applied only
   after low-resolution sampling. `psf_sigma_map` now feeds PSF blur-confidence
   and PSF edge-likelihood aux maps when calibration provides it.
+- The scene edge-confidence suite compares HumanISP RGB edge proxies,
+  PerceptionISP RGB edge proxies, aux edge strength, and aux edge confidence
+  against a higher-resolution real-scene edge proxy after CameraE2E sensor
+  sampling. It is scene-edge front-end evidence, not object-boundary or
+  detector-performance evidence.
 - The scene-information stress suite validates high-resolution scene detail
   loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor
   loss, but it is diagnostic scene-to-sensor evidence and does not show that
