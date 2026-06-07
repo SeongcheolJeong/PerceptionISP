@@ -321,6 +321,25 @@ point that still has positive recall delta is confidence `0.95`
 (`R50=0.0219`, `FP/sample=3.2812`). Threshold tuning alone therefore does not
 produce a claim-ready learned RGB+Aux detector.
 
+A larger KITTI val512 scale-up is now available:
+
+```text
+exports/perception_rgb_aux_kitti_val512_detector_log/index.html
+reports/perception_rgb_aux_dnn_gate_kitti_val512_training_rollup_e12_v1/index.html
+reports/perception_rgb_aux_dnn_gate_kitti_val512_compact_e12_v1/index.html
+reports/perception_rgb_aux_dnn_sweep_kitti_val512_e12_v1/index.html
+```
+
+That run uses 512 CameraE2E-backed KITTI val samples at `640 x 192`, native
+`GRBG`, true sensor CFA mosaics, and no CFA remap. The compact DNN split is
+384 train / 128 eval. It is an important counterexample: at confidence `0.50`,
+RGB+Aux is worse than RGB-only (`dP50=-0.0049`, `dR50=-0.0067`,
+`dSmallR50=-0.0243`, `dFP50=+19.6797`). The val512 confidence sweep also
+reports `rgb_aux_dnn_sweep_no_claim_operating_point`. This means the compact
+dense architecture is trainable, but it is not a reliable learned RGB+Aux
+detector proof; a real detector fine-tune or a better aux-calibrated detector
+head is still needed.
+
 The rollup is a resource and diagnostic view. It now includes a Training-Time
 Plan derived from observed sample-epochs/sec and export samples/sec, making
 compact KITTI-sized timing scenarios reproducible. It also makes clear that the
@@ -1184,9 +1203,9 @@ PYTHONPATH=src \
   -m perception_isp.claim_dashboard \
   --claim-gate 'Aux broad vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_broad_vs_human' \
   --claim-gate 'Aux FP reducer vs Human=reports/perception_claim_gate_kitti_train512_score_label_aux_t001_fp_reducer_vs_human' \
-  --training-rollup reports/perception_rgb_aux_dnn_gate_kitti_val128_training_rollup_e12_v1 \
-  --rgb-aux-dnn-gate reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1 \
-  --rgb-aux-dnn-sweep reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1 \
+  --training-rollup reports/perception_rgb_aux_dnn_gate_kitti_val512_training_rollup_e12_v1 \
+  --rgb-aux-dnn-gate reports/perception_rgb_aux_dnn_gate_kitti_val512_compact_e12_v1 \
+  --rgb-aux-dnn-sweep reports/perception_rgb_aux_dnn_sweep_kitti_val512_e12_v1 \
   --task-metrics reports/perception_task_metrics_kitti_train512_score_label_aux_t001_vs_human \
   --task-gate reports/perception_task_gate_kitti_train512_score_label_aux_t001_recall_vs_human \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
@@ -1212,15 +1231,15 @@ PYTHONPATH=src \
 
 The dashboard currently says: broad HumanISP superiority is not supported,
 bounded FP reduction versus HumanISP is supported, and the learned RGB+aux DNN
-path is trainable but not yet claim-quality. The latest compact RGB+Aux DNN
+path is trainable but not yet claim-quality. The earlier compact RGB+Aux DNN
 gate improves over RGB-only inside the 12-epoch KITTI val128 quick run, but the
-gate still fails because sample scale, absolute precision, and absolute FP are
-not claim-quality. The confidence sweep also fails to find a claim-ready
-operating point, so threshold tuning alone is not enough. When task metrics are
-provided, it also keeps the task-level claim narrow: the `recall_improvement`
-task gate fails for VRU/person/cyclist/vehicle/small-object groups, so task
-recall improvement versus HumanISP is not supported even though FP/sample is
-reduced. Mechanism
+larger KITTI val512 run is a counterexample where RGB+Aux loses to RGB-only on
+precision, recall, small-object recall, and FP at confidence `0.50`. The val512
+confidence sweep also fails to find a claim-ready operating point, so threshold
+tuning alone is not enough. When task metrics are provided, it also keeps the
+task-level claim narrow: the `recall_improvement` task gate fails for
+VRU/person/cyclist/vehicle/small-object groups, so task recall improvement
+versus HumanISP is not supported even though FP/sample is reduced. Mechanism
 validation is shown as front-end feasibility evidence only, not as detector
 performance evidence, and the CFA stress sweep is shown as diagnostic
 condition/CFA evidence only. The edge-confidence suite is also shown as

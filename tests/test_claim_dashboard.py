@@ -11,6 +11,50 @@ from perception_isp.claim_dashboard import build_claim_dashboard, main as dashbo
 
 
 class ClaimDashboardTest(unittest.TestCase):
+    def test_dnn_sweep_evidence_handles_missing_best_recall_row(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sweep = root / "sweep"
+            sweep.mkdir()
+            (sweep / "index.html").write_text("<html></html>")
+            row = _dnn_sweep_row(
+                confidence=0.98,
+                metric_pass=False,
+                aux=(0.06, 0.05, 0.04, 4.8),
+                rgb=(0.03, 0.01, 0.01, 3.1),
+                failed=("absolute_recall", "fp_vs_rgb_only"),
+            )
+            (sweep / "rgb_aux_dnn_sweep_summary.json").write_text(
+                json.dumps(
+                    {
+                        "status": "fail",
+                        "pass": False,
+                        "metric_pass": False,
+                        "claim_status": "rgb_aux_dnn_sweep_no_claim_operating_point",
+                        "profile": "claim_quality",
+                        "row_count": 1,
+                        "rows": [row],
+                        "best_passing_row": None,
+                        "best_metric_row": None,
+                        "best_recall_positive_delta_row": None,
+                        "lowest_fp_positive_recall_delta_row": row,
+                        "interpretation": "unit no operating point",
+                        "claim_boundary": "unit boundary",
+                    }
+                )
+                + "\n"
+            )
+
+            dashboard = build_claim_dashboard(claim_gate_specs=[], rgb_aux_dnn_sweep=sweep)
+
+            evidence = next(
+                item
+                for item in dashboard["evidence_map"]["current_evidence"]
+                if item["area"] == "RGB+Aux DNN operating-point sweep"
+            )
+            self.assertIn("bestRecall none", evidence["evidence"])
+            self.assertIn("lowestFPPositive conf=0.9800", evidence["evidence"])
+
     def test_dashboard_separates_supported_and_blocked_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

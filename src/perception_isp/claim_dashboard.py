@@ -2252,19 +2252,24 @@ def _rgb_aux_dnn_sweep_evidence(sweep: Mapping[str, Any]) -> str:
         if isinstance(sweep.get("lowest_fp_positive_recall_delta_row"), Mapping)
         else {}
     )
-    best_aux = best_recall.get("rgb_aux", {}) if isinstance(best_recall.get("rgb_aux"), Mapping) else {}
-    best_deltas = best_recall.get("deltas", {}) if isinstance(best_recall.get("deltas"), Mapping) else {}
-    low_aux = lowest_fp.get("rgb_aux", {}) if isinstance(lowest_fp.get("rgb_aux"), Mapping) else {}
-    low_deltas = lowest_fp.get("deltas", {}) if isinstance(lowest_fp.get("deltas"), Mapping) else {}
     return (
         f"profile={sweep.get('profile', '')}; rows={int(sweep.get('row_count', 0))}; "
         f"metric_pass={bool(sweep.get('metric_pass'))}; "
-        f"bestRecall conf={_fmt(best_recall.get('confidence'))}, "
-        f"R50={_fmt(best_aux.get('recall@0.50_mean'))}, FP={_fmt(best_aux.get('fp@0.50_mean'))}, "
-        f"dR={_fmt(best_deltas.get('recall@0.50_mean'), signed=True)}, dFP={_fmt(best_deltas.get('fp@0.50_mean'), signed=True)}; "
-        f"lowestFPPositive conf={_fmt(lowest_fp.get('confidence'))}, "
-        f"R50={_fmt(low_aux.get('recall@0.50_mean'))}, FP={_fmt(low_aux.get('fp@0.50_mean'))}, "
-        f"dR={_fmt(low_deltas.get('recall@0.50_mean'), signed=True)}, dFP={_fmt(low_deltas.get('fp@0.50_mean'), signed=True)}"
+        f"{_rgb_aux_dnn_sweep_evidence_row('bestRecall', best_recall)}; "
+        f"{_rgb_aux_dnn_sweep_evidence_row('lowestFPPositive', lowest_fp)}"
+    )
+
+
+def _rgb_aux_dnn_sweep_evidence_row(label: str, row: Mapping[str, Any]) -> str:
+    if not row:
+        return f"{label} none"
+    rgb_aux = row.get("rgb_aux", {}) if isinstance(row.get("rgb_aux"), Mapping) else {}
+    deltas = row.get("deltas", {}) if isinstance(row.get("deltas"), Mapping) else {}
+    return (
+        f"{label} conf={_fmt(row.get('confidence'))}, "
+        f"R50={_fmt(rgb_aux.get('recall@0.50_mean'))}, FP={_fmt(rgb_aux.get('fp@0.50_mean'))}, "
+        f"dR={_fmt(deltas.get('recall@0.50_mean'), signed=True)}, "
+        f"dFP={_fmt(deltas.get('fp@0.50_mean'), signed=True)}"
     )
 
 

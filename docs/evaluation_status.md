@@ -264,12 +264,48 @@ HumanISP-vs-PerceptionISP superiority claim. A practical aux path should either
 fine-tune a real detector stem/head or train a detector-side calibration branch
 over the pretrained RGB detector proposals.
 
-The channel ablation sharpens the conclusion. The `rgb_aux` model gets the best
-eval loss and slightly higher R50 than `rgb_only`, but it does not improve the
-operating point because FP and precision remain worse. `aux_only` is clearly
-weaker. Therefore the current compact dense architecture is not a usable proof
-that auxiliary maps improve detector performance; it is only a fast engineering
-path for testing tensor export, training, checkpoint loading, and ablations.
+A larger KITTI val512 compact DNN scale-up was then run with the same
+CameraE2E-backed detector-log export path. It uses `512` KITTI val samples,
+`640 x 192`, true sensor CFA mosaics, native `GRBG`, and no pattern remap
+(`true_sensor_cfa_mosaic_count=512`, `pattern_remapped_count=0`). The compact
+training split is `384 train / 128 eval`, still with `car/pedestrian/cyclist`,
+MPS, `12x40` grid, `base_channels=16`, and 12 epochs.
+
+```text
+exports/perception_rgb_aux_kitti_val512_detector_log/index.html
+reports/perception_rgb_aux_dnn_gate_kitti_val512_training_rollup_e12_v1/index.html
+reports/perception_rgb_aux_dnn_gate_kitti_val512_compact_e12_v1/index.html
+reports/perception_rgb_aux_dnn_sweep_kitti_val512_e12_v1/index.html
+```
+
+The val512 scale-up is a stronger negative result than val128. Although both
+models train and RGB+Aux reaches slightly lower best eval loss
+(`0.7436` vs RGB-only `0.7775`), the detector operating metrics are worse than
+RGB-only at the default `0.50` threshold:
+
+| Run | Eval samples | Precision@0.50 | Recall@0.50 | Small Recall@0.50 | FP@0.50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| RGB+Aux val512 e12 | 128 | 0.0162 | 0.2757 | 0.1502 | 88.4844 |
+| RGB-only val512 e12 | 128 | 0.0211 | 0.2825 | 0.1746 | 68.8047 |
+| RGB+Aux minus RGB-only | 128 | -0.0049 | -0.0067 | -0.0243 | +19.6797 |
+
+The val512 confidence sweep also reports
+`rgb_aux_dnn_sweep_no_claim_operating_point`. At confidence `0.95`, RGB+Aux
+has a recall gain (`dR50=+0.0261`) and small-recall gain (`dSmallR50=+0.0090`),
+but precision is lower and FP is still worse (`dFP=+3.6797`). At confidence
+`0.98`, RGB+Aux meets the absolute FP budget (`FP/sample=4.8281`) but recall is
+too low (`R50=0.0496`) and FP remains worse than RGB-only (`dFP=+1.7031`).
+This means threshold tuning alone does not fix the compact RGB+Aux architecture
+at the larger scale.
+
+The earlier val128 channel ablation sharpens the conclusion. The `rgb_aux`
+model gets the best eval loss and slightly higher R50 than `rgb_only`, but it
+does not improve the operating point because FP and precision remain worse.
+`aux_only` is clearly weaker. The larger val512 counterexample makes the
+conclusion stricter: the current compact dense architecture is not a usable
+proof that auxiliary maps improve detector performance; it is only a fast
+engineering path for testing tensor export, training, checkpoint loading, and
+ablations.
 
 The extended-inclusive benchmark protocol report is:
 
@@ -657,7 +693,7 @@ It intentionally separates claim decisions from evidence-coverage decisions:
 | --- | --- |
 | Broad HumanISP superiority | Not supported |
 | Recall-budgeted FP reduction vs RGB+Aux Fusion | Supported |
-| Learned RGB+Aux DNN direct detector claim | Not supported; the matched KITTI val128 e12 gate improves over RGB-only (`dR50=+0.0701`, `dFP50=-36.4375`) but fails `claim_quality` on sample count, absolute precision, and absolute FP. The e12 confidence sweep also reports `rgb_aux_dnn_sweep_no_claim_operating_point`, so threshold tuning alone is not enough |
+| Learned RGB+Aux DNN direct detector claim | Not supported; the matched KITTI val128 e12 gate improves over RGB-only (`dR50=+0.0701`, `dFP50=-36.4375`) but fails `claim_quality`. The larger KITTI val512 e12 gate is a counterexample: RGB+Aux is worse than RGB-only at conf `0.50` (`dP50=-0.0049`, `dR50=-0.0067`, `dSmallR50=-0.0243`, `dFP50=+19.6797`) and the val512 confidence sweep reports `rgb_aux_dnn_sweep_no_claim_operating_point`. Threshold tuning alone is not enough |
 | Task-level recall improvement | `task_gate_fail` for `vru`, `person`, `cyclist`, `vehicle`, and `small_all`; current evidence supports only the narrower FP-reduction claim |
 | Condition-specific metrics | Available in the extended bundle; current slices are metadata/proxy conditions, not a substitute for real RAW night/rain/fog datasets |
 | Condition robustness gate | `condition_gate_pass` for the `fp_reducer` profile; `warning:over_exposure` is skipped for low sample count |

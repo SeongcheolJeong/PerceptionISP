@@ -29,18 +29,23 @@ Known limits:
 
 - The Bayer demosaic block is an edge-aware numpy reference, not a production ISP demosaic.
 - The RGB+aux compact dense detector is still a learning-path benchmark, not a claim-quality detector.
-- The current matched KITTI val128 12-epoch compact DNN gate shows RGB+Aux
-  improving over RGB-only on the 32-sample eval split (`dR50=+0.0701`,
+- The matched KITTI val128 12-epoch compact DNN gate shows RGB+Aux improving
+  over RGB-only on the 32-sample eval split (`dR50=+0.0701`,
   `dSmallR50=+0.0333`, `dFP50=-36.4375`), but it fails `claim_quality` because
-  sample count, absolute precision, and absolute FP are too weak. Treat
-  `reports/perception_rgb_aux_dnn_gate_kitti_val128_compact_e12_v1/index.html`
-  as learned-aux feasibility evidence, not a detector superiority claim.
-- The corresponding e12 confidence sweep reports
+  sample count, absolute precision, and absolute FP are too weak.
+- The larger matched KITTI val512 12-epoch compact DNN gate is a counterexample:
+  the export uses 512 true CameraE2E sensor-CFA samples with native `GRBG` and
+  no remap, but the 128-sample eval split has RGB+Aux worse than RGB-only at
+  conf `0.50` (`dP50=-0.0049`, `dR50=-0.0067`, `dSmallR50=-0.0243`,
+  `dFP50=+19.6797`). Treat
+  `reports/perception_rgb_aux_dnn_gate_kitti_val512_compact_e12_v1/index.html`
+  as learned-aux feasibility/counterexample evidence, not detector superiority.
+- The current val512 e12 confidence sweep reports
   `rgb_aux_dnn_sweep_no_claim_operating_point` in
-  `reports/perception_rgb_aux_dnn_sweep_kitti_val128_e12_v1/index.html`.
-  Threshold tuning lowers FP only by collapsing recall, so this remains a
-  training-path feasibility result rather than a learned RGB+Aux performance
-  claim.
+  `reports/perception_rgb_aux_dnn_sweep_kitti_val512_e12_v1/index.html`.
+  Threshold tuning does not find a point that preserves recall, meets FP budget,
+  and beats RGB-only, so this remains a training-path feasibility result rather
+  than a learned RGB+Aux performance claim.
 - The RGB+aux smoke checkpoint predicts one generic box and is not a useful trained detector.
 - The current extended RGB+aux tensor is 15 channels after adding PSF blur and
   PSF edge-likelihood aux channels. Older 13-channel export/train/eval artifacts
