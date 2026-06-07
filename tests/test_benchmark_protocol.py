@@ -25,6 +25,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -40,6 +41,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                scene_edge_confidence=scene_edge,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
@@ -55,6 +57,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(rows["cfa_stress_sweep"]["status"], "covered")
             self.assertEqual(rows["edge_confidence_suite"]["status"], "covered")
             self.assertEqual(rows["edge_fidelity_suite"]["status"], "covered")
+            self.assertEqual(rows["scene_edge_confidence"]["status"], "covered")
             self.assertEqual(rows["scene_information_stress"]["status"], "covered")
             self.assertEqual(rows["aux_contribution_audit"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
@@ -80,6 +83,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -96,6 +100,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                scene_edge_confidence=scene_edge,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
@@ -121,6 +126,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
@@ -147,6 +153,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(edge_confidence),
                         "--edge-fidelity-suite",
                         str(edge_fidelity),
+                        "--scene-edge-confidence",
+                        str(scene_edge),
                         "--scene-information-stress",
                         str(scene_information),
                         "--aux-contribution-audit",
@@ -376,6 +384,42 @@ def _write_edge_fidelity_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_fidelity_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_scene_edge_confidence(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cases": [
+            {
+                "id": "bus",
+                "source": "sample_image_camerae2e",
+                "cfa_pattern": "GRBG",
+                "metrics": {
+                    "human_rgb_proxy_source_edge_f1": 0.66,
+                    "perception_rgb_proxy_source_edge_f1": 0.67,
+                    "perception_aux_strength_source_edge_f1": 0.75,
+                    "perception_aux_confidence_source_edge_f1": 0.37,
+                },
+            }
+        ],
+        "checks": [
+            {"id": "finite_scene_edge_outputs", "status": "pass"},
+            {"id": "reference_scene_edges_present", "status": "pass"},
+            {"id": "scene_edge_metrics_bounded", "status": "pass"},
+            {"id": "human_and_perception_edges_track_scene_edges", "status": "pass"},
+            {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
+        ],
+        "aggregate": {
+            "human_rgb_proxy_source_edge_f1_mean": 0.66,
+            "perception_rgb_proxy_source_edge_f1_mean": 0.67,
+            "perception_aux_strength_source_edge_f1_mean": 0.75,
+            "perception_aux_confidence_source_edge_f1_mean": 0.37,
+        },
+    }
+    (path / "scene_edge_confidence_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

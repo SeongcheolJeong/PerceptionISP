@@ -23,6 +23,7 @@ class ClaimDashboardTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             comparison = _write_comparison_rollup(root / "rollup")
@@ -36,6 +37,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                scene_edge_confidence=scene_edge,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
@@ -52,6 +54,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard["edge_confidence_suite"]["pass"])
             self.assertTrue(dashboard["edge_fidelity_suite"]["pass"])
+            self.assertTrue(dashboard["scene_edge_confidence"]["pass"])
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
@@ -73,6 +76,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Object edge-fidelity suite passed; HumanISP, PerceptionISP, and aux edge maps are compared against object/sensor edge oracles across CFA and LensPSF, but this is not detector-performance evidence.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Scene edge-confidence suite passed; HumanISP RGB, PerceptionISP RGB, aux edge-strength, and aux edge-confidence are compared against a high-information scene-edge proxy, but this is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -102,6 +109,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
             self.assertIn("Object Edge Fidelity", html)
+            self.assertIn("Scene Edge Confidence", html)
             self.assertIn("Scene Information Stress", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
@@ -117,6 +125,7 @@ class ClaimDashboardTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
@@ -137,6 +146,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(edge_confidence),
                         "--edge-fidelity-suite",
                         str(edge_fidelity),
+                        "--scene-edge-confidence",
+                        str(scene_edge),
                         "--scene-information-stress",
                         str(scene_information),
                         "--aux-contribution-audit",
@@ -155,6 +166,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(summary["edge_confidence_suite"]["pass"])
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
+            self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
@@ -525,6 +537,48 @@ def _write_edge_fidelity_suite(path: Path) -> Path:
                     }
                 ],
                 "interpretation": "unit edge fidelity",
+                "claim_boundary": "unit diagnostic boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_scene_edge_confidence(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "scene_edge_confidence_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "cases": [
+                    {
+                        "id": "bus",
+                        "source": "sample_image_camerae2e",
+                        "cfa_pattern": "GRBG",
+                        "metrics": {
+                            "human_rgb_proxy_source_edge_f1": 0.66,
+                            "perception_rgb_proxy_source_edge_f1": 0.67,
+                            "perception_aux_strength_source_edge_f1": 0.75,
+                            "perception_aux_confidence_source_edge_f1": 0.37,
+                        },
+                    }
+                ],
+                "checks": [
+                    {"id": "finite_scene_edge_outputs", "status": "pass"},
+                    {"id": "reference_scene_edges_present", "status": "pass"},
+                    {"id": "scene_edge_metrics_bounded", "status": "pass"},
+                    {"id": "human_and_perception_edges_track_scene_edges", "status": "pass"},
+                    {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
+                ],
+                "aggregate": {
+                    "human_rgb_proxy_source_edge_f1_mean": 0.66,
+                    "perception_rgb_proxy_source_edge_f1_mean": 0.67,
+                    "perception_aux_strength_source_edge_f1_mean": 0.75,
+                    "perception_aux_confidence_source_edge_f1_mean": 0.37,
+                },
+                "interpretation": "unit scene edge confidence",
                 "claim_boundary": "unit diagnostic boundary",
             }
         )

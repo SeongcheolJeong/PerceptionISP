@@ -827,6 +827,7 @@ PYTHONPATH=src \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
+  --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
@@ -1128,6 +1129,7 @@ PYTHONPATH=src \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
+  --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
@@ -1146,7 +1148,7 @@ adaptation, classical lightweight RAW transform, and a task-aware or
 aux-assisted path. Missing rows are blockers for broad HumanISP or
 RAW/sensor-native superiority claims. Recommended diagnostic rows, such as the
 CFA stress sweep, edge-confidence suite, object edge-fidelity suite,
-scene-information stress suite, and aux contribution audit, help interpret
+scene edge-confidence suite, scene-information stress suite, and aux contribution audit, help interpret
 sensor-native signals but do not create a detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
@@ -1167,6 +1169,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
   --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
+  --scene-edge-confidence reports/perception_scene_edge_confidence_bus_highinfo \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --min-samples 1000 \
@@ -1185,14 +1188,15 @@ reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
 reports/perception_edge_fidelity_suite_synthetic/index.html
+reports/perception_scene_edge_confidence_bus_highinfo/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
 ```
 
 It marks `coverage_status=coverage_complete`, including front-end mechanism
 validation, the recommended extended sensor-native tensor row, CFA stress
-sweep, edge-confidence suite, object edge-fidelity suite, scene-information
-stress suite, and aux contribution audit, while
+sweep, edge-confidence suite, object edge-fidelity suite, scene edge-confidence
+suite, scene-information stress suite, and aux contribution audit, while
 `metric_claim_status=fp_reducer_only`.
 That is an evidence-coverage result, not a broad-superiority result; the
 dashboard still says broad HumanISP superiority is not supported, while

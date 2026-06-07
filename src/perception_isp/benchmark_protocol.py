@@ -24,6 +24,7 @@ MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
 EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
+SCENE_EDGE_CONFIDENCE_SUMMARY = "scene_edge_confidence_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 
@@ -59,6 +60,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-stress-sweep", default=None, help="cfa_stress_sweep_summary.json path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="edge_confidence_suite_summary.json path/dir.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="edge_fidelity_suite_summary.json path/dir.")
+    parser.add_argument("--scene-edge-confidence", default=None, help="scene_edge_confidence_summary.json path/dir.")
     parser.add_argument("--scene-information-stress", default=None, help="scene_information_stress_summary.json path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="aux_contribution_audit_summary.json path/dir.")
     parser.add_argument("--min-samples", type=int, default=1000)
@@ -78,6 +80,7 @@ def main(argv: Any = None) -> int:
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
         edge_fidelity_suite=args.edge_fidelity_suite,
+        scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         min_samples=int(args.min_samples),
@@ -115,6 +118,7 @@ def build_protocol_coverage(
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
+    scene_edge_confidence: str | Path | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     min_samples: int = 1000,
@@ -132,6 +136,7 @@ def build_protocol_coverage(
         cfa_stress_sweep=cfa_stress_sweep,
         edge_confidence_suite=edge_confidence_suite,
         edge_fidelity_suite=edge_fidelity_suite,
+        scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
     )
@@ -186,6 +191,7 @@ def _collect_evidence(
     cfa_stress_sweep: str | Path | None,
     edge_confidence_suite: str | Path | None,
     edge_fidelity_suite: str | Path | None,
+    scene_edge_confidence: str | Path | None,
     scene_information_stress: str | Path | None,
     aux_contribution_audit: str | Path | None,
 ) -> Dict[str, Any]:
@@ -233,6 +239,7 @@ def _collect_evidence(
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep)
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite)
     edge_fidelity = _load_edge_fidelity_suite(edge_fidelity_suite)
+    scene_edge = _load_scene_edge_confidence(scene_edge_confidence)
     scene_information = _load_scene_information_stress(scene_information_stress)
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit)
 
@@ -256,6 +263,7 @@ def _collect_evidence(
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
         "edge_fidelity_suite": edge_fidelity,
+        "scene_edge_confidence": scene_edge,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
     }
@@ -275,6 +283,7 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
     cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     edge_confidence = evidence.get("edge_confidence_suite", {}) if isinstance(evidence.get("edge_confidence_suite"), Mapping) else {}
     edge_fidelity = evidence.get("edge_fidelity_suite", {}) if isinstance(evidence.get("edge_fidelity_suite"), Mapping) else {}
+    scene_edge = evidence.get("scene_edge_confidence", {}) if isinstance(evidence.get("scene_edge_confidence"), Mapping) else {}
     scene_information = evidence.get("scene_information_stress", {}) if isinstance(evidence.get("scene_information_stress"), Mapping) else {}
     aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
 
@@ -422,6 +431,14 @@ def _requirements(evidence: Mapping[str, Any], *, min_samples: int) -> list[Dict
             bool(edge_fidelity.get("available")) and bool(edge_fidelity.get("pass")),
             str(edge_fidelity.get("summary", "missing")),
             "An object edge-fidelity suite compares HumanISP, PerceptionISP, and aux edge maps against object/sensor edge oracles across CFA and LensPSF.",
+        ),
+        _row(
+            "scene_edge_confidence",
+            "High-information scene edge-confidence suite available",
+            "recommended",
+            bool(scene_edge.get("available")) and bool(scene_edge.get("pass")),
+            str(scene_edge.get("summary", "missing")),
+            "A scene edge-confidence suite compares HumanISP/PerceptionISP edge evidence against a higher-resolution scene-edge proxy after CameraE2E sampling.",
         ),
         _row(
             "scene_information_stress",
@@ -670,6 +687,37 @@ def _load_edge_fidelity_suite(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _load_scene_edge_confidence(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"available": False, "pass": False, "summary": "missing"}
+    summary_path = _summary_path(path, SCENE_EDGE_CONFIDENCE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    status = str(data.get("status", ""))
+    return {
+        "available": True,
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "pass": status == "pass" and not failed,
+        "status": status,
+        "case_count": len(data.get("cases", ())),
+        "check_count": len(checks),
+        "failed_checks": failed,
+        "human_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("human_rgb_proxy_source_edge_f1_mean")),
+        "perception_rgb_proxy_source_edge_f1_mean": _maybe_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
+        "perception_aux_strength_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),
+        "perception_aux_confidence_source_edge_f1_mean": _maybe_float(aggregate.get("perception_aux_confidence_source_edge_f1_mean")),
+        "summary": (
+            f"{status}, cases={len(data.get('cases', ()))}, checks={len(checks)}, failed={len(failed)}, "
+            f"humanF1={_fmt_optional(aggregate.get('human_rgb_proxy_source_edge_f1_mean'))}, "
+            f"perRgbF1={_fmt_optional(aggregate.get('perception_rgb_proxy_source_edge_f1_mean'))}, "
+            f"auxStrengthF1={_fmt_optional(aggregate.get('perception_aux_strength_source_edge_f1_mean'))}"
+        ),
+    }
+
+
 def _load_scene_information_stress(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"available": False, "pass": False, "summary": "missing"}
@@ -886,6 +934,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
     cfa_stress = evidence.get("cfa_stress_sweep", {}) if isinstance(evidence.get("cfa_stress_sweep"), Mapping) else {}
     edge_confidence = evidence.get("edge_confidence_suite", {}) if isinstance(evidence.get("edge_confidence_suite"), Mapping) else {}
     edge_fidelity = evidence.get("edge_fidelity_suite", {}) if isinstance(evidence.get("edge_fidelity_suite"), Mapping) else {}
+    scene_edge = evidence.get("scene_edge_confidence", {}) if isinstance(evidence.get("scene_edge_confidence"), Mapping) else {}
     scene_information = evidence.get("scene_information_stress", {}) if isinstance(evidence.get("scene_information_stress"), Mapping) else {}
     aux_contribution = evidence.get("aux_contribution_audit", {}) if isinstance(evidence.get("aux_contribution_audit"), Mapping) else {}
     return f"""<!doctype html>
@@ -931,6 +980,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
       <tr><th>CFA stress sweep</th><td>{_optional_link(cfa_stress, destination)} {html_lib.escape(str(cfa_stress.get('summary', 'missing')))}</td></tr>
       <tr><th>Edge-confidence suite</th><td>{_optional_link(edge_confidence, destination)} {html_lib.escape(str(edge_confidence.get('summary', 'missing')))}</td></tr>
       <tr><th>Object edge-fidelity suite</th><td>{_optional_link(edge_fidelity, destination)} {html_lib.escape(str(edge_fidelity.get('summary', 'missing')))}</td></tr>
+      <tr><th>Scene edge-confidence suite</th><td>{_optional_link(scene_edge, destination)} {html_lib.escape(str(scene_edge.get('summary', 'missing')))}</td></tr>
       <tr><th>Scene-information stress</th><td>{_optional_link(scene_information, destination)} {html_lib.escape(str(scene_information.get('summary', 'missing')))}</td></tr>
       <tr><th>Aux contribution audit</th><td>{_optional_link(aux_contribution, destination)} {html_lib.escape(str(aux_contribution.get('summary', 'missing')))}</td></tr>
     </tbody>
@@ -971,6 +1021,18 @@ def _optional_link(item: Mapping[str, Any], destination: Path) -> str:
         return ""
     relative = os.path.relpath(str(html_path), start=str(destination))
     return f"<a href=\"{html_lib.escape(relative)}\">open</a>"
+
+
+def _fmt_optional(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):.4f}"
+
+
+def _maybe_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)
 
 
 if __name__ == "__main__":

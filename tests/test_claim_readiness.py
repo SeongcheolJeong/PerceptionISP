@@ -22,6 +22,7 @@ class ClaimReadinessTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -36,6 +37,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                scene_edge_confidence=scene_edge,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
@@ -60,6 +62,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("cfa_stress_sweep", summary)
             self.assertIn("edge_confidence_suite", summary)
             self.assertIn("edge_fidelity_suite", summary)
+            self.assertIn("scene_edge_confidence", summary)
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("benchmark_protocol", summary)
@@ -67,6 +70,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
             self.assertTrue(summary["scene_information_stress"]["pass"])
+            self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
@@ -89,6 +93,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
             self.assertTrue(dashboard_summary["edge_fidelity_suite"]["pass"])
+            self.assertTrue(dashboard_summary["scene_edge_confidence"]["pass"])
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
@@ -136,6 +141,7 @@ class ClaimReadinessTest(unittest.TestCase):
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
             edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
+            scene_edge = _write_scene_edge_confidence(root / "scene_edge")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -150,6 +156,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
                 edge_fidelity_suite=edge_fidelity,
+                scene_edge_confidence=scene_edge,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
@@ -159,6 +166,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_complete")
             self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
             self.assertTrue(summary["scene_information_stress"]["pass"])
+            self.assertTrue(summary["scene_edge_confidence"]["pass"])
             self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             self.assertIn(str(naive_dir), summary["protocol_comparison_reports"])
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
@@ -169,6 +177,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
             self.assertTrue(dashboard_summary["edge_fidelity_suite"]["pass"])
+            self.assertTrue(dashboard_summary["scene_edge_confidence"]["pass"])
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
 
@@ -406,6 +415,42 @@ def _write_edge_fidelity_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_fidelity_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_scene_edge_confidence(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cases": [
+            {
+                "id": "bus",
+                "source": "sample_image_camerae2e",
+                "cfa_pattern": "GRBG",
+                "metrics": {
+                    "human_rgb_proxy_source_edge_f1": 0.66,
+                    "perception_rgb_proxy_source_edge_f1": 0.67,
+                    "perception_aux_strength_source_edge_f1": 0.75,
+                    "perception_aux_confidence_source_edge_f1": 0.37,
+                },
+            }
+        ],
+        "checks": [
+            {"id": "finite_scene_edge_outputs", "status": "pass"},
+            {"id": "reference_scene_edges_present", "status": "pass"},
+            {"id": "scene_edge_metrics_bounded", "status": "pass"},
+            {"id": "human_and_perception_edges_track_scene_edges", "status": "pass"},
+            {"id": "camerae2e_cfa_pattern_preserved", "status": "pass"},
+        ],
+        "aggregate": {
+            "human_rgb_proxy_source_edge_f1_mean": 0.66,
+            "perception_rgb_proxy_source_edge_f1_mean": 0.67,
+            "perception_aux_strength_source_edge_f1_mean": 0.75,
+            "perception_aux_confidence_source_edge_f1_mean": 0.37,
+        },
+    }
+    (path / "scene_edge_confidence_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

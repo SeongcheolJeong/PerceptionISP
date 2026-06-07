@@ -42,6 +42,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir used as diagnostic CFA evidence.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir used as diagnostic difficult-edge evidence.")
     parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir used as diagnostic CFA/LensPSF edge evidence.")
+    parser.add_argument("--scene-edge-confidence", default=None, help="Scene-edge confidence summary path/dir used as high-information scene edge evidence.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir used as diagnostic scene-to-sensor evidence.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir used as diagnostic downstream aux evidence.")
     parser.add_argument("--output-dir", default="reports/perception_claim_readiness")
@@ -65,6 +66,7 @@ def main(argv: Any = None) -> int:
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
         edge_fidelity_suite=args.edge_fidelity_suite,
+        scene_edge_confidence=args.scene_edge_confidence,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         output_dir=args.output_dir,
@@ -92,6 +94,7 @@ def run_claim_readiness(
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
     edge_fidelity_suite: str | Path | None = None,
+    scene_edge_confidence: str | Path | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     output_dir: str | Path = "reports/perception_claim_readiness",
@@ -200,6 +203,7 @@ def run_claim_readiness(
         cfa_stress_sweep=cfa_stress_sweep,
         edge_confidence_suite=edge_confidence_suite,
         edge_fidelity_suite=edge_fidelity_suite,
+        scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
         min_samples=int(min_samples),
@@ -220,6 +224,7 @@ def run_claim_readiness(
         cfa_stress_sweep=cfa_stress_sweep,
         edge_confidence_suite=edge_confidence_suite,
         edge_fidelity_suite=edge_fidelity_suite,
+        scene_edge_confidence=scene_edge_confidence,
         scene_information_stress=scene_information_stress,
         aux_contribution_audit=aux_contribution_audit,
         comparison_rollup_specs=comparison_rollups,
@@ -291,6 +296,7 @@ def run_claim_readiness(
         "cfa_stress_sweep": _cfa_stress_sweep_summary(cfa_stress_sweep),
         "edge_confidence_suite": _edge_confidence_suite_summary(edge_confidence_suite),
         "edge_fidelity_suite": _edge_fidelity_suite_summary(edge_fidelity_suite),
+        "scene_edge_confidence": _scene_edge_confidence_summary(scene_edge_confidence),
         "scene_information_stress": _scene_information_stress_summary(scene_information_stress),
         "aux_contribution_audit": _aux_contribution_audit_summary(aux_contribution_audit),
         "benchmark_protocol": {
@@ -433,6 +439,34 @@ def _edge_fidelity_suite_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _scene_edge_confidence_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "scene_edge_confidence_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"scene-edge confidence summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [row.get("id") for row in checks if str(row.get("status", "")) != "pass"]
+    aggregate = data.get("aggregate", {}) if isinstance(data.get("aggregate"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed,
+        "status": data.get("status"),
+        "failed_checks": failed,
+        "check_count": len(checks),
+        "case_count": len(data.get("cases", ())),
+        "human_rgb_proxy_source_edge_f1_mean": _optional_float(aggregate.get("human_rgb_proxy_source_edge_f1_mean")),
+        "perception_rgb_proxy_source_edge_f1_mean": _optional_float(aggregate.get("perception_rgb_proxy_source_edge_f1_mean")),
+        "perception_aux_strength_source_edge_f1_mean": _optional_float(aggregate.get("perception_aux_strength_source_edge_f1_mean")),
+        "perception_aux_confidence_source_edge_f1_mean": _optional_float(aggregate.get("perception_aux_confidence_source_edge_f1_mean")),
+    }
+
+
 def _scene_information_stress_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -499,12 +533,19 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "cfa_stress_sweep": summary.get("cfa_stress_sweep"),
         "edge_confidence_suite": summary.get("edge_confidence_suite"),
         "edge_fidelity_suite": summary.get("edge_fidelity_suite"),
+        "scene_edge_confidence": summary.get("scene_edge_confidence"),
         "scene_information_stress": summary.get("scene_information_stress"),
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
         "benchmark_protocol": summary.get("benchmark_protocol"),
         "protocol_comparison_reports": summary.get("protocol_comparison_reports"),
         "decisions": summary.get("dashboard", {}).get("decisions") if isinstance(summary.get("dashboard"), Mapping) else [],
     }
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)
 
 
 if __name__ == "__main__":
