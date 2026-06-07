@@ -275,6 +275,7 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("checkpoint_loss_kind", summary)
             self.assertEqual(summary["box_encoding"], "cell_center_size")
             self.assertEqual(summary["channel_mode"], "aux_only")
+            self.assertEqual(summary["model_architecture"], "early_fusion")
             self.assertEqual(summary["channel_mask"], [0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
             self.assertIn("train_class_names", summary)
             self.assertIn("eval_class_names", summary)
@@ -306,6 +307,7 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(direct["sample_count"], len(summary["eval_indices"]))
             self.assertEqual(direct["eval_labels"], ["car", "person"])
             self.assertEqual(direct["checkpoint_summary"]["channel_mode"], "aux_only")
+            self.assertEqual(direct["checkpoint_summary"]["model_architecture"], "early_fusion")
             self.assertTrue(all(sample["gt_count"] == 2 for sample in direct["samples"]))
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
@@ -346,6 +348,38 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(summary["eval_sample_count"], 4)
             self.assertNotEqual(summary["train_indices"], [0, 1, 2, 3])
             self.assertEqual(summary["missing_eval_class_names"], [])
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_late_fusion_detector_trains_and_evaluates(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp, include_extended=False, include_preview=False, compress=False)
+            summary = train_dense(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                model_architecture="late_fusion",
+                channel_mode="rgb_aux",
+                eval_fraction=0.34,
+                include_labels=("car", "person"),
+                output_dir=Path(tmp) / "dense_late",
+            )
+            self.assertEqual(summary["model_architecture"], "late_fusion")
+            detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
+            self.assertIsInstance(detector, RGBAuxTorchDenseDetector)
+            self.assertEqual(detector.model_architecture, "late_fusion")
+            direct = evaluate_dense_manifest(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_late_eval",
+            )
+            self.assertEqual(direct["checkpoint_summary"]["model_architecture"], "late_fusion")
+            self.assertIn("aggregate", direct)
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_extended_dense_detector_trains_and_evaluates(self) -> None:

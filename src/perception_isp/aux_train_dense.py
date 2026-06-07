@@ -39,6 +39,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--grid", default="15x20", help="Detector grid as HxW.")
     parser.add_argument("--base-channels", type=int, default=24)
+    parser.add_argument("--model-architecture", default="early_fusion", choices=["early_fusion", "late_fusion"], help="Dense detector architecture.")
     parser.add_argument("--tensor-key", default=RGB_AUX_TENSOR_KEY, help="Tensor key to train on: rgb_aux_chw or rgb_aux_extended_chw.")
     parser.add_argument("--channel-mode", default="rgb_aux", choices=["rgb_aux", "rgb_only", "aux_only"], help="Input ablation mode.")
     parser.add_argument("--eval-fraction", type=float, default=0.25)
@@ -58,6 +59,7 @@ def main(argv: Any = None) -> int:
         device_name=str(args.device),
         grid_size=parse_grid_size(args.grid),
         base_channels=int(args.base_channels),
+        model_architecture=str(args.model_architecture),
         tensor_key=str(args.tensor_key),
         channel_mode=str(args.channel_mode),
         eval_fraction=float(args.eval_fraction),
@@ -81,6 +83,7 @@ def train_dense(
     device_name: str = "auto",
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
+    model_architecture: str = "early_fusion",
     tensor_key: str = RGB_AUX_TENSOR_KEY,
     channel_mode: str = "rgb_aux",
     eval_fraction: float = 0.25,
@@ -115,6 +118,7 @@ def train_dense(
         grid_size=grid_size,
         base_channels=int(base_channels),
         in_channels=len(channels),
+        architecture=str(model_architecture),
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(learning_rate), weight_decay=5.0e-4)
     history = []
@@ -203,6 +207,7 @@ def train_dense(
         "learning_rate": float(learning_rate),
         "grid_size": [int(grid_size[0]), int(grid_size[1])],
         "base_channels": int(base_channels),
+        "model_architecture": str(model_architecture),
         "tensor_key": resolved_tensor_key,
         "input_channels": len(channels),
         "channel_mode": normalized_channel_mode,
@@ -256,6 +261,7 @@ def train_dense(
             "channel_mask": [float(value) for value in channel_mask],
             "grid_size": [int(grid_size[0]), int(grid_size[1])],
             "base_channels": int(base_channels),
+            "model_architecture": str(model_architecture),
             "class_names": list(class_names),
             "box_encoding": BOX_ENCODING,
             "summary": summary,

@@ -326,10 +326,15 @@ def make_aux_dense_detector_model(
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
     in_channels: int = 6,
+    architecture: str = "early_fusion",
 ):
     """Create a compact class-aware RGB+aux grid detector."""
 
     import torch.nn as nn
+
+    normalized_architecture = str(architecture or "early_fusion").lower().replace("-", "_")
+    if normalized_architecture not in {"early_fusion", "late_fusion"}:
+        raise ValueError(f"unsupported RGB+aux dense detector architecture: {architecture!r}")
 
     class RGBAuxDenseDetectorModel(nn.Module):
         def __init__(self) -> None:
@@ -357,8 +362,59 @@ def make_aux_dense_detector_model(
         def forward(self, value: Any) -> Any:
             return self.head(self.features(value))
 
+    class RGBLateAuxDenseDetectorModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            channels = int(base_channels)
+            rgb_channels = min(int(in_channels), 3)
+            aux_channels = max(int(in_channels) - rgb_channels, 1)
+            self.rgb_channels = rgb_channels
+            self.aux_channels = aux_channels
+            self.grid_size = (int(grid_size[0]), int(grid_size[1]))
+            self.num_classes = int(num_classes)
+            self.rgb_features = nn.Sequential(
+                nn.Conv2d(rgb_channels, channels, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 2),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels * 2, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 2),
+                nn.SiLU(inplace=True),
+            )
+            self.aux_features = nn.Sequential(
+                nn.Conv2d(aux_channels, channels, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 2),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels * 2, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 2),
+                nn.SiLU(inplace=True),
+            )
+            self.fusion = nn.Sequential(
+                nn.Conv2d(channels * 4, channels * 4, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 4),
+                nn.SiLU(inplace=True),
+                nn.AdaptiveAvgPool2d(self.grid_size),
+            )
+            self.head = nn.Conv2d(channels * 4, 5 + self.num_classes, kernel_size=1)
+
+        def forward(self, value: Any) -> Any:
+            import torch
+
+            rgb = value[:, : self.rgb_channels, :, :]
+            aux = value[:, self.rgb_channels :, :, :]
+            if int(aux.shape[1]) <= 0:
+                aux = aux.new_zeros((int(aux.shape[0]), self.aux_channels, int(aux.shape[2]), int(aux.shape[3])))
+            return self.head(self.fusion(torch.cat((self.rgb_features(rgb), self.aux_features(aux)), dim=1)))
+
     if int(num_classes) <= 0:
         raise ValueError("num_classes must be positive")
+    if normalized_architecture == "late_fusion":
+        return RGBLateAuxDenseDetectorModel()
     return RGBAuxDenseDetectorModel()
 
 

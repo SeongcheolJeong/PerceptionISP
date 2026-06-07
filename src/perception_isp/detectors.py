@@ -284,11 +284,13 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
         self.channel_mask = tuple(float(value) for value in checkpoint.get("channel_mask", (1.0,) * self.input_channels))
         grid_size = tuple(int(value) for value in checkpoint.get("grid_size", (15, 20)))
         base_channels = int(checkpoint.get("base_channels", 24))
+        self.model_architecture = str(checkpoint.get("model_architecture", "early_fusion"))
         self.model = make_aux_dense_detector_model(
             num_classes=len(self.class_names),
             grid_size=(int(grid_size[0]), int(grid_size[1])),
             base_channels=base_channels,
             in_channels=self.input_channels,
+            architecture=self.model_architecture,
         )
         self.model.load_state_dict(checkpoint["model_state"])
         self.model.to(self.device)
@@ -342,6 +344,7 @@ class RGBAuxTorchDenseDetector(DetectorAdapter):
                             "uses_rgb_aux_tensor": True,
                             "class_trained": True,
                             "channel_mode": self.channel_mode,
+                            "model_architecture": self.model_architecture,
                             "grid_cell": [int(row), int(col)],
                             "objectness": float(objectness[row, col]),
                             "class_probability": float(class_scores[class_index, row, col]),

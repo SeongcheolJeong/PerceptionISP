@@ -138,6 +138,7 @@ def evaluate_dense_manifest(
             "split_strategy": checkpoint_summary.get("split_strategy"),
             "missing_eval_class_names": checkpoint_summary.get("missing_eval_class_names"),
             "channel_mode": checkpoint.get("channel_mode") if isinstance(checkpoint, Mapping) else None,
+            "model_architecture": checkpoint.get("model_architecture") if isinstance(checkpoint, Mapping) else None,
             "channel_mask": checkpoint.get("channel_mask") if isinstance(checkpoint, Mapping) else None,
             "tensor_key": checkpoint.get("tensor_key") if isinstance(checkpoint, Mapping) else None,
             "input_channels": checkpoint.get("input_channels") if isinstance(checkpoint, Mapping) else None,
