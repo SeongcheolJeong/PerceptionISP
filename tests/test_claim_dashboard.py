@@ -22,6 +22,7 @@ class ClaimDashboardTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             comparison = _write_comparison_rollup(root / "rollup")
@@ -34,6 +35,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                edge_fidelity_suite=edge_fidelity,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 comparison_rollup_specs=[f"Calibration={comparison}"],
@@ -49,6 +51,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(dashboard["mechanism_validation"]["pass"])
             self.assertTrue(dashboard["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard["edge_fidelity_suite"]["pass"])
             self.assertTrue(dashboard["scene_information_stress"]["pass"])
             self.assertTrue(dashboard["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
@@ -66,6 +69,10 @@ class ClaimDashboardTest(unittest.TestCase):
             )
             self.assertIn(
                 "Edge-confidence suite passed; PerceptionISP confidence maps respond to difficult-edge stressors, but this is not detector-performance evidence.",
+                [item["claim"] for item in dashboard["decisions"]],
+            )
+            self.assertIn(
+                "Object edge-fidelity suite passed; HumanISP, PerceptionISP, and aux edge maps are compared against object/sensor edge oracles across CFA and LensPSF, but this is not detector-performance evidence.",
                 [item["claim"] for item in dashboard["decisions"]],
             )
             self.assertIn(
@@ -94,6 +101,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
+            self.assertIn("Object Edge Fidelity", html)
             self.assertIn("Scene Information Stress", html)
             self.assertIn("Benchmark Protocol Coverage", html)
             self.assertIn("recall_tradeoff", html)
@@ -108,6 +116,7 @@ class ClaimDashboardTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
@@ -126,6 +135,8 @@ class ClaimDashboardTest(unittest.TestCase):
                         str(cfa_stress),
                         "--edge-confidence-suite",
                         str(edge_confidence),
+                        "--edge-fidelity-suite",
+                        str(edge_fidelity),
                         "--scene-information-stress",
                         str(scene_information),
                         "--aux-contribution-audit",
@@ -143,6 +154,7 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertTrue(summary["mechanism_validation"]["pass"])
             self.assertTrue(summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             self.assertTrue(summary["scene_information_stress"]["pass"])
             self.assertTrue(summary["aux_contribution_audit"]["pass"])
             self.assertTrue((root / "dashboard" / "claim_dashboard_summary.json").exists())
@@ -463,6 +475,57 @@ def _write_edge_confidence_suite(path: Path) -> Path:
                     },
                 ],
                 "interpretation": "unit edge confidence suite",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_edge_fidelity_suite(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "edge_fidelity_suite_summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "cfa_patterns": ["RGGB", "GRBG", "RCCB"],
+                "psf_sigmas": [0.0, 1.2],
+                "cases": [
+                    {
+                        "id": "psf_0.00_RGGB",
+                        "psf_sigma": 0.0,
+                        "cfa_pattern": "RGGB",
+                        "metrics": {
+                            "human_object_edge_f1": 0.65,
+                            "perception_object_edge_f1": 0.67,
+                            "aux_object_edge_f1": 0.70,
+                            "edge_confidence_separation": 0.12,
+                        },
+                    }
+                ],
+                "checks": [
+                    {"id": "finite_edge_fidelity_outputs", "status": "pass"},
+                    {"id": "object_and_sensor_edge_oracles_present", "status": "pass"},
+                    {"id": "edge_fidelity_metrics_bounded", "status": "pass"},
+                    {"id": "lens_psf_reduces_sensor_edge_contrast", "status": "pass"},
+                ],
+                "rankings": [
+                    {
+                        "psf_sigma": 0.0,
+                        "ranked_cfas": [
+                            {
+                                "rank": 1,
+                                "cfa_pattern": "RGGB",
+                                "aux_object_edge_f1": 0.70,
+                                "perception_object_edge_f1": 0.67,
+                                "edge_confidence_separation": 0.12,
+                            }
+                        ],
+                    }
+                ],
+                "interpretation": "unit edge fidelity",
+                "claim_boundary": "unit diagnostic boundary",
             }
         )
         + "\n"

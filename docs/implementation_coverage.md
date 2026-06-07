@@ -21,7 +21,7 @@ boundary used by the benchmark protocol and claim gates.
 | DNN Export | stable RGB+aux six-channel tensor, extended sensor-native aux tensor, labels, manifest, PyTorch dataset adapter |
 | Training Smoke | tiny PyTorch RGB+aux stem, compact dense detector, channel ablations, checkpoint save/load, eval split, training/eval rollup |
 | Learned Adapter | `RGBAuxTorchSmokeDetector` and `RGBAuxTorchDenseDetector` load checkpoints into the comparison harness |
-| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, scene-information stress suite, aux contribution audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
+| Evidence / Claiming | synthetic mechanism validation, CFA stress sweep, edge-confidence suite, object edge-fidelity suite, scene-information stress suite, aux contribution audit, paired-bootstrap claim gates, broad-superiority and FP-reducer profiles, task-group metrics, task gate, condition-specific metrics, condition robustness gate, RGB+aux training rollup, benchmark-protocol coverage checklist, claim-readiness dashboard, one-shot readiness orchestration |
 | Runtime Controller | rule-based HDR/noise/fast-path suggestions |
 | Safety Monitor | exposure, visibility, focus, tint, DNN input validity |
 
@@ -43,6 +43,12 @@ Known limits:
 - The edge-confidence suite validates difficult-edge confidence behavior under
   synthetic low-light, glare, and low-MTF stress, but it remains front-end
   signal evidence rather than detector-performance evidence.
+- The object edge-fidelity suite compares object/sensor edge oracles against
+  HumanISP RGB edges, PerceptionISP RGB edges, and aux edge maps across CFA and
+  LensPSF blur, but it remains front-end edge evidence rather than
+  detector-performance evidence. PSF effects can be nearly invisible when the
+  PSF footprint is much smaller than the sensor pixel pitch or is applied only
+  after low-resolution sampling.
 - The scene-information stress suite validates high-resolution scene detail
   loss, CFA chroma alias/color uncertainty, and sub-pixel signal fill-factor
   loss, but it is diagnostic scene-to-sensor evidence and does not show that

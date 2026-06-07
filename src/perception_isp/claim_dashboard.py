@@ -21,6 +21,7 @@ PROTOCOL_COVERAGE_SUMMARY = "protocol_coverage_summary.json"
 MECHANISM_VALIDATION_SUMMARY = "mechanism_validation_summary.json"
 CFA_STRESS_SWEEP_SUMMARY = "cfa_stress_sweep_summary.json"
 EDGE_CONFIDENCE_SUMMARY = "edge_confidence_suite_summary.json"
+EDGE_FIDELITY_SUMMARY = "edge_fidelity_suite_summary.json"
 SCENE_INFORMATION_STRESS_SUMMARY = "scene_information_stress_summary.json"
 AUX_CONTRIBUTION_AUDIT_SUMMARY = "aux_contribution_audit_summary.json"
 
@@ -35,6 +36,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir.")
     parser.add_argument("--cfa-stress-sweep", default=None, help="CFA stress sweep summary path/dir.")
     parser.add_argument("--edge-confidence-suite", default=None, help="Edge-confidence suite summary path/dir.")
+    parser.add_argument("--edge-fidelity-suite", default=None, help="Object edge-fidelity suite summary path/dir.")
     parser.add_argument("--scene-information-stress", default=None, help="Scene-information stress summary path/dir.")
     parser.add_argument("--aux-contribution-audit", default=None, help="Aux contribution audit summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Comparison rollup summary path/dir, optionally name=path.")
@@ -50,6 +52,7 @@ def main(argv: Any = None) -> int:
         mechanism_validation=args.mechanism_validation,
         cfa_stress_sweep=args.cfa_stress_sweep,
         edge_confidence_suite=args.edge_confidence_suite,
+        edge_fidelity_suite=args.edge_fidelity_suite,
         scene_information_stress=args.scene_information_stress,
         aux_contribution_audit=args.aux_contribution_audit,
         comparison_rollup_specs=args.comparison_rollup,
@@ -81,6 +84,7 @@ def build_claim_dashboard(
     mechanism_validation: str | Path | None = None,
     cfa_stress_sweep: str | Path | None = None,
     edge_confidence_suite: str | Path | None = None,
+    edge_fidelity_suite: str | Path | None = None,
     scene_information_stress: str | Path | None = None,
     aux_contribution_audit: str | Path | None = None,
     comparison_rollup_specs: Sequence[str | Path] = (),
@@ -93,6 +97,7 @@ def build_claim_dashboard(
     mechanism = _load_mechanism_validation(mechanism_validation) if mechanism_validation is not None else None
     cfa_stress = _load_cfa_stress_sweep(cfa_stress_sweep) if cfa_stress_sweep is not None else None
     edge_confidence = _load_edge_confidence_suite(edge_confidence_suite) if edge_confidence_suite is not None else None
+    edge_fidelity = _load_edge_fidelity_suite(edge_fidelity_suite) if edge_fidelity_suite is not None else None
     scene_information = _load_scene_information_stress(scene_information_stress) if scene_information_stress is not None else None
     aux_contribution = _load_aux_contribution_audit(aux_contribution_audit) if aux_contribution_audit is not None else None
     comparison_rollups = [_load_comparison_rollup(spec) for spec in comparison_rollup_specs]
@@ -105,6 +110,7 @@ def build_claim_dashboard(
         mechanism,
         cfa_stress,
         edge_confidence,
+        edge_fidelity,
         scene_information,
         aux_contribution,
     )
@@ -117,6 +123,7 @@ def build_claim_dashboard(
         "mechanism_validation": mechanism,
         "cfa_stress_sweep": cfa_stress,
         "edge_confidence_suite": edge_confidence,
+        "edge_fidelity_suite": edge_fidelity,
         "scene_information_stress": scene_information,
         "aux_contribution_audit": aux_contribution,
         "comparison_rollups": comparison_rollups,
@@ -367,6 +374,64 @@ def _load_edge_confidence_suite(spec: str | Path) -> Dict[str, Any]:
     }
 
 
+def _load_edge_fidelity_suite(spec: str | Path) -> Dict[str, Any]:
+    label, path = _split_named_path(spec)
+    summary_path = _summary_path(path, EDGE_FIDELITY_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed = [str(row.get("id", "")) for row in checks if str(row.get("status", "")) != "pass"]
+    top_rows = []
+    for ranking in data.get("rankings", ()):
+        if not isinstance(ranking, Mapping):
+            continue
+        ranked = ranking.get("ranked_cfas", ()) if isinstance(ranking.get("ranked_cfas", ()), Sequence) else ()
+        first = next((row for row in ranked if isinstance(row, Mapping)), None)
+        if first is None:
+            continue
+        top_rows.append(
+            {
+                "psf_sigma": _maybe_float(ranking.get("psf_sigma")),
+                "cfa_pattern": str(first.get("cfa_pattern", "")),
+                "aux_object_edge_f1": _maybe_float(first.get("aux_object_edge_f1")),
+                "perception_object_edge_f1": _maybe_float(first.get("perception_object_edge_f1")),
+                "edge_confidence_separation": _maybe_float(first.get("edge_confidence_separation")),
+            }
+        )
+    cases = []
+    for row in data.get("cases", ()):
+        if not isinstance(row, Mapping):
+            continue
+        metrics = row.get("metrics", {}) if isinstance(row.get("metrics"), Mapping) else {}
+        cases.append(
+            {
+                "id": str(row.get("id", "")),
+                "psf_sigma": _maybe_float(row.get("psf_sigma")),
+                "cfa_pattern": str(row.get("cfa_pattern", "")),
+                "human_object_edge_f1": _maybe_float(metrics.get("human_object_edge_f1")),
+                "perception_object_edge_f1": _maybe_float(metrics.get("perception_object_edge_f1")),
+                "aux_object_edge_f1": _maybe_float(metrics.get("aux_object_edge_f1")),
+                "edge_confidence_separation": _maybe_float(metrics.get("edge_confidence_separation")),
+            }
+        )
+    status = str(data.get("status", ""))
+    return {
+        "name": label or _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": status,
+        "pass": status == "pass" and not failed,
+        "check_count": len(checks),
+        "case_count": len(data.get("cases", ())),
+        "failed_checks": failed,
+        "cfa_patterns": [str(value) for value in data.get("cfa_patterns", ())],
+        "psf_sigmas": [_maybe_float(value) for value in data.get("psf_sigmas", ())],
+        "top_rows": top_rows,
+        "cases": cases[:12],
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
 def _load_scene_information_stress(spec: str | Path) -> Dict[str, Any]:
     label, path = _split_named_path(spec)
     summary_path = _summary_path(path, SCENE_INFORMATION_STRESS_SUMMARY)
@@ -534,6 +599,7 @@ def _claim_decisions(
     mechanism_validation: Mapping[str, Any] | None,
     cfa_stress_sweep: Mapping[str, Any] | None,
     edge_confidence_suite: Mapping[str, Any] | None,
+    edge_fidelity_suite: Mapping[str, Any] | None,
     scene_information_stress: Mapping[str, Any] | None,
     aux_contribution_audit: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
@@ -576,6 +642,17 @@ def _claim_decisions(
         else:
             failed = ", ".join(str(value) for value in edge_confidence_suite.get("failed_checks", ())) or "configured edge-confidence checks"
             decisions.append({"status": "not_supported", "claim": f"Edge-confidence suite failed for {failed}; do not use edge confidence as feasibility evidence yet."})
+    if edge_fidelity_suite is not None:
+        if bool(edge_fidelity_suite.get("pass")):
+            decisions.append(
+                {
+                    "status": "diagnostic",
+                    "claim": "Object edge-fidelity suite passed; HumanISP, PerceptionISP, and aux edge maps are compared against object/sensor edge oracles across CFA and LensPSF, but this is not detector-performance evidence.",
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in edge_fidelity_suite.get("failed_checks", ())) or "configured object edge-fidelity checks"
+            decisions.append({"status": "not_supported", "claim": f"Object edge-fidelity suite failed for {failed}; do not use edge fidelity as feasibility evidence yet."})
     if scene_information_stress is not None:
         if bool(scene_information_stress.get("pass")):
             decisions.append(
@@ -768,6 +845,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
     cfa_stress_html = _cfa_stress_html(cfa_stress, destination) if isinstance(cfa_stress, Mapping) else "<p>No CFA stress sweep summary was provided.</p>"
     edge_confidence = dashboard.get("edge_confidence_suite")
     edge_confidence_html = _edge_confidence_html(edge_confidence, destination) if isinstance(edge_confidence, Mapping) else "<p>No edge-confidence suite summary was provided.</p>"
+    edge_fidelity = dashboard.get("edge_fidelity_suite")
+    edge_fidelity_html = _edge_fidelity_html(edge_fidelity, destination) if isinstance(edge_fidelity, Mapping) else "<p>No object edge-fidelity suite summary was provided.</p>"
     scene_information = dashboard.get("scene_information_stress")
     scene_information_html = (
         _scene_information_html(scene_information, destination)
@@ -826,6 +905,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {cfa_stress_html}
   <h2>Edge Confidence Suite</h2>
   {edge_confidence_html}
+  <h2>Object Edge Fidelity</h2>
+  {edge_fidelity_html}
   <h2>Scene Information Stress</h2>
   {scene_information_html}
   <h2>Benchmark Protocol Coverage</h2>
@@ -1077,6 +1158,63 @@ def _edge_confidence_delta_row(row: Mapping[str, Any]) -> str:
         f"<td>{_fmt(row.get('delta'))}</td>"
         f"<td>{_fmt(row.get('threshold'))}</td>"
         f"<td class=\"{status_class}\">{html_lib.escape(str(bool(row.get('pass'))))}</td>"
+        "</tr>"
+    )
+
+
+def _edge_fidelity_html(edge_fidelity: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(edge_fidelity.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in edge_fidelity.get("failed_checks", ())) or "none"
+    ranking_rows = "".join(_edge_fidelity_ranking_row(row) for row in edge_fidelity.get("top_rows", ()))
+    if not ranking_rows:
+        ranking_rows = '<tr><td colspan="5">No object edge-fidelity rankings were available.</td></tr>'
+    case_rows = "".join(_edge_fidelity_case_row(row) for row in edge_fidelity.get("cases", ()))
+    if not case_rows:
+        case_rows = '<tr><td colspan="6">No object edge-fidelity case rows were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(edge_fidelity.get('status', '')))}</code>. "
+        f"{html_lib.escape(str(edge_fidelity.get('interpretation', '')))} "
+        f"{html_lib.escape(str(edge_fidelity.get('claim_boundary', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Report</th><th>Cases</th><th>Checks</th><th>CFA Patterns</th><th>LensPSF Sigma</th><th>Failed</th></tr></thead>"
+        "<tbody><tr>"
+        f"<td>{_report_link(edge_fidelity, destination)}</td>"
+        f"<td>{int(edge_fidelity.get('case_count', 0))}</td>"
+        f"<td>{int(edge_fidelity.get('check_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(str(value) for value in edge_fidelity.get('cfa_patterns', ())) or 'none')}</td>"
+        f"<td>{html_lib.escape(', '.join(_fmt(value) for value in edge_fidelity.get('psf_sigmas', ()) if value is not None) or 'none')}</td>"
+        f"<td>{html_lib.escape(failed)}</td>"
+        "</tr></tbody></table>"
+        "<table>"
+        "<thead><tr><th>LensPSF Sigma</th><th>Top CFA</th><th>Aux Obj F1</th><th>Perception Obj F1</th><th>Conf Sep</th></tr></thead>"
+        f"<tbody>{ranking_rows}</tbody></table>"
+        "<table>"
+        "<thead><tr><th>Case</th><th>CFA</th><th>LensPSF</th><th>Human Obj F1</th><th>Perception Obj F1</th><th>Aux Obj F1</th></tr></thead>"
+        f"<tbody>{case_rows}</tbody></table>"
+    )
+
+
+def _edge_fidelity_ranking_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td>{_fmt(row.get('psf_sigma'))}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{_fmt(row.get('aux_object_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('perception_object_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('edge_confidence_separation'), signed=True)}</td>"
+        "</tr>"
+    )
+
+
+def _edge_fidelity_case_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('cfa_pattern', '')))}</code></td>"
+        f"<td>{_fmt(row.get('psf_sigma'))}</td>"
+        f"<td>{_fmt(row.get('human_object_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('perception_object_edge_f1'))}</td>"
+        f"<td>{_fmt(row.get('aux_object_edge_f1'))}</td>"
         "</tr>"
     )
 

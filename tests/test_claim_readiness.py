@@ -21,6 +21,7 @@ class ClaimReadinessTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -34,6 +35,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                edge_fidelity_suite=edge_fidelity,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
@@ -57,6 +59,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("mechanism_validation", summary)
             self.assertIn("cfa_stress_sweep", summary)
             self.assertIn("edge_confidence_suite", summary)
+            self.assertIn("edge_fidelity_suite", summary)
             self.assertIn("scene_information_stress", summary)
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("benchmark_protocol", summary)
@@ -64,6 +67,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_incomplete")
             self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
             self.assertTrue(summary["scene_information_stress"]["pass"])
+            self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             decisions = {item["claim"]: item["status"] for item in summary["dashboard"]["decisions"]}
             self.assertEqual(decisions["Broad HumanISP superiority is not supported by the current gate evidence."], "not_supported")
             self.assertEqual(decisions["Recall-budgeted FP reduction versus the RGB+Aux fusion baseline is supported."], "supported")
@@ -84,6 +88,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard_summary["edge_fidelity_suite"]["pass"])
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "not_claim_ready")
@@ -130,6 +135,7 @@ class ClaimReadinessTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -143,6 +149,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                edge_fidelity_suite=edge_fidelity,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 output_dir=root / "readiness",
@@ -152,6 +159,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["benchmark_protocol"]["coverage_status"], "coverage_complete")
             self.assertEqual(summary["benchmark_protocol"]["metric_claim_status"], "fp_reducer_only")
             self.assertTrue(summary["scene_information_stress"]["pass"])
+            self.assertTrue(summary["edge_fidelity_suite"]["pass"])
             self.assertIn(str(naive_dir), summary["protocol_comparison_reports"])
             dashboard_summary = json.loads((root / "readiness" / "dashboard" / "claim_dashboard_summary.json").read_text())
             self.assertEqual(dashboard_summary["protocol_coverage"]["status"], "claim_ready")
@@ -160,6 +168,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertTrue(dashboard_summary["mechanism_validation"]["pass"])
             self.assertTrue(dashboard_summary["cfa_stress_sweep"]["pass"])
             self.assertTrue(dashboard_summary["edge_confidence_suite"]["pass"])
+            self.assertTrue(dashboard_summary["edge_fidelity_suite"]["pass"])
             self.assertTrue(dashboard_summary["scene_information_stress"]["pass"])
             self.assertTrue(dashboard_summary["aux_contribution_audit"]["pass"])
 
@@ -364,6 +373,39 @@ def _write_edge_confidence_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_edge_fidelity_suite(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cfa_patterns": ["RGGB", "GRBG", "RCCB"],
+        "psf_sigmas": [0.0, 1.2],
+        "cases": [{"id": "psf_0.00_RGGB", "psf_sigma": 0.0, "cfa_pattern": "RGGB", "metrics": {"aux_object_edge_f1": 0.70}}],
+        "checks": [
+            {"id": "finite_edge_fidelity_outputs", "status": "pass"},
+            {"id": "object_and_sensor_edge_oracles_present", "status": "pass"},
+            {"id": "edge_fidelity_metrics_bounded", "status": "pass"},
+            {"id": "lens_psf_reduces_sensor_edge_contrast", "status": "pass"},
+        ],
+        "rankings": [
+            {
+                "psf_sigma": 0.0,
+                "ranked_cfas": [
+                    {
+                        "rank": 1,
+                        "cfa_pattern": "RGGB",
+                        "aux_object_edge_f1": 0.70,
+                        "perception_object_edge_f1": 0.67,
+                        "edge_confidence_separation": 0.12,
+                    }
+                ],
+            }
+        ],
+    }
+    (path / "edge_fidelity_suite_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

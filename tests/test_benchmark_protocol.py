@@ -24,6 +24,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -38,6 +39,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                edge_fidelity_suite=edge_fidelity,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
@@ -52,6 +54,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             self.assertEqual(rows["front_end_mechanism_validation"]["status"], "covered")
             self.assertEqual(rows["cfa_stress_sweep"]["status"], "covered")
             self.assertEqual(rows["edge_confidence_suite"]["status"], "covered")
+            self.assertEqual(rows["edge_fidelity_suite"]["status"], "covered")
             self.assertEqual(rows["scene_information_stress"]["status"], "covered")
             self.assertEqual(rows["aux_contribution_audit"]["status"], "covered")
             self.assertEqual(rows["naive_raw_baseline"]["status"], "missing")
@@ -76,6 +79,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
 
@@ -91,6 +95,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
                 edge_confidence_suite=edge_confidence,
+                edge_fidelity_suite=edge_fidelity,
                 scene_information_stress=scene_information,
                 aux_contribution_audit=aux_contribution,
                 min_samples=3,
@@ -115,6 +120,7 @@ class BenchmarkProtocolTest(unittest.TestCase):
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
             edge_confidence = _write_edge_confidence_suite(root / "edge_confidence")
+            edge_fidelity = _write_edge_fidelity_suite(root / "edge_fidelity")
             scene_information = _write_scene_information_stress(root / "scene_information")
             aux_contribution = _write_aux_contribution_audit(root / "aux_contribution")
             stdout = io.StringIO()
@@ -139,6 +145,8 @@ class BenchmarkProtocolTest(unittest.TestCase):
                         str(cfa_stress),
                         "--edge-confidence-suite",
                         str(edge_confidence),
+                        "--edge-fidelity-suite",
+                        str(edge_fidelity),
                         "--scene-information-stress",
                         str(scene_information),
                         "--aux-contribution-audit",
@@ -335,6 +343,39 @@ def _write_edge_confidence_suite(path: Path) -> Path:
         ],
     }
     (path / "edge_confidence_suite_summary.json").write_text(json.dumps(payload) + "\n")
+    return path
+
+
+def _write_edge_fidelity_suite(path: Path) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    payload = {
+        "status": "pass",
+        "cfa_patterns": ["RGGB", "GRBG", "RCCB"],
+        "psf_sigmas": [0.0, 1.2],
+        "cases": [{"id": "psf_0.00_RGGB", "psf_sigma": 0.0, "cfa_pattern": "RGGB", "metrics": {"aux_object_edge_f1": 0.70}}],
+        "checks": [
+            {"id": "finite_edge_fidelity_outputs", "status": "pass"},
+            {"id": "object_and_sensor_edge_oracles_present", "status": "pass"},
+            {"id": "edge_fidelity_metrics_bounded", "status": "pass"},
+            {"id": "lens_psf_reduces_sensor_edge_contrast", "status": "pass"},
+        ],
+        "rankings": [
+            {
+                "psf_sigma": 0.0,
+                "ranked_cfas": [
+                    {
+                        "rank": 1,
+                        "cfa_pattern": "RGGB",
+                        "aux_object_edge_f1": 0.70,
+                        "perception_object_edge_f1": 0.67,
+                        "edge_confidence_separation": 0.12,
+                    }
+                ],
+            }
+        ],
+    }
+    (path / "edge_fidelity_suite_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

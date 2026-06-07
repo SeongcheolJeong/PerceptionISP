@@ -809,6 +809,7 @@ PYTHONPATH=src \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
+  --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --protocol-coverage reports/perception_benchmark_protocol_kitti_with_naive_extended \
@@ -825,9 +826,10 @@ versus HumanISP is not supported even though FP/sample is reduced. Mechanism
 validation is shown as front-end feasibility evidence only, not as detector
 performance evidence, and the CFA stress sweep is shown as diagnostic
 condition/CFA evidence only. The edge-confidence suite is also shown as
-diagnostic difficult-edge evidence, the scene-information stress suite is shown
-as diagnostic scene-to-sensor evidence, and the aux contribution audit is shown
-as detector-side calibration evidence, not as DNN detector-performance
+diagnostic difficult-edge evidence, the object edge-fidelity suite is shown as
+diagnostic CFA/LensPSF edge evidence, the scene-information stress suite is
+shown as diagnostic scene-to-sensor evidence, and the aux contribution audit is
+shown as detector-side calibration evidence, not as DNN detector-performance
 evidence.
 
 Task-oriented group metrics can be extracted from the same saved detections:
@@ -928,6 +930,42 @@ synthetic deltas are directional: low light lowers mean edge confidence by
 `-0.1531`, glare lowers mean edge confidence by `-0.1381`, and low MTF lowers
 strong-edge confidence by `-0.4119`. This is front-end confidence evidence for
 hard edge cases, not detector-performance evidence.
+
+To compare object-boundary edge fidelity across HumanISP, PerceptionISP, aux
+edge maps, CFA pattern, and LensPSF blur, run the object edge-fidelity suite:
+
+```bash
+PYTHONPATH=src python3 -m perception_isp.edge_fidelity_suite \
+  --sensor-width 160 \
+  --sensor-height 96 \
+  --oversample 6 \
+  --cfa RGGB \
+  --cfa GRBG \
+  --cfa BGGR \
+  --cfa GBRG \
+  --cfa RCCB \
+  --cfa RGBIR \
+  --cfa MONO \
+  --psf-sigma 0.0 \
+  --psf-sigma 0.8 \
+  --psf-sigma 1.6 \
+  --output-dir reports/perception_edge_fidelity_suite_synthetic
+```
+
+The current object edge-fidelity report is:
+
+```text
+reports/perception_edge_fidelity_suite_synthetic/index.html
+```
+
+It builds a labeled object-edge oracle and a sensor-edge oracle, then measures
+HumanISP RGB edge F1, PerceptionISP RGB edge F1, and aux edge-map F1 against
+those oracles. In the current synthetic case, LensPSF sigma from `0.0` to
+`1.6` sensor pixels reduces absolute sensor-edge P95 from `0.0546` to `0.0362`
+(`ratio=0.6624`), so the PSF effect is visible. If PSF sigma is much smaller
+than the sensor pixel pitch, or if PSF is applied only after low-resolution
+sensor sampling, this effect can be nearly invisible. Treat this as front-end
+edge-fidelity evidence across CFA/LensPSF, not detector-performance evidence.
 
 To verify that the test is not merely passing an RGB scene through both ISPs,
 run the scene-information stress suite. It creates a higher-resolution scene
@@ -1031,6 +1069,7 @@ PYTHONPATH=src \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
+  --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --output-dir reports/perception_claim_readiness_with_naive_extended
@@ -1048,9 +1087,9 @@ condition robustness gate, front-end mechanism validation, naive RAW/minimal
 adaptation, classical lightweight RAW transform, and a task-aware or
 aux-assisted path. Missing rows are blockers for broad HumanISP or
 RAW/sensor-native superiority claims. Recommended diagnostic rows, such as the
-CFA stress sweep, edge-confidence suite, scene-information stress suite, and
-aux contribution audit, help interpret sensor-native signals but do not create
-a detector-performance claim.
+CFA stress sweep, edge-confidence suite, object edge-fidelity suite,
+scene-information stress suite, and aux contribution audit, help interpret
+sensor-native signals but do not create a detector-performance claim.
 
 The protocol checker can also be run directly when assembling evidence by hand:
 
@@ -1069,6 +1108,7 @@ PYTHONPATH=src python3 -m perception_isp.benchmark_protocol \
   --mechanism-validation reports/perception_mechanism_validation_synthetic \
   --cfa-stress-sweep reports/perception_cfa_stress_sweep_synthetic \
   --edge-confidence-suite reports/perception_edge_confidence_suite_synthetic \
+  --edge-fidelity-suite reports/perception_edge_fidelity_suite_synthetic \
   --scene-information-stress reports/perception_scene_information_stress_synthetic \
   --aux-contribution-audit reports/perception_aux_contribution_audit_kitti_train512_to_val1496 \
   --min-samples 1000 \
@@ -1086,14 +1126,15 @@ reports/perception_condition_gate_kitti_train512_score_label_aux_t001_fp_reducer
 reports/perception_mechanism_validation_synthetic/index.html
 reports/perception_cfa_stress_sweep_synthetic/index.html
 reports/perception_edge_confidence_suite_synthetic/index.html
+reports/perception_edge_fidelity_suite_synthetic/index.html
 reports/perception_scene_information_stress_synthetic/index.html
 reports/perception_aux_contribution_audit_kitti_train512_to_val1496/index.html
 ```
 
 It marks `coverage_status=coverage_complete`, including front-end mechanism
 validation, the recommended extended sensor-native tensor row, CFA stress
-sweep, edge-confidence suite, scene-information stress suite, and aux
-contribution audit, while
+sweep, edge-confidence suite, object edge-fidelity suite, scene-information
+stress suite, and aux contribution audit, while
 `metric_claim_status=fp_reducer_only`.
 That is an evidence-coverage result, not a broad-superiority result; the
 dashboard still says broad HumanISP superiority is not supported, while
