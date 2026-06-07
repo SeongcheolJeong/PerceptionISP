@@ -89,6 +89,24 @@ class AODRawDownloadImporterTest(unittest.TestCase):
             self.assertEqual(summary["status"], "blocked")
             self.assertEqual(summary["missing_file_count"], 2)
 
+    def test_bad_zip_is_reported_as_source_scan_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "AODRaw_downsampled_srgb.zip"
+            archive.write_bytes(b"not a complete zip")
+
+            summary = import_aodraw_downloads(
+                manifest=_manifest(),
+                download_roots=(archive,),
+                dataset_root=root / "aodraw",
+                dry_run=True,
+            )
+
+            self.assertEqual(summary["status"], "blocked")
+            self.assertEqual(summary["missing_file_count"], 2)
+            self.assertEqual(summary["source_scan_error_count"], 1)
+            self.assertIn("BadZipFile", summary["source_scan_errors"][0]["error"])
+
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

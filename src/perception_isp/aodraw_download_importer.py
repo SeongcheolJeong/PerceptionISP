@@ -48,6 +48,7 @@ def main(argv: Any = None) -> int:
                     "resolved_file_count": summary["resolved_file_count"],
                     "imported_file_count": summary["imported_file_count"],
                     "missing_file_count": summary["missing_file_count"],
+                    "source_scan_error_count": summary["source_scan_error_count"],
                 }
             ),
             indent=2,
@@ -68,7 +69,7 @@ def import_aodraw_downloads(
     required = _required_paths(rows, kind=kind)
     root = Path(dataset_root).expanduser()
     roots = tuple(Path(item).expanduser() for item in download_roots)
-    source_index = _build_source_index(roots, required)
+    source_index, source_scan_errors = _build_source_index(roots, required)
     actions = []
     for relative_path in required:
         target = root / relative_path
@@ -115,6 +116,8 @@ def import_aodraw_downloads(
         "actions": actions,
         "missing_files": [row["relative_path"] for row in missing],
         "imported_files": [row["relative_path"] for row in imported],
+        "source_scan_error_count": len(source_scan_errors),
+        "source_scan_errors": source_scan_errors,
         "next_action": _next_action(dry_run=bool(dry_run), missing_count=len(missing), imported_count=len(imported)),
         "post_import_command": (
             "PYTHONPATH=src python3 -m perception_isp.aodraw_image_availability "
@@ -166,23 +169,24 @@ def _required_paths(rows: Sequence[Mapping[str, Any]], *, kind: str) -> list[str
     return sorted(required)
 
 
-def _build_source_index(roots: Sequence[Path], required: Sequence[str]) -> Dict[str, Dict[str, Any]]:
+def _build_source_index(roots: Sequence[Path], required: Sequence[str]) -> tuple[Dict[str, Dict[str, Any]], list[Dict[str, Any]]]:
     required_set = set(required)
     by_basename: dict[str, list[str]] = {}
     for relative_path in required:
         by_basename.setdefault(Path(relative_path).name, []).append(relative_path)
     sources: Dict[str, Dict[str, Any]] = {}
+    scan_errors: list[Dict[str, Any]] = []
     for root in roots:
         if not root.exists():
             continue
         if root.is_file() and root.suffix.lower() == ".zip":
-            _index_zip(root, by_basename, required_set, sources)
+            _index_zip(root, by_basename, required_set, sources, scan_errors)
             continue
         if root.is_dir():
             _index_directory(root, by_basename, required_set, sources)
             for archive in root.rglob("*.zip"):
-                _index_zip(archive, by_basename, required_set, sources)
-    return sources
+                _index_zip(archive, by_basename, required_set, sources, scan_errors)
+    return sources, scan_errors
 
 
 def _index_directory(
@@ -205,6 +209,7 @@ def _index_zip(
     by_basename: Mapping[str, Sequence[str]],
     required_set: set[str],
     sources: Dict[str, Dict[str, Any]],
+    scan_errors: list[Dict[str, Any]],
 ) -> None:
     wanted_names = set(by_basename)
     try:
@@ -221,8 +226,14 @@ def _index_zip(
                         "member": member,
                         "source": f"{archive_path}!{member}",
                     }
-    except zipfile.BadZipFile:
-        return
+    except (OSError, zipfile.BadZipFile) as exc:
+        scan_errors.append(
+            {
+                "path": str(archive_path),
+                "error": f"{type(exc).__name__}: {exc}",
+                "hint": "The archive is not usable yet. It may be an incomplete or failed browser download.",
+            }
+        )
 
 
 def _best_match(path: Path, candidates: Sequence[str], required_set: set[str]) -> str:
@@ -258,6 +269,13 @@ def _next_action(*, dry_run: bool, missing_count: int, imported_count: int) -> s
 
 def _render_html(summary: Mapping[str, Any]) -> str:
     rows = "".join(_action_row(row) for row in summary.get("actions", ()) if isinstance(row, Mapping))
+    error_rows = "".join(_scan_error_row(row) for row in summary.get("source_scan_errors", ()) if isinstance(row, Mapping))
+    scan_error_section = (
+        "<h2>Source Scan Errors</h2>"
+        f"<table><thead><tr><th>Path</th><th>Error</th><th>Hint</th></tr></thead><tbody>{error_rows}</tbody></table>"
+        if error_rows
+        else ""
+    )
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -285,6 +303,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <p>{html_lib.escape(str(summary.get('next_action', '')))}</p>
   <h2>Actions</h2>
   <table><thead><tr><th>Status</th><th>Relative Path</th><th>Source</th><th>Target</th></tr></thead><tbody>{rows}</tbody></table>
+  {scan_error_section}
   <h2>Post-import Command</h2>
   <pre>{html_lib.escape(str(summary.get('post_import_command', '')))}</pre>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code>, missing list: <code>{MISSING_FILES_FILENAME}</code>, imported list: <code>{IMPORTED_FILES_FILENAME}</code></p>
@@ -301,6 +320,16 @@ def _action_row(row: Mapping[str, Any]) -> str:
         f"<td><code>{html_lib.escape(str(row.get('relative_path', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(row.get('source', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(row.get('target_path', '')))}</code></td>"
+        "</tr>"
+    )
+
+
+def _scan_error_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('path', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('error', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('hint', '')))}</td>"
         "</tr>"
     )
 

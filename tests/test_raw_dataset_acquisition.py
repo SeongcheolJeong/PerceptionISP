@@ -23,8 +23,9 @@ class RawDatasetAcquisitionTest(unittest.TestCase):
         self.assertEqual(summary["recommended_first"], "AODRaw:annotations_google_drive")
         resources = {(row["dataset"], row["resource"]): row for row in summary["resources"]}
         self.assertEqual(resources[("AODRaw", "annotations_google_drive")]["acquisition_status"], "manual_access_likely")
-        self.assertEqual(resources[("AODRaw", "images_downsampled_raw_baidu")]["acquisition_status"], "defer_large_download")
-        self.assertIn("223.0", resources[("AODRaw", "images_downsampled_raw_baidu")]["blocker"])
+        self.assertEqual(resources[("AODRaw", "images_downsampled_raw_test_baidu")]["acquisition_status"], "manual_access_likely")
+        self.assertEqual(resources[("AODRaw", "images_downsampled_raw_train_baidu")]["acquisition_status"], "defer_large_download")
+        self.assertIn("137.19", resources[("AODRaw", "images_downsampled_raw_train_baidu")]["blocker"])
         datasets = {row["dataset"]: row for row in summary["datasets"]}
         self.assertGreaterEqual(datasets["AODRaw"]["manual_access_count"], 1)
         self.assertGreaterEqual(datasets["AODRaw"]["large_download_count"], 1)

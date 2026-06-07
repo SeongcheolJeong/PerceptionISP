@@ -27,6 +27,21 @@ AODRAW_OFFICIAL_URLS = {
     "original_images_terabox": "https://terabox.com/s/1QMnQ7z0V9Wy79pBylG5ZBw",
 }
 
+AODRAW_DOWNSAMPLED_RAW_ARCHIVES = {
+    "test": {
+        "filename": "AODRaw_test_downsampled_raw.zip",
+        "size_gb": 58.94,
+        "size_bytes": 58936290415,
+        "fs_id": "39940515692639",
+    },
+    "train": {
+        "filename": "AODRaw_train_downsampled_raw.zip",
+        "size_gb": 137.19,
+        "size_bytes": 137186166557,
+        "fs_id": "472511554161908",
+    },
+}
+
 
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Create an AODRaw partial-download plan.")
@@ -91,7 +106,8 @@ def build_aodraw_download_plan(
         "download_steps": steps,
         "required_subset_files": sorted(set(raw_files + srgb_files)),
         "missing_files": missing_files,
-        "recommended_first": "AODRaw images_downsampled_srgb 4.3GB via Baidu/TeraBox",
+        "downsampled_raw_archives": dict(AODRAW_DOWNSAMPLED_RAW_ARCHIVES),
+        "recommended_first": _recommended_first(disk),
         "post_download_commands": _post_download_commands(),
         "checks": checks,
         "claim_boundary": (
@@ -143,8 +159,14 @@ def _disk_summary(root: Path) -> Dict[str, Any]:
         "used_gib": _bytes_to_gib(usage.used),
         "available_gib": _bytes_to_gib(usage.free),
         "fits_downsampled_srgb_4p3gb": bool(usage.free >= int(4.3 * 1024**3)),
+        "fits_downsampled_raw_test_zip_58p9gb": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"])),
+        "fits_downsampled_raw_train_zip_137p2gb": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["train"]["size_bytes"])),
+        "fits_downsampled_raw_all_zips_196p1gb": bool(
+            usage.free
+            >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"]) + int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["train"]["size_bytes"])
+        ),
         "fits_downsampled_raw_223gb": bool(usage.free >= int(223.0 * 1024**3)),
-        "fits_downsampled_srgb_plus_raw": bool(usage.free >= int((4.3 + 223.0) * 1024**3)),
+        "fits_downsampled_srgb_plus_raw_test_zip": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"]) + int(4.3 * 1024**3)),
     }
 
 
@@ -162,35 +184,55 @@ def _download_steps(
     return [
         {
             "priority": "P0",
-            "name": "Download downsampled sRGB directory",
+            "name": "Download AODRaw test downsampled RAW zip",
+            "target_directory": "~/Downloads or " + str(root / "downloads"),
+            "expected_size_gb": AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_gb"],
+            "source_urls": [AODRAW_OFFICIAL_URLS["downsampled_raw_baidu"]],
+            "archive_filename": AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["filename"],
+            "required_for_subset_files": [path for path in raw_files],
+            "status": "recommended_now" if disk.get("fits_downsampled_raw_test_zip_58p9gb") else "disk_blocked",
+            "why": "This is the first real RAW archive to acquire; the importer can extract only the selected subset .npy files from this zip.",
+        },
+        {
+            "priority": "P0",
+            "name": "Download downsampled sRGB zip or directory",
             "target_directory": str(root / "images_downsampled_srgb"),
             "expected_size_gb": 4.3,
             "source_urls": [AODRAW_OFFICIAL_URLS["downsampled_srgb_baidu"], AODRAW_OFFICIAL_URLS["downsampled_srgb_terabox"]],
             "required_for_subset_files": [path for path in srgb_files],
             "status": "recommended_now" if disk.get("fits_downsampled_srgb_4p3gb") else "disk_blocked",
-            "why": "Small enough to download now and immediately enables reference/sRGB baseline checks for the selected adverse subset.",
+            "why": "Small enough to download now and enables paired sRGB/reference checks for the selected adverse subset.",
         },
         {
-            "priority": "P0",
+            "priority": "P1",
             "name": "Download selected downsampled RAW files if the file browser supports partial selection",
             "target_directory": str(root / "images_downsampled_raw"),
             "expected_size_gb": None,
             "source_urls": [AODRAW_OFFICIAL_URLS["downsampled_raw_baidu"]],
             "required_for_subset_files": [path for path in raw_files],
             "status": "recommended_if_partial_selection_available",
-            "why": "This is the fastest path to real RAW HumanISP vs PerceptionISP evaluation without downloading 223GB.",
+            "why": "This would be faster than the test zip, but the current Baidu link appears to expose zip archives rather than individual files.",
         },
         {
-            "priority": "P1",
-            "name": "Download full downsampled RAW directory",
-            "target_directory": str(root / "images_downsampled_raw"),
-            "expected_size_gb": 223.0,
+            "priority": "P2",
+            "name": "Download AODRaw train downsampled RAW zip",
+            "target_directory": "~/Downloads or " + str(root / "downloads"),
+            "expected_size_gb": AODRAW_DOWNSAMPLED_RAW_ARCHIVES["train"]["size_gb"],
             "source_urls": [AODRAW_OFFICIAL_URLS["downsampled_raw_baidu"]],
-            "required_for_subset_files": [path for path in raw_files],
-            "status": "possible_but_high_disk_cost" if disk.get("fits_downsampled_raw_223gb") else "disk_blocked",
-            "why": "Use only if partial RAW file selection is impossible; current disk must retain enough headroom for extracted files and reports.",
+            "archive_filename": AODRAW_DOWNSAMPLED_RAW_ARCHIVES["train"]["filename"],
+            "required_for_subset_files": [],
+            "status": "possible_but_high_disk_cost" if disk.get("fits_downsampled_raw_train_zip_137p2gb") else "disk_blocked",
+            "why": "Defer until the test RAW evaluation works and disk headroom is increased.",
         },
     ]
+
+
+def _recommended_first(disk: Mapping[str, Any]) -> str:
+    if disk.get("fits_downsampled_raw_test_zip_58p9gb"):
+        return "AODRaw_test_downsampled_raw.zip 58.94GB via Baidu"
+    if disk.get("fits_downsampled_srgb_4p3gb"):
+        return "AODRaw images_downsampled_srgb 4.3GB via Baidu/TeraBox"
+    return "Free disk space before downloading AODRaw images"
 
 
 def _checks(
@@ -210,9 +252,14 @@ def _checks(
             "evidence": f"available_gib={disk.get('available_gib')}",
         },
         {
-            "id": "sufficient_disk_for_full_raw",
-            "status": "pass" if disk.get("fits_downsampled_raw_223gb") else "warning",
-            "evidence": f"available_gib={disk.get('available_gib')} raw_gb=223.0",
+            "id": "sufficient_disk_for_test_raw_zip",
+            "status": "pass" if disk.get("fits_downsampled_raw_test_zip_58p9gb") else "fail",
+            "evidence": f"available_gib={disk.get('available_gib')} raw_test_gb={AODRAW_DOWNSAMPLED_RAW_ARCHIVES['test']['size_gb']}",
+        },
+        {
+            "id": "sufficient_disk_for_train_raw_zip",
+            "status": "pass" if disk.get("fits_downsampled_raw_train_zip_137p2gb") else "warning",
+            "evidence": f"available_gib={disk.get('available_gib')} raw_train_gb={AODRAW_DOWNSAMPLED_RAW_ARCHIVES['train']['size_gb']}",
         },
         {
             "id": "current_availability_gate",

@@ -25,14 +25,17 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             )
 
             self.assertEqual(summary["status"], "ready_for_manual_download")
-            self.assertEqual(summary["recommended_first"], "AODRaw images_downsampled_srgb 4.3GB via Baidu/TeraBox")
+            self.assertEqual(summary["recommended_first"], "AODRaw_test_downsampled_raw.zip 58.94GB via Baidu")
             self.assertEqual(summary["sample_count"], 2)
             self.assertEqual(summary["subset_raw_file_count"], 2)
             self.assertEqual(summary["subset_srgb_file_count"], 2)
             self.assertEqual(summary["missing_file_count"], 4)
             steps = {row["name"]: row for row in summary["download_steps"]}
-            self.assertEqual(steps["Download downsampled sRGB directory"]["expected_size_gb"], 4.3)
+            self.assertEqual(steps["Download AODRaw test downsampled RAW zip"]["expected_size_gb"], 58.94)
+            self.assertEqual(steps["Download AODRaw test downsampled RAW zip"]["archive_filename"], "AODRaw_test_downsampled_raw.zip")
+            self.assertEqual(steps["Download downsampled sRGB zip or directory"]["expected_size_gb"], 4.3)
             self.assertEqual(steps["Download selected downsampled RAW files if the file browser supports partial selection"]["status"], "recommended_if_partial_selection_available")
+            self.assertEqual(summary["downsampled_raw_archives"]["train"]["filename"], "AODRaw_train_downsampled_raw.zip")
             self.assertIn("images_downsampled_raw/00000001.npy", summary["required_subset_files"])
             self.assertIn("aodraw_image_availability", summary["post_download_commands"][0])
 
