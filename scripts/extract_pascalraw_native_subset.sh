@@ -6,16 +6,20 @@ DEST="data/raw_datasets/pascalraw_full_extract"
 COUNT=512
 START_ID=1
 PART_COUNT=6
+MANIFEST=""
 PART_SUFFIXES=(aa ab ac ad ae af ag ah ai aj ak al am an)
 
 usage() {
   cat <<'EOF'
-Usage: scripts/extract_pascalraw_native_subset.sh [--count N] [--start-id N] [--parts N] [--archive-dir DIR] [--dest DIR]
+Usage: scripts/extract_pascalraw_native_subset.sh [--count N] [--start-id N] [--parts N] [--manifest FILE] [--archive-dir DIR] [--dest DIR]
 
 Extracts contiguous PASCALRAW original NEF + JPG files from the downloaded split
 PASCALRAW.tar.gz* archive prefix. A truncated gzip/tar warning is expected when
 only an archive prefix has been downloaded; the script succeeds if all requested
 NEF and JPG files are present after extraction.
+
+When --manifest is provided, the script extracts the exact sample_id list from
+that PASCALRAW manifest instead of assuming contiguous IDs.
 EOF
 }
 
@@ -39,6 +43,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --parts)
       PART_COUNT="$2"
+      shift 2
+      ;;
+    --manifest)
+      MANIFEST="$2"
       shift 2
       ;;
     -h|--help)
@@ -65,6 +73,10 @@ if [[ "$PART_COUNT" -lt 1 || "$PART_COUNT" -gt "${#PART_SUFFIXES[@]}" ]]; then
   echo "--parts must be between 1 and ${#PART_SUFFIXES[@]}" >&2
   exit 2
 fi
+if [[ -n "$MANIFEST" && ! -f "$MANIFEST" ]]; then
+  echo "Missing manifest: $MANIFEST" >&2
+  exit 1
+fi
 
 mkdir -p "$DEST"
 
@@ -79,10 +91,45 @@ for (( index = 0; index < PART_COUNT; index++ )); do
   part_paths+=("$path")
 done
 
+sample_ids=()
+if [[ -n "$MANIFEST" ]]; then
+  while IFS= read -r sample_id; do
+    [[ -n "$sample_id" ]] && sample_ids+=("$sample_id")
+  done < <(python3 - "$MANIFEST" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text())
+if isinstance(data, list):
+    rows = data
+elif isinstance(data, dict):
+    rows = data.get("manifest") or data.get("items") or data.get("samples") or []
+else:
+    rows = []
+
+for row in rows:
+    if not isinstance(row, dict):
+        continue
+    sample_id = row.get("sample_id") or row.get("id") or row.get("image_id")
+    if sample_id:
+        print(str(sample_id))
+PY
+  )
+else
+  end_id=$(( START_ID + COUNT - 1 ))
+  for (( id = START_ID; id <= end_id; id++ )); do
+    sample_ids+=("$(printf '2014_%06d' "$id")")
+  done
+fi
+
+if [[ "${#sample_ids[@]}" -lt 1 ]]; then
+  echo "No sample IDs selected for extraction" >&2
+  exit 1
+fi
+
 members=()
-end_id=$(( START_ID + COUNT - 1 ))
-for (( id = START_ID; id <= end_id; id++ )); do
-  sample_id="$(printf '2014_%06d' "$id")"
+for sample_id in "${sample_ids[@]}"; do
   members+=("PASCALRAW/original/jpg/${sample_id}.jpg")
   members+=("PASCALRAW/original/raw/${sample_id}.nef")
 done
@@ -99,8 +146,7 @@ set -e
 raw_dir="${DEST}/PASCALRAW/original/raw"
 jpg_dir="${DEST}/PASCALRAW/original/jpg"
 missing=0
-for (( id = START_ID; id <= end_id; id++ )); do
-  sample_id="$(printf '2014_%06d' "$id")"
+for sample_id in "${sample_ids[@]}"; do
   [[ -f "${raw_dir}/${sample_id}.nef" ]] || missing=$(( missing + 1 ))
   [[ -f "${jpg_dir}/${sample_id}.jpg" ]] || missing=$(( missing + 1 ))
 done
@@ -112,7 +158,9 @@ if [[ "$missing" -ne 0 ]]; then
   exit 1
 fi
 
-echo "Extracted PASCALRAW native subset count=${COUNT} start_id=${START_ID} end_id=${end_id} parts=${PART_COUNT} dest=${DEST}"
+first_sample="${sample_ids[0]}"
+last_sample="${sample_ids[$(( ${#sample_ids[@]} - 1 ))]}"
+echo "Extracted PASCALRAW native subset count=${#sample_ids[@]} first=${first_sample} last=${last_sample} parts=${PART_COUNT} dest=${DEST}"
 if [[ "$extract_rc" -ne 0 ]]; then
   echo "Note: archive prefix ended with expected gzip/tar warning; requested files are complete."
   echo "gzip stderr: $gzip_err"
