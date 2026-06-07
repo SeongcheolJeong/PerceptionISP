@@ -4,6 +4,8 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from unittest import mock
 
@@ -22,7 +24,7 @@ from perception_isp.aux_dnn import (
     make_torch_dataset,
 )
 from perception_isp.aux_eval_dense import evaluate_dense_manifest
-from perception_isp.aux_export import _load_samples, export_aux_dataset
+from perception_isp.aux_export import _load_samples, export_aux_dataset, main as aux_export_main
 from perception_isp.aux_train_dense import train_dense
 from perception_isp.aux_train_smoke import train_smoke
 from perception_isp.comparison import build_pipeline_images, compare_dataset
@@ -131,6 +133,44 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(summary["tensor_layouts"], ["rgb_aux_hwc", "rgb_aux_chw"])
             self.assertEqual(rows[0]["extended_channels"], [])
             self.assertNotIn("extended_tensor_stats", rows[0])
+
+    def test_cli_no_preview_keeps_extended_tensors_without_preview_arrays(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = aux_export_main(
+                    [
+                        "--source",
+                        "synthetic",
+                        "--count",
+                        "1",
+                        "--width",
+                        "16",
+                        "--height",
+                        "12",
+                        "--no-preview",
+                        "--no-compress",
+                        "--output-dir",
+                        tmp,
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            summary = json.loads(stdout.getvalue())
+            self.assertEqual(summary["export_options"]["include_extended"], True)
+            self.assertEqual(summary["export_options"]["include_preview"], False)
+            self.assertEqual(summary["run_config"]["no_preview"], True)
+            self.assertEqual(summary["run_config"]["include_preview"], False)
+            self.assertIn("rgb_aux_extended_chw", summary["tensor_layouts"])
+            self.assertNotIn("perception_rgb_hwc", summary["tensor_layouts"])
+            root = Path(tmp)
+            rows = [json.loads(line) for line in (root / "manifest.jsonl").read_text().splitlines() if line.strip()]
+            with np.load(root / rows[0]["tensor_path"]) as payload:
+                keys = set(payload.files)
+                self.assertIn("rgb_aux_extended_chw", keys)
+                self.assertIn("rgb_aux_extended_hwc", keys)
+                self.assertNotIn("perception_rgb_hwc", keys)
+                self.assertNotIn("perception_aux_hwc", keys)
 
     def test_load_samples_for_yolo_dataset_forwards_cache_and_progress_options(self) -> None:
         with mock.patch("perception_isp.yolo_dataset.load_yolo_detection_samples", return_value=()) as loader:

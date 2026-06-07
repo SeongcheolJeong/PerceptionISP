@@ -50,6 +50,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"])
     parser.add_argument("--demosaic-artifact-suppression", type=float, default=0.35)
     parser.add_argument("--minimal", action="store_true", help="Export only 6-channel RGB+aux tensors needed for fast gate training/eval.")
+    parser.add_argument("--no-preview", action="store_true", help="Skip preview RGB/aux arrays while keeping trainable RGB+aux tensors.")
     parser.add_argument("--no-compress", action="store_true", help="Use faster uncompressed NPZ writes instead of np.savez_compressed.")
     parser.add_argument("--output-dir", default="exports/perception_rgb_aux_dataset")
     args = parser.parse_args(argv)
@@ -80,7 +81,7 @@ def main(argv: Any = None) -> int:
         args.output_dir,
         config=config,
         include_extended=not bool(args.minimal),
-        include_preview=not bool(args.minimal),
+        include_preview=not bool(args.minimal) and not bool(args.no_preview),
         compress=not bool(args.no_compress),
         run_config={
             "source": args.source,
@@ -101,6 +102,8 @@ def main(argv: Any = None) -> int:
             "demosaic_method": str(args.demosaic_method),
             "demosaic_artifact_suppression": float(args.demosaic_artifact_suppression),
             "minimal": bool(args.minimal),
+            "no_preview": bool(args.no_preview),
+            "include_preview": not bool(args.minimal) and not bool(args.no_preview),
             "compress": not bool(args.no_compress),
         },
     )
