@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
@@ -43,6 +44,33 @@ AODRAW_DOWNSAMPLED_RAW_ARCHIVES = {
 }
 
 RAW_DOWNLOAD_HEADROOM_GIB = 10.0
+
+CLEANUP_CANDIDATES = (
+    {
+        "path": "data/raw_datasets/pascalraw_full_archive",
+        "label": "PASCALRAW split archive parts",
+        "risk": "medium",
+        "why": "Large downloaded split archive. PASCALRAW native NEF/JPG files are already extracted under data/raw_datasets/pascalraw_full_extract.",
+    },
+    {
+        "path": "exports/perception_rgb_aux_pascalraw_native750_v1",
+        "label": "PASCALRAW native750 aux tensor export",
+        "risk": "low",
+        "why": "Regenerable tensor export used for RGB+aux experiments.",
+    },
+    {
+        "path": "exports/perception_rgb_aux_kitti_train2048_detector_log_minimal_v1",
+        "label": "KITTI train2048 aux tensor export",
+        "risk": "low",
+        "why": "Regenerable tensor export used for RGB+aux training smoke runs.",
+    },
+    {
+        "path": "exports/perception_rgb_aux_kitti_val512_detector_log",
+        "label": "KITTI val512 aux tensor export",
+        "risk": "low",
+        "why": "Regenerable tensor export used for RGB+aux validation runs.",
+    },
+)
 
 
 def main(argv: Any = None) -> int:
@@ -91,6 +119,8 @@ def build_aodraw_download_plan(
     srgb_files = sorted({str(row.get("expected_srgb_relative_path", "")) for row in manifest_rows if row.get("expected_srgb_relative_path")})
     missing_files = [str(row.get("relative_path", "")) for row in availability.get("missing_files", ()) if isinstance(row, Mapping)]
     disk = _disk_summary(root)
+    cleanup_candidates = _cleanup_candidates(Path.cwd())
+    cleanup = _cleanup_summary(disk, cleanup_candidates)
     steps = _download_steps(root=root, raw_files=raw_files, srgb_files=srgb_files, disk=disk)
     checks = _checks(manifest_rows, raw_files, srgb_files, availability, disk)
     return {
@@ -105,6 +135,8 @@ def build_aodraw_download_plan(
         "missing_file_count": len(missing_files),
         "official_urls": dict(AODRAW_OFFICIAL_URLS),
         "disk": disk,
+        "cleanup": cleanup,
+        "cleanup_candidates": cleanup_candidates,
         "download_steps": steps,
         "required_subset_files": sorted(set(raw_files + srgb_files)),
         "missing_files": missing_files,
@@ -174,6 +206,70 @@ def _disk_summary(root: Path) -> Dict[str, Any]:
         "fits_downsampled_srgb_plus_raw_test_zip": bool(usage.free >= int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"]) + int(4.3 * 1024**3)),
         "raw_test_zip_download_headroom_gib": float(RAW_DOWNLOAD_HEADROOM_GIB),
     }
+
+
+def _cleanup_candidates(project_root: Path) -> list[Dict[str, Any]]:
+    candidates = []
+    for item in CLEANUP_CANDIDATES:
+        relative = Path(str(item["path"]))
+        path = project_root / relative
+        if not path.exists():
+            continue
+        size_bytes = _disk_usage_bytes(path)
+        if size_bytes <= 0:
+            continue
+        candidates.append(
+            {
+                "path": str(relative),
+                "absolute_path": str(path),
+                "label": str(item["label"]),
+                "risk": str(item["risk"]),
+                "why": str(item["why"]),
+                "size_gib": _bytes_to_gib(size_bytes),
+                "size_bytes": int(size_bytes),
+                "manual_action": f"Move or delete {relative} after confirming it is no longer needed.",
+            }
+        )
+    return sorted(candidates, key=lambda row: int(row.get("size_bytes", 0)), reverse=True)
+
+
+def _cleanup_summary(disk: Mapping[str, Any], candidates: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    required_bytes = int(AODRAW_DOWNSAMPLED_RAW_ARCHIVES["test"]["size_bytes"]) + int(RAW_DOWNLOAD_HEADROOM_GIB * 1024**3)
+    available_bytes = int(float(disk.get("available_gib", 0.0)) * 1024**3)
+    needed_bytes = max(0, required_bytes - available_bytes)
+    total_candidate_bytes = sum(int(row.get("size_bytes", 0)) for row in candidates)
+    first_sufficient = next((row for row in candidates if int(row.get("size_bytes", 0)) >= needed_bytes and needed_bytes > 0), None)
+    return {
+        "raw_test_required_with_headroom_gib": _bytes_to_gib(required_bytes),
+        "additional_free_gib_needed": _bytes_to_gib(needed_bytes),
+        "candidate_count": len(candidates),
+        "candidate_total_gib": _bytes_to_gib(total_candidate_bytes),
+        "cleanup_can_cover_gap": bool(needed_bytes <= 0 or total_candidate_bytes >= needed_bytes),
+        "first_sufficient_candidate": "" if first_sufficient is None else str(first_sufficient.get("path", "")),
+        "note": "No files are deleted by this report. Cleanup requires an explicit manual decision.",
+    }
+
+
+def _disk_usage_bytes(path: Path) -> int:
+    if path.is_file():
+        return _stat_disk_bytes(path)
+    total = 0
+    for root, dirs, files in os.walk(path):
+        root_path = Path(root)
+        for name in dirs:
+            total += _stat_disk_bytes(root_path / name)
+        for name in files:
+            total += _stat_disk_bytes(root_path / name)
+    return total
+
+
+def _stat_disk_bytes(path: Path) -> int:
+    try:
+        stat = path.stat()
+    except OSError:
+        return 0
+    blocks = getattr(stat, "st_blocks", 0)
+    return int(blocks) * 512 if blocks else int(stat.st_size)
 
 
 def _bytes_to_gib(value: int) -> float:
@@ -336,6 +432,19 @@ def _render_checklist(summary: Mapping[str, Any]) -> str:
         lines.append(f"  - Target: `{step.get('target_directory')}`")
         lines.append(f"  - Status: `{step.get('status')}`")
         lines.append(f"  - Why: {step.get('why')}")
+    cleanup = summary.get("cleanup", {}) if isinstance(summary.get("cleanup"), Mapping) else {}
+    lines.extend(
+        [
+            "",
+            "## Storage Cleanup Candidates",
+            f"Additional free space needed: `{cleanup.get('additional_free_gib_needed', '')} GiB`",
+            f"First sufficient candidate: `{cleanup.get('first_sufficient_candidate', '')}`",
+            f"Note: {cleanup.get('note', '')}",
+        ]
+    )
+    for row in summary.get("cleanup_candidates", ()):
+        if isinstance(row, Mapping):
+            lines.append(f"- `{row.get('path')}`: {row.get('size_gib')} GiB, risk={row.get('risk')}, {row.get('why')}")
     lines.extend(["", "## Subset Files"])
     for path in summary.get("required_subset_files", ()):
         lines.append(f"- `{path}`")
@@ -348,6 +457,7 @@ def _render_checklist(summary: Mapping[str, Any]) -> str:
 def _render_html(summary: Mapping[str, Any]) -> str:
     steps = "".join(_step_row(row) for row in summary.get("download_steps", ()) if isinstance(row, Mapping))
     checks = "".join(_check_row(row) for row in summary.get("checks", ()) if isinstance(row, Mapping))
+    cleanup_rows = "".join(_cleanup_row(row) for row in summary.get("cleanup_candidates", ()) if isinstance(row, Mapping))
     commands = "".join(f"<pre>{html_lib.escape(str(command))}</pre>" for command in summary.get("post_download_commands", ()))
     urls = "".join(
         f"<li><code>{html_lib.escape(str(key))}</code>: <a href=\"{html_lib.escape(str(url))}\">{html_lib.escape(str(url))}</a></li>"
@@ -377,10 +487,14 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <div class="note">{html_lib.escape(str(summary.get('claim_boundary', '')))}</div>
   <p>Status: <code>{html_lib.escape(str(summary.get('status', '')))}</code>. Recommended first: <b>{html_lib.escape(str(summary.get('recommended_first', '')))}</b>.</p>
   <p>Disk available: <code>{html_lib.escape(str(summary.get('disk', {}).get('available_gib', '')))} GiB</code>; subset samples: {int(summary.get('sample_count', 0))}; missing files: {int(summary.get('missing_file_count', 0))}.</p>
+  <p>Additional free space needed for RAW zip plus headroom: <code>{html_lib.escape(str(summary.get('cleanup', {}).get('additional_free_gib_needed', '')))} GiB</code>. First sufficient cleanup candidate: <code>{html_lib.escape(str(summary.get('cleanup', {}).get('first_sufficient_candidate', '')))}</code>.</p>
   <h2>Official Links</h2>
   <ul>{urls}</ul>
   <h2>Download Steps</h2>
   <table><thead><tr><th>Priority</th><th>Name</th><th>Status</th><th>Target</th><th>Size GB</th><th>Why</th></tr></thead><tbody>{steps}</tbody></table>
+  <h2>Storage Cleanup Candidates</h2>
+  <div class="note">{html_lib.escape(str(summary.get('cleanup', {}).get('note', '')))}</div>
+  <table><thead><tr><th>Path</th><th>Size GiB</th><th>Risk</th><th>Why</th><th>Manual Action</th></tr></thead><tbody>{cleanup_rows}</tbody></table>
   <h2>Checks</h2>
   <table><thead><tr><th>Check</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{checks}</tbody></table>
   <h2>Post-download Commands</h2>
@@ -412,6 +526,18 @@ def _check_row(row: Mapping[str, Any]) -> str:
         f"<td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
         f"<td class=\"{status}\">{status}</td>"
         f"<td>{html_lib.escape(str(row.get('evidence', '')))}</td>"
+        "</tr>"
+    )
+
+
+def _cleanup_row(row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('path', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(row.get('size_gib', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('risk', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('why', '')))}</td>"
+        f"<td>{html_lib.escape(str(row.get('manual_action', '')))}</td>"
         "</tr>"
     )
 
