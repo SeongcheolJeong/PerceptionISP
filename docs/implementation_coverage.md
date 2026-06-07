@@ -66,7 +66,9 @@ Known limits:
   PerceptionISP can recover information absent from RAW.
 - The aux contribution audit shows aux features can add proposal-scoring FP
   reduction beyond score/label calibration, but it is detector-side calibration
-  evidence rather than proof of a trained RGB+aux DNN.
+  evidence rather than proof of a trained RGB+aux DNN. The same-sample bridge
+  now also reports proposal-level edge support correlation: low edge support
+  identifies removed FP proposals versus kept TP proposals with AUC `0.6904`.
 - The condition gate currently uses KITTI metadata/proxy slices; it does not replace real night/rain/fog/HDR RAW datasets.
 - The benchmark-protocol checklist is a claim blocker/coverage tool; it does not create missing real-RAW or adverse-condition evidence by itself.
 - CameraE2E integration is optional and environment-dependent.

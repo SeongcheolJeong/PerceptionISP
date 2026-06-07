@@ -650,6 +650,39 @@ def _load_aux_sample_bridge(payload: Any) -> Dict[str, Any] | None:
         "removed_fp_to_tp_ratio": _maybe_float_or_none(payload.get("removed_fp_to_tp_ratio")),
         "support_means": payload.get("support_means", {}) if isinstance(payload.get("support_means"), Mapping) else {},
         "support_deltas": payload.get("support_deltas", {}) if isinstance(payload.get("support_deltas"), Mapping) else {},
+        "proposal_correlation": _load_proposal_correlation(payload.get("proposal_correlation")),
+        "interpretation": str(payload.get("interpretation", "")),
+    }
+
+
+def _load_proposal_correlation(payload: Any) -> Dict[str, Any] | None:
+    if not isinstance(payload, Mapping):
+        return None
+    rows = []
+    for row in payload.get("rows", ()):
+        if not isinstance(row, Mapping):
+            continue
+        rows.append(
+            {
+                "comparison": str(row.get("comparison", "")),
+                "feature": str(row.get("feature", "")),
+                "positive_status": str(row.get("positive_status", "")),
+                "negative_status": str(row.get("negative_status", "")),
+                "positive_count": int(row.get("positive_count", 0)),
+                "negative_count": int(row.get("negative_count", 0)),
+                "positive_mean": _maybe_float_or_none(row.get("positive_mean")),
+                "negative_mean": _maybe_float_or_none(row.get("negative_mean")),
+                "delta": _maybe_float_or_none(row.get("delta")),
+                "point_biserial": _maybe_float_or_none(row.get("point_biserial")),
+                "auc_low_feature_predicts_positive": _maybe_float_or_none(row.get("auc_low_feature_predicts_positive")),
+                "lower_feature_predicts_positive": bool(row.get("lower_feature_predicts_positive")),
+            }
+        )
+    return {
+        "status": str(payload.get("status", "")),
+        "baseline_proposal_count": int(payload.get("baseline_proposal_count", 0)),
+        "rows": rows,
+        "key_results": payload.get("key_results", {}) if isinstance(payload.get("key_results"), Mapping) else {},
         "interpretation": str(payload.get("interpretation", "")),
     }
 
@@ -1053,10 +1086,16 @@ def _aux_contribution_evidence(aux_contribution: Mapping[str, Any]) -> str:
     if isinstance(bridge, Mapping):
         support_deltas = bridge.get("support_deltas", {}) if isinstance(bridge.get("support_deltas"), Mapping) else {}
         edge_delta = _maybe_float_or_none(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
+        edge_correlation = _proposal_correlation_lookup(
+            bridge.get("proposal_correlation"),
+            feature="edge_support",
+            comparison="removed_fp_vs_kept_tp",
+        )
+        edge_auc = _maybe_float_or_none(edge_correlation.get("auc_low_feature_predicts_positive")) if isinstance(edge_correlation, Mapping) else None
         bridge_text = (
             f"; same-sample removed_fp={int(bridge.get('removed_fp_count', 0))}, removed_tp={int(bridge.get('removed_tp_count', 0))}, "
             f"fp_delta_count={int(bridge.get('fp_delta_count', 0))}, removed_fp_fraction={_fmt(bridge.get('removed_fp_fraction'))}, "
-            f"removedFP-edge-vs-keptTP={_fmt(edge_delta, signed=True)}"
+            f"removedFP-edge-vs-keptTP={_fmt(edge_delta, signed=True)}, edgeAUC_low={_fmt(edge_auc)}"
         )
     return (
         f"aux_features={int(aux_contribution.get('aux_feature_count', 0))}; "
@@ -1084,11 +1123,14 @@ def _future_evidence_rows(
     cfa_stress_sweep: Mapping[str, Any] | None,
     training: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
-    scene_aux_gap = (
-        "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
-        if scene_edge_confidence is not None and aux_contribution_audit is not None
-        else "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
-    )
+    edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
+    has_edge_correlation = isinstance(edge_correlation, Mapping) and bool(edge_correlation.get("lower_feature_predicts_positive"))
+    if has_edge_correlation:
+        scene_aux_gap = "Proposal-level aux edge correlation exists; high-information scene-edge oracle is not yet joined to each detector box."
+    elif scene_edge_confidence is not None and aux_contribution_audit is not None:
+        scene_aux_gap = "Scene-edge evidence and aux proposal bridge both exist, but they are not yet joined per proposal/object."
+    else:
+        scene_aux_gap = "Need both scene-edge evidence and aux proposal bridge before correlation can be measured."
     cfa_gap = (
         "CFA/LensPSF front-end diagnostics exist, but detector metrics are not yet swept per CFA/LensPSF condition."
         if cfa_stress_sweep is not None or edge_fidelity_suite is not None
@@ -1098,10 +1140,10 @@ def _future_evidence_rows(
     return [
         {
             "priority": "P0",
-            "evidence": "Same-sample edge-to-proposal correlation",
-            "why": "Turns the edge-confidence story into detector-relevant evidence by showing whether weak/ambiguous edge evidence predicts removed FP proposals.",
+            "evidence": "Scene-edge oracle to proposal correlation",
+            "why": "Extends the new aux-edge proposal correlation by using the high-information scene-edge proxy inside detector boxes.",
             "current_gap": scene_aux_gap,
-            "implementation_path": "Join proposal TP/FP/kept/removed flags with local scene-edge, aux-edge, reliability, and saturation support inside each box.",
+            "implementation_path": "Join proposal TP/FP/kept/removed flags with high-information scene-edge pixels, aux-edge support, reliability, and saturation support inside each box.",
         },
         {
             "priority": "P0",
@@ -1132,6 +1174,30 @@ def _future_evidence_rows(
             "implementation_path": "Collect representative FP removals, TP losses, CFA/PSF wins, and counterexamples into a visual casebook.",
         },
     ]
+
+
+def _sample_bridge_edge_correlation(aux_contribution_audit: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if aux_contribution_audit is None:
+        return None
+    sample_bridge = aux_contribution_audit.get("sample_bridge")
+    if not isinstance(sample_bridge, Mapping):
+        return None
+    return _proposal_correlation_lookup(
+        sample_bridge.get("proposal_correlation"),
+        feature="edge_support",
+        comparison="removed_fp_vs_kept_tp",
+    )
+
+
+def _proposal_correlation_lookup(payload: Any, *, feature: str, comparison: str) -> Mapping[str, Any] | None:
+    if not isinstance(payload, Mapping):
+        return None
+    for row in payload.get("rows", ()):
+        if not isinstance(row, Mapping):
+            continue
+        if str(row.get("feature", "")) == str(feature) and str(row.get("comparison", "")) == str(comparison):
+            return row
+    return None
 
 
 def _claim_decisions(
@@ -1228,6 +1294,13 @@ def _claim_decisions(
                 support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
                 edge_delta = _maybe_float_or_none(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
                 edge_clause = "" if edge_delta is None else f" Removed-FP edge support delta vs kept TP {_fmt(edge_delta, signed=True)}."
+                edge_correlation = _proposal_correlation_lookup(
+                    sample_bridge.get("proposal_correlation"),
+                    feature="edge_support",
+                    comparison="removed_fp_vs_kept_tp",
+                )
+                edge_auc = _maybe_float_or_none(edge_correlation.get("auc_low_feature_predicts_positive")) if isinstance(edge_correlation, Mapping) else None
+                edge_auc_clause = "" if edge_auc is None else f" Low-edge AUC for removed FP vs kept TP {_fmt(edge_auc)}."
                 decisions.append(
                     {
                         "status": "diagnostic",
@@ -1236,7 +1309,7 @@ def _claim_decisions(
                             f"{int(sample_bridge.get('removed_fp_count', 0))} FP and "
                             f"{int(sample_bridge.get('removed_tp_count', 0))} TP proposals "
                             f"with net FP delta {int(sample_bridge.get('fp_delta_count', 0))}."
-                            f"{edge_clause} "
+                            f"{edge_clause}{edge_auc_clause} "
                             "This is proposal-level evidence, not a trained DNN detector claim."
                         ),
                     }
@@ -1698,10 +1771,17 @@ def _aux_contribution_row(row: Mapping[str, Any]) -> str:
 
 def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
     support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
+    edge_correlation = _proposal_correlation_lookup(
+        sample_bridge.get("proposal_correlation"),
+        feature="edge_support",
+        comparison="removed_fp_vs_kept_tp",
+    )
+    edge_auc = _maybe_float_or_none(edge_correlation.get("auc_low_feature_predicts_positive")) if isinstance(edge_correlation, Mapping) else None
+    edge_point_biserial = _maybe_float_or_none(edge_correlation.get("point_biserial")) if isinstance(edge_correlation, Mapping) else None
     return (
         f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
         "<table>"
-        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th><th>Removed FP Edge Delta vs Kept TP</th></tr></thead>"
+        "<thead><tr><th>Baseline</th><th>Target</th><th>Samples</th><th>Removed FP</th><th>Removed TP</th><th>FP Delta</th><th>TP Delta</th><th>Removed FP Fraction</th><th>Removed FP Edge Delta vs Kept TP</th><th>Low-Edge AUC</th><th>Edge Point-Biserial</th></tr></thead>"
         "<tbody><tr>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('baseline_input', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(sample_bridge.get('target_input', '')))}</code></td>"
@@ -1712,6 +1792,8 @@ def _aux_sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         f"<td>{int(sample_bridge.get('tp_delta_count', 0))}</td>"
         f"<td>{_fmt(sample_bridge.get('removed_fp_fraction'))}</td>"
         f"<td>{_fmt(support_deltas.get('removed_fp_minus_kept_tp_edge_support_mean'), signed=True)}</td>"
+        f"<td>{_fmt(edge_auc)}</td>"
+        f"<td>{_fmt(edge_point_biserial, signed=True)}</td>"
         "</tr></tbody></table>"
     )
 

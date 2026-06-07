@@ -78,7 +78,7 @@ class ClaimDashboardTest(unittest.TestCase):
                 )
             )
             future_evidence = [row["evidence"] for row in dashboard["evidence_map"]["future_evidence"]]
-            self.assertIn("Same-sample edge-to-proposal correlation", future_evidence)
+            self.assertIn("Scene-edge oracle to proposal correlation", future_evidence)
             self.assertIn("CFA/LensPSF detector sweep", future_evidence)
             self.assertEqual(dashboard["comparison_rollups"][0]["name"], "Calibration")
             self.assertIn(
@@ -126,6 +126,7 @@ class ClaimDashboardTest(unittest.TestCase):
                     item["claim"].startswith("Same-sample aux bridge passed")
                     and item["status"] == "diagnostic"
                     and "edge support delta" in item["claim"]
+                    and "Low-edge AUC" in item["claim"]
                     for item in dashboard["decisions"]
                 )
             )
@@ -145,11 +146,12 @@ class ClaimDashboardTest(unittest.TestCase):
             self.assertIn("Performance Evidence Map", html)
             self.assertIn("What More Evidence To Build", html)
             self.assertIn("Do not claim broad HumanISP superiority", html)
-            self.assertIn("Same-sample edge-to-proposal correlation", html)
+            self.assertIn("Scene-edge oracle to proposal correlation", html)
             self.assertIn("Task Metrics", html)
             self.assertIn("Aux Contribution Audit", html)
             self.assertIn("Same-Sample Aux Bridge", html)
             self.assertIn("Removed FP Edge Delta vs Kept TP", html)
+            self.assertIn("Low-Edge AUC", html)
             self.assertIn("Mechanism Validation", html)
             self.assertIn("CFA Stress Sweep", html)
             self.assertIn("Edge Confidence Suite", html)
@@ -753,6 +755,26 @@ def _write_aux_contribution_audit(path: Path) -> Path:
                     "removed_fp_to_tp_ratio": 2.0,
                     "support_means": {},
                     "support_deltas": {"removed_fp_minus_kept_tp_edge_support_mean": -0.2},
+                    "proposal_correlation": {
+                        "status": "pass",
+                        "baseline_proposal_count": 10,
+                        "rows": [
+                            {
+                                "comparison": "removed_fp_vs_kept_tp",
+                                "feature": "edge_support",
+                                "positive_status": "removed_fp",
+                                "negative_status": "kept_tp",
+                                "positive_count": 2,
+                                "negative_count": 6,
+                                "positive_mean": 0.1,
+                                "negative_mean": 0.3,
+                                "delta": -0.2,
+                                "point_biserial": -0.4,
+                                "auc_low_feature_predicts_positive": 0.8,
+                                "lower_feature_predicts_positive": True,
+                            }
+                        ],
+                    },
                     "interpretation": "unit same-sample bridge",
                 },
                 "feature_audit": {"aux_feature_count": 3, "aux_features": ["aux_support", "edge_support", "reliability_support"]},

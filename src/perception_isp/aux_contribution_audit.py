@@ -373,6 +373,7 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
         "added_fp": [],
         "added_tp": [],
     }
+    baseline_proposal_rows: list[Dict[str, Any]] = []
     examples: list[Dict[str, Any]] = []
     for index, baseline_sample in enumerate(baseline_samples):
         sample_id = str(baseline_sample.get("sample_id", index))
@@ -395,26 +396,53 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
         for detection_index, detection in enumerate(baseline_detections):
             target_index = _matching_detection_index(detection, target_detections)
             is_tp = detection_index in baseline_positive
+            support = _support_values(detection)
+            label = str((detection.get("box", {}) if isinstance(detection.get("box"), Mapping) else {}).get("label", "object"))
             if target_index >= 0:
                 counts["common_detection_count"] += 1
                 matched_targets.add(target_index)
-                support_groups["kept_tp" if is_tp else "kept_fp"].append(_support_values(detection))
+                status = "kept_tp" if is_tp else "kept_fp"
+                support_groups[status].append(support)
+                baseline_proposal_rows.append(
+                    {
+                        "sample_id": sample_id,
+                        "label": label,
+                        "target_status": status,
+                        "is_tp": bool(is_tp),
+                        "is_fp": not bool(is_tp),
+                        "is_removed": False,
+                        **support,
+                    }
+                )
                 continue
             counts["baseline_only_detection_count"] += 1
             if is_tp:
                 counts["removed_tp_count"] += 1
-                support_groups["removed_tp"].append(_support_values(detection))
+                status = "removed_tp"
+                support_groups[status].append(support)
             else:
                 counts["removed_fp_count"] += 1
-                support_groups["removed_fp"].append(_support_values(detection))
+                status = "removed_fp"
+                support_groups[status].append(support)
+            baseline_proposal_rows.append(
+                {
+                    "sample_id": sample_id,
+                    "label": label,
+                    "target_status": status,
+                    "is_tp": bool(is_tp),
+                    "is_fp": not bool(is_tp),
+                    "is_removed": True,
+                    **support,
+                }
+            )
             if len(examples) < 12:
                 examples.append(
                     {
                         "sample_id": sample_id,
-                        "label": str((detection.get("box", {}) if isinstance(detection.get("box"), Mapping) else {}).get("label", "object")),
+                        "label": label,
                         "baseline_score": _maybe_float(detection.get("score")),
-                        "target_status": "removed_tp" if is_tp else "removed_fp",
-                        **_support_values(detection),
+                        "target_status": status,
+                        **support,
                     }
                 )
         for target_index, detection in enumerate(target_detections):
@@ -438,6 +466,7 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
     counts["removed_fp_to_tp_ratio"] = counts["removed_fp_count"] / max(float(counts["removed_tp_count"]), 1.0)
     support_means = {name: _support_mean(rows) for name, rows in support_groups.items()}
     support_deltas = _support_deltas(support_means)
+    proposal_correlation = _proposal_correlation(baseline_proposal_rows)
     return {
         "status": "pass",
         "baseline_input": str(baseline_input),
@@ -446,6 +475,7 @@ def _sample_bridge_from_inputs(inputs: Mapping[str, Mapping[str, Any]], *, basel
         **counts,
         "support_means": support_means,
         "support_deltas": support_deltas,
+        "proposal_correlation": proposal_correlation,
         "examples": examples,
         "interpretation": (
             "This same-sample bridge compares score_label and score_label_aux proposal outputs on matched samples. "
@@ -461,6 +491,8 @@ def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, An
     fp_delta = int(sample_bridge.get("fp_delta_count", 0))
     support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
     edge_delta = _maybe_float(support_deltas.get("removed_fp_minus_kept_tp_edge_support_mean"))
+    proposal_correlation = sample_bridge.get("proposal_correlation", {}) if isinstance(sample_bridge.get("proposal_correlation"), Mapping) else {}
+    edge_correlation = _proposal_correlation_lookup(proposal_correlation, feature="edge_support", comparison="removed_fp_vs_kept_tp")
     checks = [
         {
             "id": "same_sample_aux_bridge_available",
@@ -503,7 +535,40 @@ def _sample_bridge_checks(sample_bridge: Mapping[str, Any]) -> list[Dict[str, An
                 ],
             }
         )
+    if edge_correlation is not None:
+        edge_auc = _maybe_float(edge_correlation.get("auc_low_feature_predicts_positive"))
+        edge_corr_delta = _maybe_float(edge_correlation.get("delta"))
+        checks.append(
+            {
+                "id": "edge_support_correlates_with_same_sample_removed_fp",
+                "description": "At proposal level, low edge support should identify false positives removed by incremental aux scoring.",
+                "status": "pass" if edge_corr_delta < 0.0 and edge_auc > 0.5 else "fail",
+                "criteria": [
+                    {
+                        "metric": "removed_fp_vs_kept_tp_edge_support_delta",
+                        "value": edge_corr_delta,
+                        "threshold": 0.0,
+                        "pass": edge_corr_delta < 0.0,
+                    },
+                    {
+                        "metric": "removed_fp_vs_kept_tp_auc_low_edge_support",
+                        "value": edge_auc,
+                        "threshold": 0.5,
+                        "pass": edge_auc > 0.5,
+                    },
+                ],
+            }
+        )
     return checks
+
+
+def _proposal_correlation_lookup(proposal_correlation: Mapping[str, Any], *, feature: str, comparison: str) -> Mapping[str, Any] | None:
+    for row in proposal_correlation.get("rows", ()):
+        if not isinstance(row, Mapping):
+            continue
+        if str(row.get("feature", "")) == str(feature) and str(row.get("comparison", "")) == str(comparison):
+            return row
+    return None
 
 
 def _load_comparison_summary(path_value: Any) -> Dict[str, Any] | None:
@@ -619,6 +684,124 @@ def _support_deltas(support_means: Mapping[str, Mapping[str, Any]]) -> Dict[str,
         f"removed_fp_minus_kept_tp_{key}_mean": _maybe_float(removed_fp.get(f"{key}_mean")) - _maybe_float(kept_tp.get(f"{key}_mean"))
         for key in keys
     }
+
+
+def _proposal_correlation(rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    baseline_rows = [row for row in rows if isinstance(row, Mapping)]
+    feature_names = ("score", "aux_support", "edge_support", "saturation_support", "reliability_support", "aux_box_iou")
+    comparisons = (
+        ("removed_fp_vs_kept_tp", "removed_fp", "kept_tp"),
+        ("removed_fp_vs_kept_fp", "removed_fp", "kept_fp"),
+        ("removed_vs_kept", "removed", "kept"),
+    )
+    result_rows: list[Dict[str, Any]] = []
+    for feature in feature_names:
+        for comparison_id, positive_status, negative_status in comparisons:
+            row = _proposal_correlation_row(baseline_rows, feature, comparison_id, positive_status, negative_status)
+            if row is not None:
+                result_rows.append(row)
+    key_results = {
+        f"{row['comparison']}_{row['feature']}_{name}": row[name]
+        for row in result_rows
+        for name in ("positive_mean", "negative_mean", "delta", "point_biserial", "auc_low_feature_predicts_positive")
+        if row.get(name) is not None
+    }
+    removed_fp_edge = next(
+        (
+            row
+            for row in result_rows
+            if row.get("feature") == "edge_support" and row.get("comparison") == "removed_fp_vs_kept_tp"
+        ),
+        None,
+    )
+    return {
+        "status": "pass" if removed_fp_edge is not None and bool(removed_fp_edge.get("lower_feature_predicts_positive")) else "diagnostic",
+        "baseline_proposal_count": len(baseline_rows),
+        "rows": result_rows,
+        "key_results": key_results,
+        "interpretation": (
+            "This proposal-level correlation table tests whether lower support values identify proposals that incremental aux scoring removes. "
+            "It is same-sample proposal evidence, not a trained DNN detector result."
+        ),
+    }
+
+
+def _proposal_correlation_row(
+    rows: Sequence[Mapping[str, Any]],
+    feature: str,
+    comparison_id: str,
+    positive_status: str,
+    negative_status: str,
+) -> Dict[str, Any] | None:
+    positives = [_maybe_float(row.get(feature)) for row in rows if _proposal_status_matches(row, positive_status)]
+    negatives = [_maybe_float(row.get(feature)) for row in rows if _proposal_status_matches(row, negative_status)]
+    if not positives or not negatives:
+        return None
+    positive_mean = sum(positives) / len(positives)
+    negative_mean = sum(negatives) / len(negatives)
+    auc_low = _binary_auc([-value for value in positives], [-value for value in negatives])
+    point_biserial = _point_biserial(positives, negatives)
+    delta = positive_mean - negative_mean
+    return {
+        "comparison": comparison_id,
+        "feature": feature,
+        "positive_status": positive_status,
+        "negative_status": negative_status,
+        "positive_count": len(positives),
+        "negative_count": len(negatives),
+        "positive_mean": positive_mean,
+        "negative_mean": negative_mean,
+        "delta": delta,
+        "point_biserial": point_biserial,
+        "auc_low_feature_predicts_positive": auc_low,
+        "lower_feature_predicts_positive": delta < 0.0 and auc_low > 0.5,
+    }
+
+
+def _proposal_status_matches(row: Mapping[str, Any], status: str) -> bool:
+    target_status = str(row.get("target_status", ""))
+    if status == "removed":
+        return bool(row.get("is_removed", False))
+    if status == "kept":
+        return not bool(row.get("is_removed", False))
+    return target_status == status
+
+
+def _binary_auc(positive_scores: Sequence[float], negative_scores: Sequence[float]) -> float:
+    if not positive_scores or not negative_scores:
+        return 0.5
+    ranked = sorted([(float(score), 1) for score in positive_scores] + [(float(score), 0) for score in negative_scores], key=lambda item: item[0])
+    rank_sum_positive = 0.0
+    rank = 1
+    index = 0
+    while index < len(ranked):
+        tie_end = index + 1
+        while tie_end < len(ranked) and ranked[tie_end][0] == ranked[index][0]:
+            tie_end += 1
+        average_rank = (rank + rank + (tie_end - index) - 1) / 2.0
+        positives_in_tie = sum(label for _, label in ranked[index:tie_end])
+        rank_sum_positive += average_rank * positives_in_tie
+        rank += tie_end - index
+        index = tie_end
+    n_pos = len(positive_scores)
+    n_neg = len(negative_scores)
+    return (rank_sum_positive - (n_pos * (n_pos + 1) / 2.0)) / float(n_pos * n_neg)
+
+
+def _point_biserial(positive_values: Sequence[float], negative_values: Sequence[float]) -> float:
+    if not positive_values or not negative_values:
+        return 0.0
+    values = [*positive_values, *negative_values]
+    mean_all = sum(values) / len(values)
+    variance = sum((value - mean_all) ** 2 for value in values) / len(values)
+    if variance <= 0.0:
+        return 0.0
+    mean_pos = sum(positive_values) / len(positive_values)
+    mean_neg = sum(negative_values) / len(negative_values)
+    n_pos = len(positive_values)
+    n_neg = len(negative_values)
+    n_total = n_pos + n_neg
+    return (mean_pos - mean_neg) / (variance**0.5) * ((n_pos * n_neg) / float(n_total * n_total)) ** 0.5
 
 
 def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
@@ -747,6 +930,8 @@ def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
     if not example_rows:
         example_rows = '<tr><td colspan="7">No removed detection examples were available.</td></tr>'
     support_deltas = sample_bridge.get("support_deltas", {}) if isinstance(sample_bridge.get("support_deltas"), Mapping) else {}
+    proposal_correlation = sample_bridge.get("proposal_correlation")
+    correlation_html = _proposal_correlation_html(proposal_correlation) if isinstance(proposal_correlation, Mapping) else "<p>No proposal correlation rows were available.</p>"
     return (
         f"<p>{html_lib.escape(str(sample_bridge.get('interpretation', '')))}</p>"
         "<table>"
@@ -769,6 +954,43 @@ def _sample_bridge_html(sample_bridge: Mapping[str, Any]) -> str:
         "<table>"
         "<thead><tr><th>Sample</th><th>Status</th><th>Label</th><th>Score</th><th>Aux Support</th><th>Edge Support</th><th>Reliability</th></tr></thead>"
         f"<tbody>{example_rows}</tbody></table>"
+        "<h3>Proposal Support Correlation</h3>"
+        f"{correlation_html}"
+    )
+
+
+def _proposal_correlation_html(proposal_correlation: Mapping[str, Any]) -> str:
+    rows = "".join(
+        _proposal_correlation_row_html(row)
+        for row in proposal_correlation.get("rows", ())
+        if isinstance(row, Mapping) and str(row.get("comparison", "")) in {"removed_fp_vs_kept_tp", "removed_fp_vs_kept_fp"}
+    )
+    if not rows:
+        rows = '<tr><td colspan="10">No proposal correlation rows were available.</td></tr>'
+    return (
+        f"<p>{html_lib.escape(str(proposal_correlation.get('interpretation', '')))}</p>"
+        "<table>"
+        "<thead><tr><th>Comparison</th><th>Feature</th><th>Positive</th><th>Negative</th><th>Positive Mean</th><th>Negative Mean</th><th>Delta</th><th>AUC Low Feature</th><th>Point-Biserial</th><th>Pass Direction</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _proposal_correlation_row_html(row: Mapping[str, Any]) -> str:
+    pass_direction = bool(row.get("lower_feature_predicts_positive"))
+    status_class = "pass" if pass_direction else "fail"
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('comparison', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('feature', '')))}</code></td>"
+        f"<td>{int(row.get('positive_count', 0))} {html_lib.escape(str(row.get('positive_status', '')))}</td>"
+        f"<td>{int(row.get('negative_count', 0))} {html_lib.escape(str(row.get('negative_status', '')))}</td>"
+        f"<td>{_fmt(row.get('positive_mean'))}</td>"
+        f"<td>{_fmt(row.get('negative_mean'))}</td>"
+        f"<td>{_fmt(row.get('delta'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('auc_low_feature_predicts_positive'))}</td>"
+        f"<td>{_fmt(row.get('point_biserial'), signed=True)}</td>"
+        f"<td class=\"{status_class}\">{html_lib.escape(str(pass_direction))}</td>"
+        "</tr>"
     )
 
 
