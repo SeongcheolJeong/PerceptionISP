@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 import hashlib
 import html as html_lib
 import json
 import statistics
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Tuple
@@ -56,6 +57,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--include-labels", default=None)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--jobs", type=int, default=1, help="Number of seeds to evaluate in parallel.")
+    parser.add_argument("--job-backend", default="process", choices=["process", "thread"], help="Parallel backend used when --jobs > 1.")
+    parser.add_argument("--quiet", action="store_true", help="Suppress progress messages while evaluating seeds.")
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_dense_select_test_gate")
     args = parser.parse_args(argv)
 
@@ -81,6 +84,8 @@ def main(argv: Any = None) -> int:
         include_labels=parse_label_list(args.include_labels),
         device=str(args.device),
         jobs=int(args.jobs),
+        job_backend=str(args.job_backend),
+        progress=not bool(args.quiet),
         split_source_summary=str(args.split_source_summary),
     )
     html_path = write_dense_select_test_gate(summary, args.output_dir)
@@ -95,6 +100,8 @@ def main(argv: Any = None) -> int:
                     "claim_status": summary["claim_status"],
                     "pass_test_seed_count": summary["pass_test_seed_count"],
                     "seed_count": summary["seed_count"],
+                    "jobs": summary["jobs"],
+                    "job_backend": summary["job_backend"],
                     "mean_test_deltas": summary["mean_test_deltas"],
                 }
             ),
@@ -123,6 +130,8 @@ def build_dense_select_test_gate(
     include_labels: Sequence[str] | None = None,
     device: str = "auto",
     jobs: int = 1,
+    job_backend: str = "process",
+    progress: bool = False,
     split_source_summary: str | Path | None = None,
 ) -> Dict[str, Any]:
     start = time.perf_counter()
@@ -152,14 +161,16 @@ def build_dense_select_test_gate(
         for seed in seeds
     ]
     worker_count = max(int(jobs), 1)
-    if worker_count > 1 and len(seed_jobs) > 1:
-        with ProcessPoolExecutor(max_workers=min(worker_count, len(seed_jobs))) as executor:
-            rows = list(executor.map(_run_seed_gate_from_kwargs, seed_jobs))
-    else:
-        rows = [
-            _run_seed_gate_from_kwargs(seed_job)
-            for seed_job in seed_jobs
-        ]
+    backend = str(job_backend)
+    if backend not in {"process", "thread"}:
+        raise ValueError(f"unsupported job_backend: {job_backend}")
+    rows = _run_seed_jobs(
+        seed_jobs,
+        worker_count=worker_count,
+        job_backend=backend,
+        progress=bool(progress),
+    )
+    rows = sorted(rows, key=lambda row: int(row.get("seed", 0)))
     mean_selection_deltas = _mean_deltas(rows, "selection_deltas")
     mean_test_deltas = _mean_deltas(rows, "test_deltas")
     pass_test = [row for row in rows if row.get("test_status") == "pass"]
@@ -189,6 +200,7 @@ def build_dense_select_test_gate(
         "tune_rgb_baseline": bool(tune_rgb_baseline),
         "aux_fp_budget_source": str(aux_fp_budget_source),
         "jobs": int(worker_count),
+        "job_backend": backend,
         "selection_rule": (
             (
                 "tune RGB-only threshold and RGB+Aux epoch/threshold on the selection subset under the same "
@@ -210,6 +222,42 @@ def build_dense_select_test_gate(
             "The underlying training may have logged eval loss on the original eval split; metric selection here only uses the selection subset.",
         ],
     }
+
+
+def _run_seed_jobs(
+    seed_jobs: Sequence[Mapping[str, Any]],
+    *,
+    worker_count: int,
+    job_backend: str,
+    progress: bool,
+) -> list[Dict[str, Any]]:
+    if worker_count <= 1 or len(seed_jobs) <= 1:
+        rows = []
+        for index, seed_job in enumerate(seed_jobs, start=1):
+            _log_progress(progress, f"[dense-gate] seed {seed_job.get('seed')} start ({index}/{len(seed_jobs)})")
+            rows.append(_run_seed_gate_from_kwargs(seed_job))
+            _log_progress(progress, f"[dense-gate] seed {seed_job.get('seed')} done ({index}/{len(seed_jobs)})")
+        return rows
+
+    max_workers = min(max(int(worker_count), 1), len(seed_jobs))
+    executor_cls = ThreadPoolExecutor if str(job_backend) == "thread" else ProcessPoolExecutor
+    rows = []
+    with executor_cls(max_workers=max_workers) as executor:
+        future_to_seed = {
+            executor.submit(_run_seed_gate_from_kwargs, seed_job): int(seed_job["seed"])
+            for seed_job in seed_jobs
+        }
+        _log_progress(progress, f"[dense-gate] submitted {len(future_to_seed)} seed jobs with {str(job_backend)} backend / {max_workers} workers")
+        for done_count, future in enumerate(as_completed(future_to_seed), start=1):
+            seed = future_to_seed[future]
+            rows.append(future.result())
+            _log_progress(progress, f"[dense-gate] seed {seed} done ({done_count}/{len(future_to_seed)})")
+    return rows
+
+
+def _log_progress(enabled: bool, message: str) -> None:
+    if bool(enabled):
+        print(message, file=sys.stderr, flush=True)
 
 
 def _run_seed_gate_from_kwargs(kwargs: Mapping[str, Any]) -> Dict[str, Any]:
@@ -636,6 +684,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     <li>Candidate NMS IoUs: <code>{html_lib.escape(str(summary.get('candidate_nms_ious', [])))}</code>; max detections: <code>{html_lib.escape(str(summary.get('candidate_max_detections', [])))}</code></li>
     <li>Tuned RGB baseline: <code>{html_lib.escape(str(summary.get('tune_rgb_baseline', False)))}</code>; RGB thresholds: <code>{html_lib.escape(str(summary.get('candidate_rgb_thresholds', [])))}</code></li>
     <li>Aux FP budget source: <code>{html_lib.escape(str(summary.get('aux_fp_budget_source', 'default_rgb')))}</code></li>
+    <li>Parallel evaluation: <code>{int(summary.get('jobs', 1))}</code> job(s), backend <code>{html_lib.escape(str(summary.get('job_backend', 'process')))}</code></li>
   </ul>
   <p class="note"><strong>Boundary:</strong> this is stronger than same-split metric selection, but still compact-detector feasibility evidence rather than production detector proof.</p>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code>; split JSON: <code>{SPLIT_FILENAME}</code></p>

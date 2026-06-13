@@ -116,6 +116,42 @@ class DenseSelectTestGateTest(unittest.TestCase):
         self.assertEqual(strict_row["selected_confidence"], 0.0)
         self.assertAlmostEqual(strict_row["test_deltas"]["fp"], -1.0)
 
+    def test_build_gate_thread_backend_reports_sorted_rows(self) -> None:
+        def fake_eval(**kwargs):
+            checkpoint = str(kwargs["checkpoint_path"])
+            is_aux = "aux" in checkpoint
+            return {
+                "aggregate": {
+                    "precision@0.50_mean": 0.30 if is_aux else 0.20,
+                    "recall@0.50_mean": 0.70 if is_aux else 0.60,
+                    "fp@0.50_mean": 4.0 if is_aux else 5.0,
+                    "det_count_mean": 5.0 if is_aux else 6.0,
+                    "small_recall@0.50_mean": 0.0,
+                }
+            }
+
+        with mock.patch.object(gate, "evaluate_dense_manifest", side_effect=fake_eval):
+            summary = build_dense_select_test_gate(
+                manifest_path="manifest.jsonl",
+                source_eval_indices=(0, 1, 2, 3),
+                seeds=(8, 7),
+                rgb_only_template="rgb_{seed}.pt",
+                aux_checkpoint_template="aux_{seed}_{epoch:03d}.pt",
+                epochs=(0,),
+                thresholds=(0.0,),
+                rgb_thresholds=(0.0,),
+                nms_ious=(None,),
+                max_detections=(None,),
+                jobs=2,
+                job_backend="thread",
+                progress=True,
+            )
+
+        self.assertEqual(summary["job_backend"], "thread")
+        self.assertEqual(summary["jobs"], 2)
+        self.assertEqual([row["seed"] for row in summary["rows"]], [7, 8])
+        self.assertEqual(summary["pass_test_seed_count"], 2)
+
     def test_write_dense_select_test_gate_outputs_report_files(self) -> None:
         summary = {
             "claim_status": "heldout_test_equal_fp_3seed_improvement",
