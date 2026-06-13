@@ -37,6 +37,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--epochs", default="0-11", help="Comma-separated epoch ids or ranges, for example 0-11.")
     parser.add_argument("--thresholds", default=",".join(str(value) for value in DEFAULT_THRESHOLDS))
     parser.add_argument("--rgb-thresholds", default=None, help="RGB-only thresholds used when --tune-rgb-baseline is enabled; defaults to --thresholds.")
+    parser.add_argument("--nms-ious", default="none", help="Comma-separated NMS IoU candidates applied to both RGB-only and RGB+Aux; use none for checkpoint default.")
+    parser.add_argument("--max-detections", default="none", help="Comma-separated top-k candidates applied to both RGB-only and RGB+Aux; use none for checkpoint default.")
     parser.add_argument(
         "--tune-rgb-baseline",
         action="store_true",
@@ -68,6 +70,8 @@ def main(argv: Any = None) -> int:
         epochs=parse_int_list(args.epochs),
         thresholds=parse_float_list(args.thresholds),
         rgb_thresholds=parse_float_list(args.rgb_thresholds) if args.rgb_thresholds is not None else None,
+        nms_ious=parse_optional_float_list(args.nms_ious),
+        max_detections=parse_optional_int_list(args.max_detections),
         tune_rgb_baseline=bool(args.tune_rgb_baseline),
         aux_fp_budget_source=str(args.aux_fp_budget_source),
         split_seed=str(args.split_seed),
@@ -107,6 +111,8 @@ def build_dense_select_test_gate(
     epochs: Sequence[int],
     thresholds: Sequence[float] = DEFAULT_THRESHOLDS,
     rgb_thresholds: Sequence[float] | None = None,
+    nms_ious: Sequence[float | None] = (None,),
+    max_detections: Sequence[int | None] = (None,),
     tune_rgb_baseline: bool = False,
     aux_fp_budget_source: str = "default_rgb",
     split_seed: str = "native1000-select-test-v1",
@@ -132,6 +138,8 @@ def build_dense_select_test_gate(
                 epochs=epochs,
                 thresholds=thresholds,
                 rgb_thresholds=rgb_thresholds if rgb_thresholds is not None else thresholds,
+                nms_ious=nms_ious,
+                max_detections=max_detections,
                 tune_rgb_baseline=bool(tune_rgb_baseline),
                 aux_fp_budget_source=str(aux_fp_budget_source),
                 selection_indices=selection_indices,
@@ -163,6 +171,8 @@ def build_dense_select_test_gate(
         "pass_test_seed_count": int(len(pass_test)),
         "candidate_thresholds": [float(value) for value in thresholds],
         "candidate_rgb_thresholds": [float(value) for value in (rgb_thresholds if rgb_thresholds is not None else thresholds)],
+        "candidate_nms_ious": [None if value is None else float(value) for value in nms_ious],
+        "candidate_max_detections": [None if value is None else int(value) for value in max_detections],
         "candidate_epochs": [int(value) for value in epochs],
         "tune_rgb_baseline": bool(tune_rgb_baseline),
         "aux_fp_budget_source": str(aux_fp_budget_source),
@@ -255,6 +265,32 @@ def parse_float_list(value: str) -> Tuple[float, ...]:
     return tuple(values)
 
 
+def parse_optional_float_list(value: str) -> Tuple[float | None, ...]:
+    values: list[float | None] = []
+    for token in str(value or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if token.lower() in {"none", "null", "default"}:
+            values.append(None)
+        else:
+            values.append(float(token))
+    return tuple(values) or (None,)
+
+
+def parse_optional_int_list(value: str) -> Tuple[int | None, ...]:
+    values: list[int | None] = []
+    for token in str(value or "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if token.lower() in {"none", "null", "default"}:
+            values.append(None)
+        else:
+            values.append(int(token))
+    return tuple(values) or (None,)
+
+
 def _run_seed_gate(
     *,
     manifest_path: str | Path,
@@ -264,6 +300,8 @@ def _run_seed_gate(
     epochs: Sequence[int],
     thresholds: Sequence[float],
     rgb_thresholds: Sequence[float],
+    nms_ious: Sequence[float | None],
+    max_detections: Sequence[int | None],
     tune_rgb_baseline: bool,
     aux_fp_budget_source: str,
     selection_indices: Sequence[int],
@@ -279,29 +317,38 @@ def _run_seed_gate(
         include_labels=include_labels,
         device=device,
     )
-    rgb_candidates = [
-        {
-            "seed": int(seed),
-            "model": "rgb_only",
-            "confidence": float(confidence),
-            "checkpoint": str(rgb_only_checkpoint),
-            "metrics": _eval_metrics(
-                manifest_path=manifest_path,
-                checkpoint=rgb_only_checkpoint,
-                confidence=float(confidence),
-                indices=selection_indices,
-                include_labels=include_labels,
-                device=device,
-            ),
-        }
-        for confidence in rgb_thresholds
-    ]
+    rgb_candidates = []
+    for confidence in rgb_thresholds:
+        for nms_iou in nms_ious:
+            for max_detection_count in max_detections:
+                rgb_candidates.append(
+                    {
+                        "seed": int(seed),
+                        "model": "rgb_only",
+                        "confidence": float(confidence),
+                        "nms_iou": None if nms_iou is None else float(nms_iou),
+                        "max_detections": None if max_detection_count is None else int(max_detection_count),
+                        "checkpoint": str(rgb_only_checkpoint),
+                        "metrics": _eval_metrics(
+                            manifest_path=manifest_path,
+                            checkpoint=rgb_only_checkpoint,
+                            confidence=float(confidence),
+                            nms_iou=nms_iou,
+                            max_detections=max_detection_count,
+                            indices=selection_indices,
+                            include_labels=include_labels,
+                            device=device,
+                        ),
+                    }
+                )
     if not rgb_candidates:
         rgb_candidates = [
             {
                 "seed": int(seed),
                 "model": "rgb_only",
                 "confidence": 0.0,
+                "nms_iou": None,
+                "max_detections": None,
                 "checkpoint": str(rgb_only_checkpoint),
                 "metrics": rgb_selection,
             }
@@ -311,6 +358,8 @@ def _run_seed_gate(
         "seed": int(seed),
         "model": "rgb_only",
         "confidence": 0.0,
+        "nms_iou": None,
+        "max_detections": None,
         "checkpoint": str(rgb_only_checkpoint),
         "metrics": rgb_selection,
     }
@@ -319,24 +368,30 @@ def _run_seed_gate(
     for epoch in epochs:
         checkpoint = aux_checkpoint_template.format(seed=int(seed), epoch=int(epoch))
         for confidence in thresholds:
-            metrics = _eval_metrics(
-                manifest_path=manifest_path,
-                checkpoint=checkpoint,
-                confidence=float(confidence),
-                indices=selection_indices,
-                include_labels=include_labels,
-                device=device,
-            )
-            candidates.append(
-                {
-                    "seed": int(seed),
-                    "epoch": int(epoch),
-                    "confidence": float(confidence),
-                    "checkpoint": str(checkpoint),
-                    "metrics": metrics,
-                    "deltas": _metric_deltas(metrics, selected_rgb["metrics"] if bool(tune_rgb_baseline) else rgb_selection),
-                }
-            )
+            for nms_iou in nms_ious:
+                for max_detection_count in max_detections:
+                    metrics = _eval_metrics(
+                        manifest_path=manifest_path,
+                        checkpoint=checkpoint,
+                        confidence=float(confidence),
+                        nms_iou=nms_iou,
+                        max_detections=max_detection_count,
+                        indices=selection_indices,
+                        include_labels=include_labels,
+                        device=device,
+                    )
+                    candidates.append(
+                        {
+                            "seed": int(seed),
+                            "epoch": int(epoch),
+                            "confidence": float(confidence),
+                            "nms_iou": None if nms_iou is None else float(nms_iou),
+                            "max_detections": None if max_detection_count is None else int(max_detection_count),
+                            "checkpoint": str(checkpoint),
+                            "metrics": metrics,
+                            "deltas": _metric_deltas(metrics, selected_rgb["metrics"] if bool(tune_rgb_baseline) else rgb_selection),
+                        }
+                    )
     if bool(tune_rgb_baseline):
         selected = _best_under_fp_budget(candidates, aux_fp_budget)
         aux_within_fp_budget = float(selected["metrics"]["fp"]) <= float(aux_fp_budget) + 1.0e-9
@@ -348,6 +403,8 @@ def _run_seed_gate(
         manifest_path=manifest_path,
         checkpoint=selected_rgb["checkpoint"],
         confidence=float(selected_rgb["confidence"]),
+        nms_iou=selected_rgb.get("nms_iou"),
+        max_detections=selected_rgb.get("max_detections"),
         indices=test_indices,
         include_labels=include_labels,
         device=device,
@@ -356,6 +413,8 @@ def _run_seed_gate(
         manifest_path=manifest_path,
         checkpoint=selected["checkpoint"],
         confidence=float(selected["confidence"]),
+        nms_iou=selected.get("nms_iou"),
+        max_detections=selected.get("max_detections"),
         indices=test_indices,
         include_labels=include_labels,
         device=device,
@@ -366,7 +425,11 @@ def _run_seed_gate(
         "selection_status": selection_status,
         "selected_epoch": int(selected["epoch"]),
         "selected_confidence": float(selected["confidence"]),
+        "selected_nms_iou": selected.get("nms_iou"),
+        "selected_max_detections": selected.get("max_detections"),
         "selected_rgb_confidence": float(selected_rgb["confidence"]),
+        "selected_rgb_nms_iou": selected_rgb.get("nms_iou"),
+        "selected_rgb_max_detections": selected_rgb.get("max_detections"),
         "selection_default_rgb_fp_budget": default_rgb_fp_budget,
         "selection_fp_budget": aux_fp_budget,
         "selection_aux_within_fp_budget": bool(aux_within_fp_budget),
@@ -418,6 +481,8 @@ def _eval_metrics(
     manifest_path: str | Path,
     checkpoint: str | Path,
     confidence: float,
+    nms_iou: float | None = None,
+    max_detections: int | None = None,
     indices: Sequence[int],
     include_labels: Sequence[str] | None,
     device: str,
@@ -427,6 +492,8 @@ def _eval_metrics(
         checkpoint_path=checkpoint,
         split="eval",
         confidence=float(confidence),
+        nms_iou=None if nms_iou is None else float(nms_iou),
+        max_detections=None if max_detections is None else int(max_detections),
         device=device,
         label_agnostic=False,
         include_labels=include_labels,
@@ -549,6 +616,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     <li>Source eval samples: {int(summary.get('source_eval_count', 0))}; selection: {int(summary.get('selection_sample_count', 0))}; test: {int(summary.get('test_sample_count', 0))}.</li>
     <li>Candidate epochs: <code>{html_lib.escape(str(summary.get('candidate_epochs', [])))}</code></li>
     <li>Candidate thresholds: <code>{html_lib.escape(str(summary.get('candidate_thresholds', [])))}</code></li>
+    <li>Candidate NMS IoUs: <code>{html_lib.escape(str(summary.get('candidate_nms_ious', [])))}</code>; max detections: <code>{html_lib.escape(str(summary.get('candidate_max_detections', [])))}</code></li>
     <li>Tuned RGB baseline: <code>{html_lib.escape(str(summary.get('tune_rgb_baseline', False)))}</code>; RGB thresholds: <code>{html_lib.escape(str(summary.get('candidate_rgb_thresholds', [])))}</code></li>
     <li>Aux FP budget source: <code>{html_lib.escape(str(summary.get('aux_fp_budget_source', 'default_rgb')))}</code></li>
   </ul>

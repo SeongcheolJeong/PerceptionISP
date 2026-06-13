@@ -10,6 +10,8 @@ from perception_isp import dense_select_test_gate as gate
 from perception_isp.dense_select_test_gate import (
     build_dense_select_test_gate,
     parse_int_list,
+    parse_optional_float_list,
+    parse_optional_int_list,
     select_candidate,
     split_indices_by_hash,
     write_dense_select_test_gate,
@@ -41,6 +43,8 @@ class DenseSelectTestGateTest(unittest.TestCase):
     def test_parse_int_list_accepts_ranges(self) -> None:
         self.assertEqual(parse_int_list("0-2,4,2"), (0, 1, 2, 4))
         self.assertEqual(parse_int_list("3-1"), (3, 2, 1))
+        self.assertEqual(parse_optional_float_list("none,0.4"), (None, 0.4))
+        self.assertEqual(parse_optional_int_list("none,10"), (None, 10))
 
     def test_build_gate_can_tune_rgb_baseline_threshold(self) -> None:
         def fake_eval(**kwargs):
@@ -78,12 +82,16 @@ class DenseSelectTestGateTest(unittest.TestCase):
                 epochs=(0,),
                 thresholds=(0.0, 0.2),
                 rgb_thresholds=(0.0, 0.2),
+                nms_ious=(None, 0.4),
+                max_detections=(None, 10),
                 tune_rgb_baseline=True,
             )
         row = summary["rows"][0]
         self.assertTrue(row["tune_rgb_baseline"])
         self.assertEqual(row["selected_rgb_confidence"], 0.2)
         self.assertEqual(row["selected_confidence"], 0.2)
+        self.assertIn(row["selected_nms_iou"], (None, 0.4))
+        self.assertIn(row["selected_max_detections"], (None, 10))
         self.assertEqual(row["selection_fp_budget"], 10.0)
         self.assertAlmostEqual(row["test_deltas"]["recall"], 0.20)
 
