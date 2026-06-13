@@ -382,6 +382,7 @@ class AuxDNNExportTest(unittest.TestCase):
                 manifest_path=manifest,
                 epochs=1,
                 device_name="cpu",
+                batch_size=2,
                 grid_size=(4, 6),
                 base_channels=8,
                 channel_mode="aux_only",
@@ -391,6 +392,7 @@ class AuxDNNExportTest(unittest.TestCase):
                 output_dir=Path(tmp) / "dense",
             )
             self.assertEqual(summary["sample_count"], 3)
+            self.assertEqual(summary["batch_size"], 2)
             self.assertEqual(summary["include_labels"], ["car", "person"])
             self.assertEqual(summary["class_names"], ["car", "person"])
             self.assertEqual(summary["split_strategy"], "coverage")

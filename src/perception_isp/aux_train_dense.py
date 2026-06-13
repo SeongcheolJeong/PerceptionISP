@@ -38,6 +38,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1.0e-3)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    parser.add_argument("--batch-size", type=int, default=1, help="Number of samples per optimizer/eval step.")
     parser.add_argument("--grid", default="15x20", help="Detector grid as HxW.")
     parser.add_argument("--base-channels", type=int, default=24)
     parser.add_argument("--model-architecture", default="early_fusion", choices=["early_fusion", "late_fusion"], help="Dense detector architecture.")
@@ -73,6 +74,7 @@ def main(argv: Any = None) -> int:
         epochs=int(args.epochs),
         learning_rate=float(args.lr),
         device_name=str(args.device),
+        batch_size=int(args.batch_size),
         grid_size=parse_grid_size(args.grid),
         base_channels=int(args.base_channels),
         model_architecture=str(args.model_architecture),
@@ -103,6 +105,7 @@ def train_dense(
     epochs: int = 20,
     learning_rate: float = 1.0e-3,
     device_name: str = "auto",
+    batch_size: int = 1,
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
     model_architecture: str = "early_fusion",
@@ -137,6 +140,7 @@ def train_dense(
     normalized_channel_mode = normalize_channel_mode(channel_mode)
     channel_mask = channel_mask_for_mode(normalized_channel_mode, channels=channels)
     device = _select_device(torch, device_name)
+    effective_batch_size = max(int(batch_size), 1)
     train_indices, eval_indices = _split_indices(dataset, eval_fraction, strategy=split_strategy, allowed_labels=set(class_names))
     train_class_names = _class_names_for_indices(dataset, train_indices, allowed_labels=set(class_names))
     eval_class_names = _class_names_for_indices(dataset, eval_indices, allowed_labels=set(class_names))
@@ -182,15 +186,16 @@ def train_dense(
         box_weight=box_weight,
         class_weight=class_weight,
         channel_mask=channel_mask,
+        batch_size=effective_batch_size,
     )
     for epoch in range(epoch_count):
         model.train()
         epoch_loss = 0.0
-        for index in train_indices:
-            loss = _sample_loss(
+        for batch_indices in _batched_indices(train_indices, effective_batch_size):
+            loss = _batch_loss(
                 model,
                 dataset,
-                int(index),
+                batch_indices,
                 class_to_index,
                 device,
                 torch,
@@ -208,8 +213,8 @@ def train_dense(
             value = float(loss.detach().cpu())
             first_loss = value if first_loss is None else first_loss
             last_loss = value
-            epoch_loss += value
-            total_steps += 1
+            epoch_loss += value * len(batch_indices)
+            total_steps += len(batch_indices)
         train_mean = float(epoch_loss / max(len(train_indices), 1))
         eval_mean = _evaluate_loss(
             model,
@@ -225,6 +230,7 @@ def train_dense(
             box_weight=box_weight,
             class_weight=class_weight,
             channel_mask=channel_mask,
+            batch_size=effective_batch_size,
         )
         history.append(
             {
@@ -257,6 +263,7 @@ def train_dense(
         "device": str(device),
         "epochs": int(epoch_count),
         "learning_rate": float(learning_rate),
+        "batch_size": int(effective_batch_size),
         "grid_size": [int(grid_size[0]), int(grid_size[1])],
         "base_channels": int(base_channels),
         "model_architecture": str(model_architecture),
@@ -419,32 +426,103 @@ def _sample_loss(
     class_weight: float,
     channel_mask: Sequence[float],
 ) -> Any:
-    tensor, target = dataset[int(index)]
-    x = apply_channel_mask(tensor.unsqueeze(0).to(device), channel_mask)
-    pred = model(x)
-    grid_size = (int(pred.shape[2]), int(pred.shape[3]))
-    object_target, box_target, class_target = _dense_targets(
-        target,
+    return _batch_loss(
+        model,
+        dataset,
+        (int(index),),
         class_to_index,
-        grid_size,
         device,
         torch,
+        functional,
+        no_object_weight=no_object_weight,
+        object_loss_mode=object_loss_mode,
+        negative_focal_gamma=negative_focal_gamma,
+        box_weight=box_weight,
+        class_weight=class_weight,
+        channel_mask=channel_mask,
     )
+
+
+def _batch_loss(
+    model: Any,
+    dataset: Any,
+    indices: Sequence[int],
+    class_to_index: Mapping[str, int],
+    device: Any,
+    torch: Any,
+    functional: Any,
+    *,
+    no_object_weight: float,
+    object_loss_mode: str,
+    negative_focal_gamma: float,
+    box_weight: float,
+    class_weight: float,
+    channel_mask: Sequence[float],
+) -> Any:
+    if not indices:
+        raise ValueError("batch loss requires at least one index")
+    batch = [dataset[int(index)] for index in indices]
+    tensors = torch.stack([item[0] for item in batch], dim=0).to(device)
+    x = apply_channel_mask(tensors, channel_mask)
+    pred = model(x)
+    grid_size = (int(pred.shape[2]), int(pred.shape[3]))
+    targets = [
+        _dense_targets(
+            target,
+            class_to_index,
+            grid_size,
+            device,
+            torch,
+        )
+        for _, target in batch
+    ]
+    object_target = torch.cat([item[0] for item in targets], dim=0)
+    box_target = torch.stack([item[1] for item in targets], dim=0)
+    class_target = torch.stack([item[2] for item in targets], dim=0)
+    return _dense_prediction_loss(
+        pred,
+        object_target,
+        box_target,
+        class_target,
+        torch,
+        functional,
+        no_object_weight=no_object_weight,
+        object_loss_mode=object_loss_mode,
+        negative_focal_gamma=negative_focal_gamma,
+        box_weight=box_weight,
+        class_weight=class_weight,
+    )
+
+
+def _dense_prediction_loss(
+    pred: Any,
+    object_target: Any,
+    box_target: Any,
+    class_target: Any,
+    torch: Any,
+    functional: Any,
+    *,
+    no_object_weight: float,
+    object_loss_mode: str,
+    negative_focal_gamma: float,
+    box_weight: float,
+    class_weight: float,
+) -> Any:
     object_logits = pred[:, 0, :, :]
     box_pred = torch.sigmoid(pred[:, 1:5, :, :])
     class_logits = pred[:, 5:, :, :]
 
-    positive = object_target[0] > 0.5
+    positive = object_target > 0.5
     object_loss_raw = functional.binary_cross_entropy_with_logits(object_logits, object_target, reduction="none")
-    negative = object_target[0] <= 0.5
+    negative = object_target <= 0.5
     if bool(torch.any(positive)):
-        positive_object_loss = object_loss_raw[0, positive].mean()
+        positive_object_loss = object_loss_raw[positive].mean()
     else:
         positive_object_loss = object_logits.sum() * 0.0
     if bool(torch.any(negative)):
-        negative_losses = object_loss_raw[0, negative]
+        negative_losses = object_loss_raw[negative]
         if str(object_loss_mode) == "negative_focal":
-            negative_probs = torch.sigmoid(object_logits[0, negative])
+            negative_probs = torch.sigmoid(object_logits[negative])
             focal_weight = torch.pow(negative_probs.clamp(0.0, 1.0), float(negative_focal_gamma))
             negative_object_loss = (focal_weight * negative_losses).mean()
         elif str(object_loss_mode) == "balanced_positive_negative":
@@ -456,10 +534,10 @@ def _sample_loss(
     object_loss = positive_object_loss + float(no_object_weight) * negative_object_loss
 
     if bool(torch.any(positive)):
-        pred_boxes = box_pred[0, :, positive].transpose(0, 1).contiguous()
-        target_boxes = box_target[:, positive].transpose(0, 1).contiguous()
+        pred_boxes = box_pred.permute(0, 2, 3, 1)[positive].contiguous()
+        target_boxes = box_target.permute(0, 2, 3, 1)[positive].contiguous()
         box_loss = functional.smooth_l1_loss(pred_boxes, target_boxes)
-        pred_classes = class_logits[0, :, positive].transpose(0, 1).contiguous()
+        pred_classes = class_logits.permute(0, 2, 3, 1)[positive].contiguous()
         target_classes = class_target[positive].contiguous()
         cls_loss = functional.cross_entropy(pred_classes, target_classes)
     else:
@@ -554,6 +632,7 @@ def _evaluate_loss(
     box_weight: float,
     class_weight: float,
     channel_mask: Sequence[float],
+    batch_size: int = 1,
 ) -> Optional[float]:
     if not indices:
         return None
@@ -561,31 +640,32 @@ def _evaluate_loss(
     model.eval()
     losses = []
     with torch.no_grad():
-        for index in indices:
-            losses.append(
-                float(
-                    _sample_loss(
-                        model,
-                        dataset,
-                        int(index),
-                        class_to_index,
-                        device,
-                        torch,
-                        functional,
-                        no_object_weight=no_object_weight,
-                        object_loss_mode=object_loss_mode,
-                        negative_focal_gamma=negative_focal_gamma,
-                        box_weight=box_weight,
-                        class_weight=class_weight,
-                        channel_mask=channel_mask,
-                    )
-                    .detach()
-                    .cpu()
-                )
+        for batch_indices in _batched_indices(indices, max(int(batch_size), 1)):
+            loss = _batch_loss(
+                model,
+                dataset,
+                batch_indices,
+                class_to_index,
+                device,
+                torch,
+                functional,
+                no_object_weight=no_object_weight,
+                object_loss_mode=object_loss_mode,
+                negative_focal_gamma=negative_focal_gamma,
+                box_weight=box_weight,
+                class_weight=class_weight,
+                channel_mask=channel_mask,
             )
+            losses.extend([float(loss.detach().cpu())] * len(batch_indices))
     if was_training:
         model.train()
     return float(sum(losses) / max(len(losses), 1))
+
+
+def _batched_indices(indices: Sequence[int], batch_size: int) -> Tuple[Tuple[int, ...], ...]:
+    values = tuple(int(index) for index in indices)
+    size = max(int(batch_size), 1)
+    return tuple(tuple(values[start : start + size]) for start in range(0, len(values), size))
 
 
 def _apply_initial_checkpoint(
