@@ -65,6 +65,13 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--negative-focal-gamma", type=float, default=2.0, help="Gamma for --object-loss-mode negative_focal.")
     parser.add_argument("--box-weight", type=float, default=5.0)
     parser.add_argument("--class-weight", type=float, default=1.0)
+    parser.add_argument(
+        "--small-object-weight",
+        type=float,
+        default=1.0,
+        help="Positive-cell loss multiplier for boxes at or below --small-object-area-threshold.",
+    )
+    parser.add_argument("--small-object-area-threshold", type=float, default=32.0 * 32.0)
     parser.add_argument("--seed", type=int, default=None, help="Optional deterministic seed for dense training.")
     parser.add_argument("--initial-checkpoint", default=None, help="Optional dense-detector checkpoint to warm-start from.")
     parser.add_argument(
@@ -98,6 +105,8 @@ def main(argv: Any = None) -> int:
         negative_focal_gamma=float(args.negative_focal_gamma),
         box_weight=float(args.box_weight),
         class_weight=float(args.class_weight),
+        small_object_weight=float(args.small_object_weight),
+        small_object_area_threshold=float(args.small_object_area_threshold),
         seed=args.seed,
         initial_checkpoint=args.initial_checkpoint,
         zero_aux_input_weights=bool(args.zero_aux_input_weights),
@@ -131,6 +140,8 @@ def train_dense(
     negative_focal_gamma: float = 2.0,
     box_weight: float = 5.0,
     class_weight: float = 1.0,
+    small_object_weight: float = 1.0,
+    small_object_area_threshold: float = 32.0 * 32.0,
     seed: int | None = None,
     initial_checkpoint: str | Path | None = None,
     zero_aux_input_weights: bool = False,
@@ -202,6 +213,8 @@ def train_dense(
         negative_focal_gamma=negative_focal_gamma,
         box_weight=box_weight,
         class_weight=class_weight,
+        small_object_weight=small_object_weight,
+        small_object_area_threshold=small_object_area_threshold,
         channel_mask=channel_mask,
         batch_size=effective_batch_size,
         box_encoding=normalized_box_encoding,
@@ -224,6 +237,8 @@ def train_dense(
                 negative_focal_gamma=negative_focal_gamma,
                 box_weight=box_weight,
                 class_weight=class_weight,
+                small_object_weight=small_object_weight,
+                small_object_area_threshold=small_object_area_threshold,
                 channel_mask=channel_mask,
                 box_encoding=normalized_box_encoding,
                 positive_cell_radius=effective_positive_cell_radius,
@@ -250,6 +265,8 @@ def train_dense(
             negative_focal_gamma=negative_focal_gamma,
             box_weight=box_weight,
             class_weight=class_weight,
+            small_object_weight=small_object_weight,
+            small_object_area_threshold=small_object_area_threshold,
             channel_mask=channel_mask,
             batch_size=effective_batch_size,
             box_encoding=normalized_box_encoding,
@@ -312,6 +329,8 @@ def train_dense(
         "negative_focal_gamma": float(negative_focal_gamma),
         "box_weight": float(box_weight),
         "class_weight": float(class_weight),
+        "small_object_weight": float(small_object_weight),
+        "small_object_area_threshold": float(small_object_area_threshold),
         "seed": None if seed is None else int(seed),
         "seed_info": seed_info,
         "initial_checkpoint": None if initial_checkpoint is None else str(initial_checkpoint),
@@ -462,6 +481,8 @@ def _sample_loss(
     negative_focal_gamma: float,
     box_weight: float,
     class_weight: float,
+    small_object_weight: float = 1.0,
+    small_object_area_threshold: float = 32.0 * 32.0,
     channel_mask: Sequence[float],
     box_encoding: str = DEFAULT_BOX_ENCODING,
     positive_cell_radius: int = 0,
@@ -479,6 +500,8 @@ def _sample_loss(
         negative_focal_gamma=negative_focal_gamma,
         box_weight=box_weight,
         class_weight=class_weight,
+        small_object_weight=small_object_weight,
+        small_object_area_threshold=small_object_area_threshold,
         channel_mask=channel_mask,
         box_encoding=box_encoding,
         positive_cell_radius=positive_cell_radius,
@@ -499,6 +522,8 @@ def _batch_loss(
     negative_focal_gamma: float,
     box_weight: float,
     class_weight: float,
+    small_object_weight: float = 1.0,
+    small_object_area_threshold: float = 32.0 * 32.0,
     channel_mask: Sequence[float],
     box_encoding: str = DEFAULT_BOX_ENCODING,
     positive_cell_radius: int = 0,
@@ -519,17 +544,21 @@ def _batch_loss(
             torch,
             box_encoding=box_encoding,
             positive_cell_radius=positive_cell_radius,
+            small_object_weight=small_object_weight,
+            small_object_area_threshold=small_object_area_threshold,
         )
         for _, target in batch
     ]
     object_target = torch.cat([item[0] for item in targets], dim=0)
     box_target = torch.stack([item[1] for item in targets], dim=0)
     class_target = torch.stack([item[2] for item in targets], dim=0)
+    positive_weight = torch.stack([item[3] for item in targets], dim=0)
     return _dense_prediction_loss(
         pred,
         object_target,
         box_target,
         class_target,
+        positive_weight,
         torch,
         functional,
         no_object_weight=no_object_weight,
@@ -545,6 +574,7 @@ def _dense_prediction_loss(
     object_target: Any,
     box_target: Any,
     class_target: Any,
+    positive_weight: Any,
     torch: Any,
     functional: Any,
     *,
@@ -562,7 +592,7 @@ def _dense_prediction_loss(
     object_loss_raw = functional.binary_cross_entropy_with_logits(object_logits, object_target, reduction="none")
     negative = object_target <= 0.5
     if bool(torch.any(positive)):
-        positive_object_loss = object_loss_raw[positive].mean()
+        positive_object_loss = _weighted_mean(object_loss_raw[positive], positive_weight[positive], torch)
     else:
         positive_object_loss = object_logits.sum() * 0.0
     if bool(torch.any(negative)):
@@ -582,14 +612,23 @@ def _dense_prediction_loss(
     if bool(torch.any(positive)):
         pred_boxes = box_pred.permute(0, 2, 3, 1)[positive].contiguous()
         target_boxes = box_target.permute(0, 2, 3, 1)[positive].contiguous()
-        box_loss = functional.smooth_l1_loss(pred_boxes, target_boxes)
+        box_loss_per_cell = functional.smooth_l1_loss(pred_boxes, target_boxes, reduction="none").mean(dim=1)
+        positive_weights = positive_weight[positive].contiguous()
+        box_loss = _weighted_mean(box_loss_per_cell, positive_weights, torch)
         pred_classes = class_logits.permute(0, 2, 3, 1)[positive].contiguous()
         target_classes = class_target[positive].contiguous()
-        cls_loss = functional.cross_entropy(pred_classes, target_classes)
+        cls_loss_per_cell = functional.cross_entropy(pred_classes, target_classes, reduction="none")
+        cls_loss = _weighted_mean(cls_loss_per_cell, positive_weights, torch)
     else:
         box_loss = box_pred.sum() * 0.0
         cls_loss = class_logits.sum() * 0.0
     return object_loss + float(box_weight) * box_loss + float(class_weight) * cls_loss
+
+
+def _weighted_mean(values: Any, weights: Any, torch: Any) -> Any:
+    safe_weights = weights.to(dtype=values.dtype, device=values.device).clamp_min(0.0)
+    denominator = torch.clamp(torch.ones_like(values).sum(), min=1.0e-12)
+    return (values * safe_weights).sum() / denominator
 
 
 def _dense_targets(
@@ -601,18 +640,22 @@ def _dense_targets(
     *,
     box_encoding: str = DEFAULT_BOX_ENCODING,
     positive_cell_radius: int = 0,
-) -> Tuple[Any, Any, Any]:
+    small_object_weight: float = 1.0,
+    small_object_area_threshold: float = 32.0 * 32.0,
+) -> Tuple[Any, Any, Any, Any]:
     rows, cols = int(grid_size[0]), int(grid_size[1])
     encoding = _normalize_box_encoding(box_encoding)
     radius = _normalize_positive_cell_radius(positive_cell_radius, box_encoding=encoding)
     object_target = torch.zeros((1, rows, cols), dtype=torch.float32, device=device)
     box_target = torch.zeros((4, rows, cols), dtype=torch.float32, device=device)
     class_target = torch.zeros((rows, cols), dtype=torch.long, device=device)
+    positive_weight = torch.ones((rows, cols), dtype=torch.float32, device=device)
     boxes = target.get("boxes_normalized")
+    absolute_boxes = target.get("boxes")
     labels = tuple(str(value) for value in target.get("labels_text", ()))
     occupied: set[Tuple[int, int]] = set()
     if boxes is None or boxes.numel() <= 0:
-        return object_target, box_target, class_target
+        return object_target, box_target, class_target, positive_weight
     for box_index, box in enumerate(boxes.detach().cpu()):
         if box_index >= len(labels):
             continue
@@ -633,6 +676,12 @@ def _dense_targets(
             continue
         width = max(x2 - x1, 1.0e-6)
         height = max(y2 - y1, 1.0e-6)
+        cell_weight = _box_positive_weight(
+            absolute_boxes,
+            box_index=box_index,
+            small_object_weight=small_object_weight,
+            small_object_area_threshold=small_object_area_threshold,
+        )
         for cell_row, cell_col in cells:
             occupied.add((cell_row, cell_col))
             object_target[0, cell_row, cell_col] = 1.0
@@ -644,7 +693,30 @@ def _dense_targets(
                 encoded_box = (offset_x, offset_y, width, height)
             box_target[:, cell_row, cell_col] = torch.tensor(encoded_box, dtype=torch.float32, device=device)
             class_target[cell_row, cell_col] = int(class_index)
-    return object_target, box_target, class_target
+            positive_weight[cell_row, cell_col] = float(cell_weight)
+    return object_target, box_target, class_target, positive_weight
+
+
+def _box_positive_weight(
+    absolute_boxes: Any,
+    *,
+    box_index: int,
+    small_object_weight: float,
+    small_object_area_threshold: float,
+) -> float:
+    multiplier = max(float(small_object_weight), 0.0)
+    if multiplier <= 1.0:
+        return 1.0
+    if absolute_boxes is None or not hasattr(absolute_boxes, "numel") or absolute_boxes.numel() <= 0:
+        return 1.0
+    if int(box_index) >= int(absolute_boxes.shape[0]):
+        return 1.0
+    x1, y1, x2, y2 = [float(value) for value in absolute_boxes[int(box_index)].detach().cpu()]
+    width = max(0.0, x2 - x1)
+    height = max(0.0, y2 - y1)
+    if width * height <= max(float(small_object_area_threshold), 0.0):
+        return multiplier
+    return 1.0
 
 
 def _target_cells(
@@ -711,6 +783,8 @@ def _evaluate_loss(
     negative_focal_gamma: float,
     box_weight: float,
     class_weight: float,
+    small_object_weight: float = 1.0,
+    small_object_area_threshold: float = 32.0 * 32.0,
     channel_mask: Sequence[float],
     batch_size: int = 1,
     box_encoding: str = DEFAULT_BOX_ENCODING,
@@ -736,6 +810,8 @@ def _evaluate_loss(
                 negative_focal_gamma=negative_focal_gamma,
                 box_weight=box_weight,
                 class_weight=class_weight,
+                small_object_weight=small_object_weight,
+                small_object_area_threshold=small_object_area_threshold,
                 channel_mask=channel_mask,
                 box_encoding=box_encoding,
                 positive_cell_radius=positive_cell_radius,

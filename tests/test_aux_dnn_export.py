@@ -25,7 +25,7 @@ from perception_isp.aux_dnn import (
 )
 from perception_isp.aux_eval_dense import _apply_input_ablation, _shuffle_indices, evaluate_dense_manifest
 from perception_isp.aux_export import _load_samples, export_aux_dataset, main as aux_export_main
-from perception_isp.aux_train_dense import train_dense
+from perception_isp.aux_train_dense import _dense_targets, _weighted_mean, train_dense
 from perception_isp.aux_train_smoke import train_smoke
 from perception_isp.comparison import build_pipeline_images, compare_dataset
 from perception_isp.detectors import RGBAuxTorchDenseDetector, RGBAuxTorchSmokeDetector, rgb_aux_detector_from_checkpoint
@@ -403,6 +403,8 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("checkpoint_loss_kind", summary)
             self.assertEqual(summary["box_encoding"], "cell_center_size")
             self.assertEqual(summary["positive_cell_radius"], 0)
+            self.assertEqual(summary["small_object_weight"], 1.0)
+            self.assertEqual(summary["small_object_area_threshold"], 32.0 * 32.0)
             self.assertEqual(summary["channel_mode"], "aux_only")
             self.assertEqual(summary["object_loss_mode"], "balanced_positive_negative")
             self.assertEqual(summary["negative_focal_gamma"], 2.0)
@@ -652,6 +654,7 @@ class AuxDNNExportTest(unittest.TestCase):
             )
             self.assertEqual(summary["box_encoding"], "xyxy")
             self.assertEqual(summary["positive_cell_radius"], 1)
+            self.assertEqual(summary["small_object_weight"], 1.0)
             detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
             self.assertEqual(detector.box_encoding, "xyxy")
             direct = evaluate_dense_manifest(
@@ -664,6 +667,52 @@ class AuxDNNExportTest(unittest.TestCase):
             )
             self.assertEqual(direct["checkpoint_summary"]["tensor_key"], "rgb_aux_chw")
             self.assertIn("aggregate", direct)
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_targets_weight_small_objects(self) -> None:
+        import torch
+
+        target = {
+            "boxes": torch.tensor(
+                [
+                    [2.0, 2.0, 12.0, 12.0],
+                    [32.0, 32.0, 96.0, 96.0],
+                ],
+                dtype=torch.float32,
+            ),
+            "boxes_normalized": torch.tensor(
+                [
+                    [0.05, 0.05, 0.20, 0.20],
+                    [0.60, 0.60, 0.90, 0.90],
+                ],
+                dtype=torch.float32,
+            ),
+            "labels_text": ("car", "person"),
+        }
+        object_target, _, class_target, positive_weight = _dense_targets(
+            target,
+            {"car": 0, "person": 1},
+            (4, 4),
+            torch.device("cpu"),
+            torch,
+            box_encoding="xyxy",
+            positive_cell_radius=0,
+            small_object_weight=3.0,
+            small_object_area_threshold=32.0 * 32.0,
+        )
+        positives = object_target[0] > 0.5
+        self.assertEqual(int(torch.sum(positives).item()), 2)
+        self.assertEqual(float(torch.max(positive_weight[positives]).item()), 3.0)
+        self.assertEqual(float(torch.min(positive_weight[positives]).item()), 1.0)
+        self.assertEqual(set(int(value.item()) for value in class_target[positives]), {0, 1})
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_weighted_mean_uses_weights_as_loss_multipliers(self) -> None:
+        import torch
+
+        values = torch.tensor([2.0, 4.0], dtype=torch.float32)
+        weights = torch.tensor([1.0, 3.0], dtype=torch.float32)
+        self.assertAlmostEqual(float(_weighted_mean(values, weights, torch).item()), 7.0)
 
 
 if __name__ == "__main__":
