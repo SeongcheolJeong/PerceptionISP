@@ -27,7 +27,12 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--label-agnostic", action="store_true", help="Use label-agnostic metrics instead of the label-aware gate default.")
     parser.add_argument("--min-zero-aux-recall-drop", type=float, default=0.05)
-    parser.add_argument("--min-zero-aux-precision-drop", type=float, default=0.0)
+    parser.add_argument(
+        "--min-zero-aux-precision-drop",
+        type=float,
+        default=0.0,
+        help="Optional precision-drop requirement for zero_aux. Values <= 0 keep precision as a diagnostic.",
+    )
     parser.add_argument("--min-zero-rgb-recall-drop", type=float, default=0.05)
     parser.add_argument("--output-dir", default="reports/perception_dense_input_ablation_gate")
     args = parser.parse_args(argv)
@@ -256,27 +261,35 @@ def _checks(
     else:
         recall_drop = -float(zero_aux_delta.get("recall", 0.0))
         precision_drop = -float(zero_aux_delta.get("precision", 0.0))
+        precision_required = float(min_zero_aux_precision_drop) > 0.0
+        recall_pass = recall_drop >= float(min_zero_aux_recall_drop)
+        precision_pass = precision_drop >= float(min_zero_aux_precision_drop)
         checks.append(
             {
                 "id": "zero_aux_reduces_dense_dnn_performance",
                 "required": True,
                 "status": "pass"
-                if recall_drop >= float(min_zero_aux_recall_drop)
-                and precision_drop >= float(min_zero_aux_precision_drop)
+                if recall_pass
+                and (not precision_required or precision_pass)
                 else "fail",
-                "description": "Zeroing Aux channels should degrade held-out dense-detector performance.",
+                "description": (
+                    "Zeroing Aux channels should degrade held-out dense-detector recall. Precision is diagnostic by "
+                    "default because a disabled evidence path can reduce detections and raise precision while losing recall."
+                ),
                 "criteria": [
                     {
                         "metric": "recall_drop",
                         "value": recall_drop,
                         "threshold": float(min_zero_aux_recall_drop),
-                        "pass": recall_drop >= float(min_zero_aux_recall_drop),
+                        "required": True,
+                        "pass": recall_pass,
                     },
                     {
                         "metric": "precision_drop",
                         "value": precision_drop,
                         "threshold": float(min_zero_aux_precision_drop),
-                        "pass": precision_drop >= float(min_zero_aux_precision_drop),
+                        "required": precision_required,
+                        "pass": precision_pass,
                     },
                 ],
             }

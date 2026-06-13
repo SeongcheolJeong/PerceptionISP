@@ -43,6 +43,39 @@ class DenseInputAblationGateTest(unittest.TestCase):
         self.assertEqual(checks["shuffle_aux_spatial_sensitivity_diagnostic"]["status"], "pass")
         self.assertFalse(checks["shuffle_aux_spatial_sensitivity_diagnostic"]["required"])
 
+    def test_zero_aux_precision_gain_can_still_pass_when_recall_drops(self) -> None:
+        def fake_eval(**kwargs):
+            mode = str(kwargs["input_ablation"])
+            values = {
+                "none": (0.40, 0.60, 18.0, 19.0),
+                "zero_aux": (0.45, 0.25, 8.0, 8.4),
+                "zero_rgb": (0.10, 0.15, 20.0, 20.5),
+            }[mode]
+            precision, recall, fp, det_count = values
+            return {
+                "sample_count": 4,
+                "aggregate": {
+                    "precision@0.50_mean": precision,
+                    "recall@0.50_mean": recall,
+                    "fp@0.50_mean": fp,
+                    "det_count_mean": det_count,
+                    "small_recall@0.50_mean": 0.0,
+                },
+            }
+
+        with mock.patch.object(gate, "evaluate_dense_manifest", side_effect=fake_eval):
+            summary = build_dense_input_ablation_gate(
+                gate_summary=_gate_summary(),
+                modes=("none", "zero_aux", "zero_rgb"),
+            )
+
+        checks = {row["id"]: row for row in summary["checks"]}
+        self.assertEqual(summary["status"], "pass")
+        self.assertEqual(checks["zero_aux_reduces_dense_dnn_performance"]["status"], "pass")
+        precision_criterion = checks["zero_aux_reduces_dense_dnn_performance"]["criteria"][1]
+        self.assertFalse(precision_criterion["required"])
+        self.assertLess(precision_criterion["value"], 0.0)
+
     def test_write_and_cli_emit_report_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -16,6 +16,7 @@ from perception_isp.dense_select_test_gate import (
     split_indices_by_hash,
     write_dense_select_test_gate,
 )
+from perception_isp.eval_types import BoundingBox, Detection
 
 
 class DenseSelectTestGateTest(unittest.TestCase):
@@ -45,6 +46,32 @@ class DenseSelectTestGateTest(unittest.TestCase):
         self.assertEqual(parse_int_list("3-1"), (3, 2, 1))
         self.assertEqual(parse_optional_float_list("none,0.4"), (None, 0.4))
         self.assertEqual(parse_optional_int_list("none,10"), (None, 10))
+
+    def test_cached_metric_sweep_applies_threshold_and_topk(self) -> None:
+        cache = {
+            "samples": [
+                {
+                    "ground_truth": (BoundingBox((0.0, 0.0, 10.0, 10.0), label="car"),),
+                    "detections": (
+                        Detection(BoundingBox((0.0, 0.0, 10.0, 10.0), label="car"), score=0.9),
+                        Detection(BoundingBox((20.0, 20.0, 30.0, 30.0), label="car"), score=0.8),
+                    ),
+                },
+                {
+                    "ground_truth": (BoundingBox((0.0, 0.0, 10.0, 10.0), label="car"),),
+                    "detections": (
+                        Detection(BoundingBox((20.0, 20.0, 30.0, 30.0), label="car"), score=0.7),
+                    ),
+                },
+            ]
+        }
+
+        metrics = gate._eval_metrics_from_cache(cache, confidence=0.65, nms_iou=None, max_detections=1)
+
+        self.assertAlmostEqual(metrics["recall"], 0.5)
+        self.assertAlmostEqual(metrics["precision"], 0.5)
+        self.assertAlmostEqual(metrics["fp"], 0.5)
+        self.assertAlmostEqual(metrics["det_count"], 1.0)
 
     def test_build_gate_can_tune_rgb_baseline_threshold(self) -> None:
         def fake_eval(**kwargs):

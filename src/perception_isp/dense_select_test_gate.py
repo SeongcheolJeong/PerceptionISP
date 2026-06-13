@@ -13,7 +13,12 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Tuple
 
-from .aux_eval_dense import evaluate_dense_manifest, parse_label_list
+import numpy as np
+
+from .aux_dnn import hwc_tensor_key, load_manifest
+from .aux_eval_dense import _eval_labels, _filter_boxes, _read_boxes, evaluate_dense_manifest, parse_label_list
+from .detectors import _nms_detections, rgb_aux_detector_from_checkpoint
+from .metrics import aggregate_metric_rows, evaluate_detections
 from .types import json_ready
 
 
@@ -27,6 +32,9 @@ METRIC_KEYS = {
     "small_recall": "small_recall@0.50_mean",
 }
 DEFAULT_THRESHOLDS = (0.0, 0.02, 0.04, 0.055, 0.08, 0.10, 0.12, 0.16, 0.20)
+DENSE_DEFAULT_NMS_IOU = 0.50
+DENSE_DEFAULT_MAX_DETECTIONS = 100
+RAW_CACHE_MAX_DETECTIONS = 100000
 
 
 def main(argv: Any = None) -> int:
@@ -58,6 +66,11 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--jobs", type=int, default=1, help="Number of seeds to evaluate in parallel.")
     parser.add_argument("--job-backend", default="process", choices=["process", "thread"], help="Parallel backend used when --jobs > 1.")
+    parser.add_argument(
+        "--cache-detections",
+        action="store_true",
+        help="Run each checkpoint once per split and sweep confidence/NMS/top-k from cached raw detections.",
+    )
     parser.add_argument("--quiet", action="store_true", help="Suppress progress messages while evaluating seeds.")
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_dense_select_test_gate")
     args = parser.parse_args(argv)
@@ -85,6 +98,7 @@ def main(argv: Any = None) -> int:
         device=str(args.device),
         jobs=int(args.jobs),
         job_backend=str(args.job_backend),
+        cache_detections=bool(args.cache_detections),
         progress=not bool(args.quiet),
         split_source_summary=str(args.split_source_summary),
     )
@@ -131,6 +145,7 @@ def build_dense_select_test_gate(
     device: str = "auto",
     jobs: int = 1,
     job_backend: str = "process",
+    cache_detections: bool = False,
     progress: bool = False,
     split_source_summary: str | Path | None = None,
 ) -> Dict[str, Any]:
@@ -157,6 +172,7 @@ def build_dense_select_test_gate(
             "test_indices": test_indices,
             "include_labels": include_labels,
             "device": device,
+            "cache_detections": bool(cache_detections),
         }
         for seed in seeds
     ]
@@ -201,6 +217,7 @@ def build_dense_select_test_gate(
         "aux_fp_budget_source": str(aux_fp_budget_source),
         "jobs": int(worker_count),
         "job_backend": backend,
+        "cache_detections": bool(cache_detections),
         "selection_rule": (
             (
                 "tune RGB-only threshold and RGB+Aux epoch/threshold on the selection subset under the same "
@@ -373,7 +390,26 @@ def _run_seed_gate(
     test_indices: Sequence[int],
     include_labels: Sequence[str] | None,
     device: str,
+    cache_detections: bool = False,
 ) -> Dict[str, Any]:
+    if bool(cache_detections):
+        return _run_seed_gate_cached(
+            manifest_path=manifest_path,
+            seed=seed,
+            rgb_only_checkpoint=rgb_only_checkpoint,
+            aux_checkpoint_template=aux_checkpoint_template,
+            epochs=epochs,
+            thresholds=thresholds,
+            rgb_thresholds=rgb_thresholds,
+            nms_ious=nms_ious,
+            max_detections=max_detections,
+            tune_rgb_baseline=tune_rgb_baseline,
+            aux_fp_budget_source=aux_fp_budget_source,
+            selection_indices=selection_indices,
+            test_indices=test_indices,
+            include_labels=include_labels,
+            device=device,
+        )
     rgb_selection = _eval_metrics(
         manifest_path=manifest_path,
         checkpoint=rgb_only_checkpoint,
@@ -513,6 +549,179 @@ def _run_seed_gate(
         "test_rgb_aux": aux_test,
         "test_deltas": test_deltas,
         "test_status": "pass" if _candidate_passes(test_deltas) else "mixed",
+        "cache_detections": False,
+    }
+
+
+def _run_seed_gate_cached(
+    *,
+    manifest_path: str | Path,
+    seed: int,
+    rgb_only_checkpoint: str,
+    aux_checkpoint_template: str,
+    epochs: Sequence[int],
+    thresholds: Sequence[float],
+    rgb_thresholds: Sequence[float],
+    nms_ious: Sequence[float | None],
+    max_detections: Sequence[int | None],
+    tune_rgb_baseline: bool,
+    aux_fp_budget_source: str,
+    selection_indices: Sequence[int],
+    test_indices: Sequence[int],
+    include_labels: Sequence[str] | None,
+    device: str,
+) -> Dict[str, Any]:
+    rgb_selection_cache = _build_dense_detection_cache(
+        manifest_path=manifest_path,
+        checkpoint=rgb_only_checkpoint,
+        indices=selection_indices,
+        include_labels=include_labels,
+        device=device,
+    )
+    rgb_selection = _eval_metrics_from_cache(
+        rgb_selection_cache,
+        confidence=0.0,
+        nms_iou=None,
+        max_detections=None,
+    )
+    rgb_candidates = []
+    for confidence in rgb_thresholds:
+        for nms_iou in nms_ious:
+            for max_detection_count in max_detections:
+                rgb_candidates.append(
+                    {
+                        "seed": int(seed),
+                        "model": "rgb_only",
+                        "confidence": float(confidence),
+                        "nms_iou": None if nms_iou is None else float(nms_iou),
+                        "max_detections": None if max_detection_count is None else int(max_detection_count),
+                        "checkpoint": str(rgb_only_checkpoint),
+                        "metrics": _eval_metrics_from_cache(
+                            rgb_selection_cache,
+                            confidence=float(confidence),
+                            nms_iou=nms_iou,
+                            max_detections=max_detection_count,
+                        ),
+                    }
+                )
+    if not rgb_candidates:
+        rgb_candidates = [
+            {
+                "seed": int(seed),
+                "model": "rgb_only",
+                "confidence": 0.0,
+                "nms_iou": None,
+                "max_detections": None,
+                "checkpoint": str(rgb_only_checkpoint),
+                "metrics": rgb_selection,
+            }
+        ]
+    default_rgb_fp_budget = float(rgb_selection["fp"])
+    selected_rgb = _best_under_fp_budget(rgb_candidates, default_rgb_fp_budget) if bool(tune_rgb_baseline) else {
+        "seed": int(seed),
+        "model": "rgb_only",
+        "confidence": 0.0,
+        "nms_iou": None,
+        "max_detections": None,
+        "checkpoint": str(rgb_only_checkpoint),
+        "metrics": rgb_selection,
+    }
+    aux_fp_budget = float(selected_rgb["metrics"]["fp"]) if str(aux_fp_budget_source) == "selected_rgb" else default_rgb_fp_budget
+    candidates = []
+    for epoch in epochs:
+        checkpoint = aux_checkpoint_template.format(seed=int(seed), epoch=int(epoch))
+        aux_selection_cache = _build_dense_detection_cache(
+            manifest_path=manifest_path,
+            checkpoint=checkpoint,
+            indices=selection_indices,
+            include_labels=include_labels,
+            device=device,
+        )
+        for confidence in thresholds:
+            for nms_iou in nms_ious:
+                for max_detection_count in max_detections:
+                    metrics = _eval_metrics_from_cache(
+                        aux_selection_cache,
+                        confidence=float(confidence),
+                        nms_iou=nms_iou,
+                        max_detections=max_detection_count,
+                    )
+                    candidates.append(
+                        {
+                            "seed": int(seed),
+                            "epoch": int(epoch),
+                            "confidence": float(confidence),
+                            "nms_iou": None if nms_iou is None else float(nms_iou),
+                            "max_detections": None if max_detection_count is None else int(max_detection_count),
+                            "checkpoint": str(checkpoint),
+                            "metrics": metrics,
+                            "deltas": _metric_deltas(metrics, selected_rgb["metrics"] if bool(tune_rgb_baseline) else rgb_selection),
+                        }
+                    )
+    if bool(tune_rgb_baseline):
+        selected = _best_under_fp_budget(candidates, aux_fp_budget)
+        aux_within_fp_budget = float(selected["metrics"]["fp"]) <= float(aux_fp_budget) + 1.0e-9
+        selection_status = "pass" if aux_within_fp_budget and float(selected["metrics"]["recall"]) >= float(selected_rgb["metrics"]["recall"]) else "no_strict_selection_pass"
+    else:
+        selected, selection_status = select_candidate(candidates)
+        aux_within_fp_budget = float(selected["metrics"]["fp"]) <= float(aux_fp_budget) + 1.0e-9
+    rgb_test_cache = _build_dense_detection_cache(
+        manifest_path=manifest_path,
+        checkpoint=selected_rgb["checkpoint"],
+        indices=test_indices,
+        include_labels=include_labels,
+        device=device,
+    )
+    aux_test_cache = _build_dense_detection_cache(
+        manifest_path=manifest_path,
+        checkpoint=selected["checkpoint"],
+        indices=test_indices,
+        include_labels=include_labels,
+        device=device,
+    )
+    rgb_test = _eval_metrics_from_cache(
+        rgb_test_cache,
+        confidence=float(selected_rgb["confidence"]),
+        nms_iou=selected_rgb.get("nms_iou"),
+        max_detections=selected_rgb.get("max_detections"),
+    )
+    aux_test = _eval_metrics_from_cache(
+        aux_test_cache,
+        confidence=float(selected["confidence"]),
+        nms_iou=selected.get("nms_iou"),
+        max_detections=selected.get("max_detections"),
+    )
+    test_deltas = _metric_deltas(aux_test, rgb_test)
+    return {
+        "seed": int(seed),
+        "selection_status": selection_status,
+        "selected_epoch": int(selected["epoch"]),
+        "selected_confidence": float(selected["confidence"]),
+        "selected_nms_iou": selected.get("nms_iou"),
+        "selected_max_detections": selected.get("max_detections"),
+        "selected_rgb_confidence": float(selected_rgb["confidence"]),
+        "selected_rgb_nms_iou": selected_rgb.get("nms_iou"),
+        "selected_rgb_max_detections": selected_rgb.get("max_detections"),
+        "selection_default_rgb_fp_budget": default_rgb_fp_budget,
+        "selection_fp_budget": aux_fp_budget,
+        "selection_aux_within_fp_budget": bool(aux_within_fp_budget),
+        "aux_fp_budget_source": str(aux_fp_budget_source),
+        "tune_rgb_baseline": bool(tune_rgb_baseline),
+        "rgb_checkpoint": str(rgb_only_checkpoint),
+        "aux_checkpoint": str(selected["checkpoint"]),
+        "selection_rgb_only_default": rgb_selection,
+        "selection_rgb_only": selected_rgb["metrics"],
+        "selection_rgb_aux": selected["metrics"],
+        "selection_deltas": selected["deltas"],
+        "selection_candidate_count": int(len(candidates)),
+        "selection_rgb_candidate_count": int(len(rgb_candidates)),
+        "selection_valid_count": int(_valid_candidate_count(candidates)),
+        "test_rgb_only": rgb_test,
+        "test_rgb_aux": aux_test,
+        "test_deltas": test_deltas,
+        "test_status": "pass" if _candidate_passes(test_deltas) else "mixed",
+        "cache_detections": True,
+        "cache_raw_detector_passes": int(1 + len(epochs) + 2),
     }
 
 
@@ -566,6 +775,90 @@ def _eval_metrics(
         output_dir=None,
     )
     aggregate = summary.get("aggregate", {})
+    return {name: float(aggregate.get(key, 0.0)) for name, key in METRIC_KEYS.items()}
+
+
+def _build_dense_detection_cache(
+    *,
+    manifest_path: str | Path,
+    checkpoint: str | Path,
+    indices: Sequence[int],
+    include_labels: Sequence[str] | None,
+    device: str,
+) -> Dict[str, Any]:
+    import torch
+
+    path = Path(manifest_path).expanduser()
+    manifest = load_manifest(path)
+    manifest_root = path.parent
+    checkpoint_payload = torch.load(str(checkpoint), map_location="cpu")
+    if not isinstance(checkpoint_payload, Mapping):
+        raise ValueError("dense cached evaluation requires a mapping checkpoint")
+    checkpoint_summary = checkpoint_payload.get("summary", {}) if isinstance(checkpoint_payload.get("summary", {}), Mapping) else {}
+    tensor_key = hwc_tensor_key(checkpoint_payload.get("tensor_key", checkpoint_summary.get("tensor_key", "rgb_aux_chw")))
+    eval_labels = _eval_labels(checkpoint_payload, checkpoint_summary, include_labels)
+    detector = rgb_aux_detector_from_checkpoint(
+        str(checkpoint),
+        confidence=0.0,
+        nms_iou=1.0,
+        max_detections=RAW_CACHE_MAX_DETECTIONS,
+        device=device,
+    )
+    if getattr(detector, "name", "") != "rgb_aux_torch_dense_detector":
+        raise ValueError(f"cached gate only supports rgb_aux_torch_dense_detector checkpoints, got {getattr(detector, 'name', '')!r}")
+    samples = []
+    for index in indices:
+        item = manifest[int(index)]
+        tensor_path = manifest_root / str(item["tensor_path"])
+        label_path = manifest_root / str(item["label_path"])
+        with np.load(tensor_path) as payload:
+            if tensor_key not in payload:
+                raise KeyError(f"tensor payload does not contain {tensor_key!r}: {tensor_path}")
+            tensor = np.asarray(payload[tensor_key], dtype=np.float32)
+        ground_truth = _filter_boxes(_read_boxes(label_path), eval_labels)
+        result = detector.detect(tensor, input_name="perception_rgb_aux_dnn")
+        detections = _filter_boxes(result.detections, eval_labels)
+        samples.append(
+            {
+                "index": int(index),
+                "ground_truth": ground_truth,
+                "detections": tuple(detections),
+            }
+        )
+    return {
+        "checkpoint": str(checkpoint),
+        "indices": [int(index) for index in indices],
+        "eval_labels": list(eval_labels),
+        "samples": samples,
+    }
+
+
+def _eval_metrics_from_cache(
+    cache: Mapping[str, Any],
+    *,
+    confidence: float,
+    nms_iou: float | None,
+    max_detections: int | None,
+) -> Dict[str, float]:
+    resolved_nms_iou = DENSE_DEFAULT_NMS_IOU if nms_iou is None else float(nms_iou)
+    resolved_max_detections = DENSE_DEFAULT_MAX_DETECTIONS if max_detections is None else int(max_detections)
+    metric_rows = []
+    for sample in cache.get("samples", ()):
+        raw_detections = tuple(sample.get("detections", ()))
+        detections = tuple(detection for detection in raw_detections if float(detection.score) >= float(confidence))
+        detections = _nms_detections(
+            detections,
+            iou_threshold=resolved_nms_iou,
+            max_detections=resolved_max_detections,
+        )
+        metric_rows.append(
+            evaluate_detections(
+                detections,
+                tuple(sample.get("ground_truth", ())),
+                label_agnostic=False,
+            )
+        )
+    aggregate = aggregate_metric_rows(metric_rows)
     return {name: float(aggregate.get(key, 0.0)) for name, key in METRIC_KEYS.items()}
 
 
@@ -684,6 +977,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     <li>Candidate NMS IoUs: <code>{html_lib.escape(str(summary.get('candidate_nms_ious', [])))}</code>; max detections: <code>{html_lib.escape(str(summary.get('candidate_max_detections', [])))}</code></li>
     <li>Tuned RGB baseline: <code>{html_lib.escape(str(summary.get('tune_rgb_baseline', False)))}</code>; RGB thresholds: <code>{html_lib.escape(str(summary.get('candidate_rgb_thresholds', [])))}</code></li>
     <li>Aux FP budget source: <code>{html_lib.escape(str(summary.get('aux_fp_budget_source', 'default_rgb')))}</code></li>
+    <li>Cached detection sweep: <code>{html_lib.escape(str(summary.get('cache_detections', False)))}</code></li>
     <li>Parallel evaluation: <code>{int(summary.get('jobs', 1))}</code> job(s), backend <code>{html_lib.escape(str(summary.get('job_backend', 'process')))}</code></li>
   </ul>
   <p class="note"><strong>Boundary:</strong> this is stronger than same-split metric selection, but still compact-detector feasibility evidence rather than production detector proof.</p>
