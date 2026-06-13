@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 import hashlib
 import html as html_lib
 import json
@@ -54,6 +55,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--selection-fraction", type=float, default=0.5)
     parser.add_argument("--include-labels", default=None)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    parser.add_argument("--jobs", type=int, default=1, help="Number of seeds to evaluate in parallel.")
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_dense_select_test_gate")
     args = parser.parse_args(argv)
 
@@ -78,6 +80,7 @@ def main(argv: Any = None) -> int:
         selection_fraction=float(args.selection_fraction),
         include_labels=parse_label_list(args.include_labels),
         device=str(args.device),
+        jobs=int(args.jobs),
         split_source_summary=str(args.split_source_summary),
     )
     html_path = write_dense_select_test_gate(summary, args.output_dir)
@@ -119,6 +122,7 @@ def build_dense_select_test_gate(
     selection_fraction: float = 0.5,
     include_labels: Sequence[str] | None = None,
     device: str = "auto",
+    jobs: int = 1,
     split_source_summary: str | Path | None = None,
 ) -> Dict[str, Any]:
     start = time.perf_counter()
@@ -127,27 +131,35 @@ def build_dense_select_test_gate(
         selection_fraction=selection_fraction,
         split_seed=split_seed,
     )
-    rows = []
-    for seed in seeds:
-        rows.append(
-            _run_seed_gate(
-                manifest_path=manifest_path,
-                seed=int(seed),
-                rgb_only_checkpoint=rgb_only_template.format(seed=int(seed)),
-                aux_checkpoint_template=aux_checkpoint_template,
-                epochs=epochs,
-                thresholds=thresholds,
-                rgb_thresholds=rgb_thresholds if rgb_thresholds is not None else thresholds,
-                nms_ious=nms_ious,
-                max_detections=max_detections,
-                tune_rgb_baseline=bool(tune_rgb_baseline),
-                aux_fp_budget_source=str(aux_fp_budget_source),
-                selection_indices=selection_indices,
-                test_indices=test_indices,
-                include_labels=include_labels,
-                device=device,
-            )
-        )
+    seed_jobs = [
+        {
+            "manifest_path": manifest_path,
+            "seed": int(seed),
+            "rgb_only_checkpoint": rgb_only_template.format(seed=int(seed)),
+            "aux_checkpoint_template": aux_checkpoint_template,
+            "epochs": epochs,
+            "thresholds": thresholds,
+            "rgb_thresholds": rgb_thresholds if rgb_thresholds is not None else thresholds,
+            "nms_ious": nms_ious,
+            "max_detections": max_detections,
+            "tune_rgb_baseline": bool(tune_rgb_baseline),
+            "aux_fp_budget_source": str(aux_fp_budget_source),
+            "selection_indices": selection_indices,
+            "test_indices": test_indices,
+            "include_labels": include_labels,
+            "device": device,
+        }
+        for seed in seeds
+    ]
+    worker_count = max(int(jobs), 1)
+    if worker_count > 1 and len(seed_jobs) > 1:
+        with ProcessPoolExecutor(max_workers=min(worker_count, len(seed_jobs))) as executor:
+            rows = list(executor.map(_run_seed_gate_from_kwargs, seed_jobs))
+    else:
+        rows = [
+            _run_seed_gate_from_kwargs(seed_job)
+            for seed_job in seed_jobs
+        ]
     mean_selection_deltas = _mean_deltas(rows, "selection_deltas")
     mean_test_deltas = _mean_deltas(rows, "test_deltas")
     pass_test = [row for row in rows if row.get("test_status") == "pass"]
@@ -176,6 +188,7 @@ def build_dense_select_test_gate(
         "candidate_epochs": [int(value) for value in epochs],
         "tune_rgb_baseline": bool(tune_rgb_baseline),
         "aux_fp_budget_source": str(aux_fp_budget_source),
+        "jobs": int(worker_count),
         "selection_rule": (
             (
                 "tune RGB-only threshold and RGB+Aux epoch/threshold on the selection subset under the same "
@@ -197,6 +210,10 @@ def build_dense_select_test_gate(
             "The underlying training may have logged eval loss on the original eval split; metric selection here only uses the selection subset.",
         ],
     }
+
+
+def _run_seed_gate_from_kwargs(kwargs: Mapping[str, Any]) -> Dict[str, Any]:
+    return _run_seed_gate(**dict(kwargs))
 
 
 def split_indices_by_hash(
