@@ -50,7 +50,10 @@ class DenseSelectTestGateTest(unittest.TestCase):
             if is_aux:
                 recall = 0.80 if confidence >= 0.2 else 0.40
                 precision = 0.25 if confidence >= 0.2 else 0.10
-                fp = 9.0 if confidence >= 0.2 else 11.0
+                fp = 9.0 if confidence >= 0.2 else 4.0
+                if confidence < 0.2:
+                    recall = 0.65
+                    precision = 0.22
             else:
                 recall = 0.60 if confidence >= 0.2 else 0.50
                 precision = 0.20 if confidence >= 0.2 else 0.10
@@ -83,6 +86,27 @@ class DenseSelectTestGateTest(unittest.TestCase):
         self.assertEqual(row["selected_confidence"], 0.2)
         self.assertEqual(row["selection_fp_budget"], 10.0)
         self.assertAlmostEqual(row["test_deltas"]["recall"], 0.20)
+
+        with mock.patch.object(gate, "evaluate_dense_manifest", side_effect=fake_eval):
+            strict = build_dense_select_test_gate(
+                manifest_path="manifest.jsonl",
+                source_eval_indices=(0, 1, 2, 3),
+                seeds=(7,),
+                rgb_only_template="rgb_{seed}.pt",
+                aux_checkpoint_template="aux_{seed}_{epoch:03d}.pt",
+                epochs=(0,),
+                thresholds=(0.0, 0.2),
+                rgb_thresholds=(0.0, 0.2),
+                tune_rgb_baseline=True,
+                aux_fp_budget_source="selected_rgb",
+            )
+        strict_row = strict["rows"][0]
+        self.assertEqual(strict["claim_status"], "strict_fair_tuned_rgb_baseline_heldout_pass")
+        self.assertEqual(strict_row["selection_fp_budget"], 5.0)
+        self.assertTrue(strict_row["selection_aux_within_fp_budget"])
+        self.assertEqual(strict_row["aux_fp_budget_source"], "selected_rgb")
+        self.assertEqual(strict_row["selected_confidence"], 0.0)
+        self.assertAlmostEqual(strict_row["test_deltas"]["fp"], -1.0)
 
     def test_write_dense_select_test_gate_outputs_report_files(self) -> None:
         summary = {

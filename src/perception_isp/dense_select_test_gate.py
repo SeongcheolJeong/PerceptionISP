@@ -42,6 +42,12 @@ def main(argv: Any = None) -> int:
         action="store_true",
         help="Also select the RGB-only operating point on the selection subset under the same FP budget.",
     )
+    parser.add_argument(
+        "--aux-fp-budget-source",
+        default="default_rgb",
+        choices=("default_rgb", "selected_rgb"),
+        help="FP budget used to select RGB+Aux candidates when --tune-rgb-baseline is enabled.",
+    )
     parser.add_argument("--split-seed", default="native1000-select-test-v1")
     parser.add_argument("--selection-fraction", type=float, default=0.5)
     parser.add_argument("--include-labels", default=None)
@@ -63,6 +69,7 @@ def main(argv: Any = None) -> int:
         thresholds=parse_float_list(args.thresholds),
         rgb_thresholds=parse_float_list(args.rgb_thresholds) if args.rgb_thresholds is not None else None,
         tune_rgb_baseline=bool(args.tune_rgb_baseline),
+        aux_fp_budget_source=str(args.aux_fp_budget_source),
         split_seed=str(args.split_seed),
         selection_fraction=float(args.selection_fraction),
         include_labels=parse_label_list(args.include_labels),
@@ -101,6 +108,7 @@ def build_dense_select_test_gate(
     thresholds: Sequence[float] = DEFAULT_THRESHOLDS,
     rgb_thresholds: Sequence[float] | None = None,
     tune_rgb_baseline: bool = False,
+    aux_fp_budget_source: str = "default_rgb",
     split_seed: str = "native1000-select-test-v1",
     selection_fraction: float = 0.5,
     include_labels: Sequence[str] | None = None,
@@ -125,6 +133,7 @@ def build_dense_select_test_gate(
                 thresholds=thresholds,
                 rgb_thresholds=rgb_thresholds if rgb_thresholds is not None else thresholds,
                 tune_rgb_baseline=bool(tune_rgb_baseline),
+                aux_fp_budget_source=str(aux_fp_budget_source),
                 selection_indices=selection_indices,
                 test_indices=test_indices,
                 include_labels=include_labels,
@@ -138,7 +147,7 @@ def build_dense_select_test_gate(
     return {
         "name": "Selection/test-separated RGB+Aux dense detector gate",
         "status": status,
-        "claim_status": _claim_status(bool(tune_rgb_baseline), status),
+        "claim_status": _claim_status(bool(tune_rgb_baseline), status, aux_fp_budget_source=str(aux_fp_budget_source)),
         "manifest": str(manifest_path),
         "split_source_summary": None if split_source_summary is None else str(split_source_summary),
         "split_method": f"sha1({split_seed}:index), first fraction selection, remainder test",
@@ -156,10 +165,11 @@ def build_dense_select_test_gate(
         "candidate_rgb_thresholds": [float(value) for value in (rgb_thresholds if rgb_thresholds is not None else thresholds)],
         "candidate_epochs": [int(value) for value in epochs],
         "tune_rgb_baseline": bool(tune_rgb_baseline),
+        "aux_fp_budget_source": str(aux_fp_budget_source),
         "selection_rule": (
             (
                 "tune RGB-only threshold and RGB+Aux epoch/threshold on the selection subset under the same "
-                "FP budget; maximize recall, then precision"
+                f"FP budget source ({aux_fp_budget_source}); maximize recall, then precision"
             )
             if bool(tune_rgb_baseline)
             else (
@@ -213,8 +223,10 @@ def write_dense_select_test_gate(summary: Mapping[str, Any], output_dir: str | P
     return html_path
 
 
-def _claim_status(tune_rgb_baseline: bool, status: str) -> str:
+def _claim_status(tune_rgb_baseline: bool, status: str, *, aux_fp_budget_source: str = "default_rgb") -> str:
     if bool(tune_rgb_baseline):
+        if str(aux_fp_budget_source) == "selected_rgb":
+            return "strict_fair_tuned_rgb_baseline_heldout_pass" if status == "pass" else "strict_fair_tuned_rgb_baseline_mixed"
         return "fair_tuned_rgb_baseline_heldout_pass" if status == "pass" else "fair_tuned_rgb_baseline_mixed"
     return "heldout_test_equal_fp_3seed_improvement" if status == "pass" else "heldout_test_mixed_result"
 
@@ -253,6 +265,7 @@ def _run_seed_gate(
     thresholds: Sequence[float],
     rgb_thresholds: Sequence[float],
     tune_rgb_baseline: bool,
+    aux_fp_budget_source: str,
     selection_indices: Sequence[int],
     test_indices: Sequence[int],
     include_labels: Sequence[str] | None,
@@ -293,14 +306,15 @@ def _run_seed_gate(
                 "metrics": rgb_selection,
             }
         ]
-    fp_budget = float(rgb_selection["fp"])
-    selected_rgb = _best_under_fp_budget(rgb_candidates, fp_budget) if bool(tune_rgb_baseline) else {
+    default_rgb_fp_budget = float(rgb_selection["fp"])
+    selected_rgb = _best_under_fp_budget(rgb_candidates, default_rgb_fp_budget) if bool(tune_rgb_baseline) else {
         "seed": int(seed),
         "model": "rgb_only",
         "confidence": 0.0,
         "checkpoint": str(rgb_only_checkpoint),
         "metrics": rgb_selection,
     }
+    aux_fp_budget = float(selected_rgb["metrics"]["fp"]) if str(aux_fp_budget_source) == "selected_rgb" else default_rgb_fp_budget
     candidates = []
     for epoch in epochs:
         checkpoint = aux_checkpoint_template.format(seed=int(seed), epoch=int(epoch))
@@ -324,10 +338,12 @@ def _run_seed_gate(
                 }
             )
     if bool(tune_rgb_baseline):
-        selected = _best_under_fp_budget(candidates, fp_budget)
-        selection_status = "pass" if float(selected["metrics"]["recall"]) >= float(selected_rgb["metrics"]["recall"]) else "no_aux_recall_gain"
+        selected = _best_under_fp_budget(candidates, aux_fp_budget)
+        aux_within_fp_budget = float(selected["metrics"]["fp"]) <= float(aux_fp_budget) + 1.0e-9
+        selection_status = "pass" if aux_within_fp_budget and float(selected["metrics"]["recall"]) >= float(selected_rgb["metrics"]["recall"]) else "no_strict_selection_pass"
     else:
         selected, selection_status = select_candidate(candidates)
+        aux_within_fp_budget = float(selected["metrics"]["fp"]) <= float(aux_fp_budget) + 1.0e-9
     rgb_test = _eval_metrics(
         manifest_path=manifest_path,
         checkpoint=selected_rgb["checkpoint"],
@@ -351,7 +367,10 @@ def _run_seed_gate(
         "selected_epoch": int(selected["epoch"]),
         "selected_confidence": float(selected["confidence"]),
         "selected_rgb_confidence": float(selected_rgb["confidence"]),
-        "selection_fp_budget": fp_budget,
+        "selection_default_rgb_fp_budget": default_rgb_fp_budget,
+        "selection_fp_budget": aux_fp_budget,
+        "selection_aux_within_fp_budget": bool(aux_within_fp_budget),
+        "aux_fp_budget_source": str(aux_fp_budget_source),
         "tune_rgb_baseline": bool(tune_rgb_baseline),
         "rgb_checkpoint": str(rgb_only_checkpoint),
         "aux_checkpoint": str(selected["checkpoint"]),
@@ -531,6 +550,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     <li>Candidate epochs: <code>{html_lib.escape(str(summary.get('candidate_epochs', [])))}</code></li>
     <li>Candidate thresholds: <code>{html_lib.escape(str(summary.get('candidate_thresholds', [])))}</code></li>
     <li>Tuned RGB baseline: <code>{html_lib.escape(str(summary.get('tune_rgb_baseline', False)))}</code>; RGB thresholds: <code>{html_lib.escape(str(summary.get('candidate_rgb_thresholds', [])))}</code></li>
+    <li>Aux FP budget source: <code>{html_lib.escape(str(summary.get('aux_fp_budget_source', 'default_rgb')))}</code></li>
   </ul>
   <p class="note"><strong>Boundary:</strong> this is stronger than same-split metric selection, but still compact-detector feasibility evidence rather than production detector proof.</p>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code>; split JSON: <code>{SPLIT_FILENAME}</code></p>
