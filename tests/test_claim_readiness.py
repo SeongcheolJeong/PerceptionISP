@@ -19,6 +19,7 @@ class ClaimReadinessTest(unittest.TestCase):
             eval_dir = _write_eval_summary(root / "eval")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
             rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
+            dense_input_ablation = _write_dense_input_ablation_gate(root / "dense_input_ablation", passed=True)
             rollup_dir = _write_comparison_rollup(root / "rollup")
             mechanism = _write_mechanism_validation(root / "mechanism")
             cfa_stress = _write_cfa_stress_sweep(root / "cfa_stress")
@@ -47,6 +48,7 @@ class ClaimReadinessTest(unittest.TestCase):
                 training_summaries=[train_dir, eval_dir],
                 rgb_aux_dnn_gate=rgb_aux_dnn_gate,
                 rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
+                dense_input_ablation_gate=dense_input_ablation,
                 comparison_rollups=[f"Calibration={rollup_dir}"],
                 mechanism_validation=mechanism,
                 cfa_stress_sweep=cfa_stress,
@@ -95,6 +97,7 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("aux_contribution_audit", summary)
             self.assertIn("rgb_aux_dnn_gate", summary)
             self.assertIn("rgb_aux_dnn_sweep", summary)
+            self.assertIn("dense_input_ablation_gate", summary)
             self.assertIn("adverse_native_slice", summary)
             self.assertIn("adverse_task_slice", summary)
             self.assertIn("cfa_lenspsf_proposal_audit", summary)
@@ -113,6 +116,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(summary["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
             self.assertFalse(summary["rgb_aux_dnn_sweep"]["pass"])
             self.assertEqual(summary["rgb_aux_dnn_sweep"]["claim_status"], "rgb_aux_dnn_sweep_no_claim_operating_point")
+            self.assertTrue(summary["dense_input_ablation_gate"]["pass"])
+            self.assertEqual(summary["dense_input_ablation_gate"]["claim_status"], "aux_input_used_by_dense_dnn")
             self.assertTrue(summary["adverse_native_slice"]["pass"])
             self.assertEqual(summary["adverse_native_slice"]["claim_status"], "adverse_fp_reducer_supported")
             self.assertTrue(summary["adverse_task_slice"]["pass"])
@@ -172,6 +177,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertEqual(dashboard_summary["rgb_aux_dnn_gate"]["claim_status"], "rgb_aux_dnn_not_claim_ready")
             self.assertFalse(dashboard_summary["rgb_aux_dnn_sweep"]["pass"])
             self.assertEqual(dashboard_summary["rgb_aux_dnn_sweep"]["claim_status"], "rgb_aux_dnn_sweep_no_claim_operating_point")
+            self.assertTrue(dashboard_summary["dense_input_ablation_gate"]["pass"])
+            self.assertEqual(dashboard_summary["dense_input_ablation_gate"]["claim_status"], "aux_input_used_by_dense_dnn")
             self.assertTrue(dashboard_summary["adverse_native_slice"]["pass"])
             self.assertTrue(dashboard_summary["adverse_task_slice"]["pass"])
             self.assertTrue(dashboard_summary["cfa_lenspsf_proposal_audit"]["pass"])
@@ -192,6 +199,7 @@ class ClaimReadinessTest(unittest.TestCase):
             cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
             rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
+            dense_input_ablation = _write_dense_input_ablation_gate(root / "dense_input_ablation", passed=True)
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
             object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
             detector_box_support = _write_detector_box_support_audit(root / "detector_box_support")
@@ -214,6 +222,8 @@ class ClaimReadinessTest(unittest.TestCase):
                         str(rgb_aux_dnn_gate),
                         "--rgb-aux-dnn-sweep",
                         str(rgb_aux_dnn_sweep),
+                        "--dense-input-ablation-gate",
+                        str(dense_input_ablation),
                         "--object-boundary-edge",
                         str(object_boundary),
                         "--object-boundary-detection-bridge",
@@ -236,6 +246,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("condition_gate", printed)
             self.assertFalse(printed["rgb_aux_dnn_gate"]["pass"])
             self.assertFalse(printed["rgb_aux_dnn_sweep"]["pass"])
+            self.assertTrue(printed["dense_input_ablation_gate"]["pass"])
+            self.assertEqual(printed["dense_input_ablation_gate"]["claim_status"], "aux_input_used_by_dense_dnn")
             self.assertTrue(printed["object_boundary_edge"]["pass"])
             self.assertEqual(printed["object_boundary_edge"]["claim_status"], "object_boundary_edge_diagnostic")
             self.assertTrue(printed["object_boundary_detection_bridge"]["pass"])
@@ -567,6 +579,53 @@ def _write_rgb_aux_dnn_sweep(path: Path, *, passed: bool) -> Path:
         )
         + "\n"
     )
+    return path
+
+
+def _write_dense_input_ablation_gate(path: Path, *, passed: bool) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    checks = [
+        {
+            "id": "zero_aux_reduces_dense_dnn_performance",
+            "required": True,
+            "status": "pass" if passed else "fail",
+            "description": "Zeroing Aux channels should degrade held-out dense-detector performance.",
+            "criteria": [
+                {"metric": "recall_drop", "value": 0.50 if passed else 0.01, "threshold": 0.05, "pass": passed},
+                {"metric": "precision_drop", "value": 0.04 if passed else -0.01, "threshold": 0.0, "pass": passed},
+            ],
+        },
+        {
+            "id": "zero_rgb_is_not_sufficient_for_selected_detector",
+            "required": True,
+            "status": "pass",
+            "description": "Zeroing RGB should not outperform the full RGB+Aux input.",
+            "criteria": [{"metric": "recall_drop", "value": 0.40, "threshold": 0.05, "pass": True}],
+        },
+    ]
+    payload = {
+        "status": "pass" if passed else "fail",
+        "claim_status": "aux_input_used_by_dense_dnn" if passed else "aux_input_dependence_not_supported",
+        "seed_count": 3,
+        "test_sample_count": 125,
+        "modes": ["none", "zero_aux", "shuffle_aux", "zero_rgb"],
+        "mean_by_mode": {
+            "none": {"precision": 0.05, "recall": 0.60, "small_recall": 0.02, "fp": 18.0, "det_count": 19.0},
+            "zero_aux": {"precision": 0.01, "recall": 0.10, "small_recall": 0.00, "fp": 26.0, "det_count": 26.5},
+            "shuffle_aux": {"precision": 0.04, "recall": 0.55, "small_recall": 0.02, "fp": 18.5, "det_count": 19.0},
+            "zero_rgb": {"precision": 0.02, "recall": 0.20, "small_recall": 0.00, "fp": 24.0, "det_count": 24.5},
+        },
+        "deltas_vs_none": {
+            "zero_aux": {"precision": -0.04, "recall": -0.50, "small_recall": -0.02, "fp": 8.0, "det_count": 7.5},
+            "shuffle_aux": {"precision": -0.01, "recall": -0.05, "small_recall": 0.0, "fp": 0.5, "det_count": 0.0},
+            "zero_rgb": {"precision": -0.03, "recall": -0.40, "small_recall": -0.02, "fp": 6.0, "det_count": 5.5},
+        },
+        "checks": checks,
+        "interpretation": "unit dense input ablation",
+        "claim_boundary": "unit compact dense-DNN boundary",
+    }
+    (path / "dense_input_ablation_summary.json").write_text(json.dumps(payload) + "\n")
     return path
 
 

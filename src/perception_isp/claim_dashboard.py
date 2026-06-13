@@ -16,6 +16,7 @@ CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 RGB_AUX_DNN_GATE_SUMMARY = "rgb_aux_dnn_gate_summary.json"
 RGB_AUX_DNN_SWEEP_SUMMARY = "rgb_aux_dnn_sweep_summary.json"
+DENSE_INPUT_ABLATION_SUMMARY = "dense_input_ablation_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
 TASK_GATE_SUMMARY = "task_gate_summary.json"
@@ -49,6 +50,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
     parser.add_argument("--rgb-aux-dnn-gate", default=None, help="RGB+Aux versus RGB-only DNN gate summary path/dir.")
     parser.add_argument("--rgb-aux-dnn-sweep", default=None, help="RGB+Aux versus RGB-only DNN confidence sweep summary path/dir.")
+    parser.add_argument("--dense-input-ablation-gate", default=None, help="Dense RGB+Aux DNN input-ablation gate summary path/dir.")
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
     parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
     parser.add_argument("--protocol-coverage", default=None, help="Benchmark protocol coverage summary path/dir.")
@@ -81,6 +83,7 @@ def main(argv: Any = None) -> int:
         training_rollup=args.training_rollup,
         rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
         rgb_aux_dnn_sweep=args.rgb_aux_dnn_sweep,
+        dense_input_ablation_gate=args.dense_input_ablation_gate,
         task_metrics=args.task_metrics,
         task_gate=args.task_gate,
         protocol_coverage=args.protocol_coverage,
@@ -129,6 +132,7 @@ def build_claim_dashboard(
     training_rollup: str | Path | None = None,
     rgb_aux_dnn_gate: str | Path | None = None,
     rgb_aux_dnn_sweep: str | Path | None = None,
+    dense_input_ablation_gate: str | Path | None = None,
     task_metrics: str | Path | None = None,
     task_gate: str | Path | None = None,
     protocol_coverage: str | Path | None = None,
@@ -158,6 +162,11 @@ def build_claim_dashboard(
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
     rgb_aux_dnn = _load_rgb_aux_dnn_gate(rgb_aux_dnn_gate) if rgb_aux_dnn_gate is not None else None
     rgb_aux_dnn_sweep_data = _load_rgb_aux_dnn_sweep(rgb_aux_dnn_sweep) if rgb_aux_dnn_sweep is not None else None
+    dense_input_ablation = (
+        _load_dense_input_ablation_gate(dense_input_ablation_gate)
+        if dense_input_ablation_gate is not None
+        else None
+    )
     task = _load_task_metrics(task_metrics, claims=claims) if task_metrics is not None else None
     task_gate_data = _load_task_gate(task_gate) if task_gate is not None else None
     protocol = _load_protocol_coverage(protocol_coverage) if protocol_coverage is not None else None
@@ -211,6 +220,7 @@ def build_claim_dashboard(
         training,
         rgb_aux_dnn,
         rgb_aux_dnn_sweep_data,
+        dense_input_ablation,
         task,
         task_gate_data,
         protocol,
@@ -240,6 +250,7 @@ def build_claim_dashboard(
         training,
         rgb_aux_dnn,
         rgb_aux_dnn_sweep_data,
+        dense_input_ablation,
         task,
         task_gate_data,
         protocol,
@@ -269,6 +280,7 @@ def build_claim_dashboard(
         "training": training,
         "rgb_aux_dnn_gate": rgb_aux_dnn,
         "rgb_aux_dnn_sweep": rgb_aux_dnn_sweep_data,
+        "dense_input_ablation_gate": dense_input_ablation,
         "task_metrics": task,
         "task_gate": task_gate_data,
         "protocol_coverage": protocol,
@@ -434,6 +446,36 @@ def _load_rgb_aux_dnn_sweep(path: str | Path) -> Dict[str, Any]:
             if isinstance(data.get("lowest_fp_positive_recall_delta_row"), Mapping)
             else None
         ),
+        "interpretation": str(data.get("interpretation", "")),
+        "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_dense_input_ablation_gate(path: str | Path) -> Dict[str, Any]:
+    summary_path = _summary_path(path, DENSE_INPUT_ABLATION_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed_required = [
+        str(row.get("id", ""))
+        for row in checks
+        if bool(row.get("required")) and str(row.get("status", "")) != "pass"
+    ]
+    mean_by_mode = data.get("mean_by_mode", {}) if isinstance(data.get("mean_by_mode"), Mapping) else {}
+    deltas = data.get("deltas_vs_none", {}) if isinstance(data.get("deltas_vs_none"), Mapping) else {}
+    return {
+        "name": _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": str(data.get("status", "")) == "pass" and not failed_required,
+        "claim_status": str(data.get("claim_status", "")),
+        "seed_count": int(data.get("seed_count", 0)),
+        "test_sample_count": int(data.get("test_sample_count", 0)),
+        "modes": [str(value) for value in data.get("modes", ())],
+        "mean_by_mode": {str(key): dict(value) for key, value in mean_by_mode.items() if isinstance(value, Mapping)},
+        "deltas_vs_none": {str(key): dict(value) for key, value in deltas.items() if isinstance(value, Mapping)},
+        "checks": checks,
+        "failed_required_checks": failed_required,
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
     }
@@ -1702,6 +1744,7 @@ def _build_evidence_map(
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
     rgb_aux_dnn_sweep: Mapping[str, Any] | None,
+    dense_input_ablation_gate: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
@@ -2119,6 +2162,24 @@ def _build_evidence_map(
                     )
                 ),
                 "next_evidence": "Improve detector calibration/training so one threshold preserves recall while meeting precision and FP budgets.",
+            }
+        )
+
+    if dense_input_ablation_gate is not None:
+        passed = bool(dense_input_ablation_gate.get("pass"))
+        current.append(
+            {
+                "area": "RGB+Aux DNN input-ablation gate",
+                "status": "supported" if passed else "not_supported",
+                "claim_strength": str(dense_input_ablation_gate.get("claim_status", "")),
+                "evidence": _dense_input_ablation_evidence(dense_input_ablation_gate),
+                "claim_boundary": (
+                    "Compact dense-DNN input-dependence evidence only; it proves the trained model uses Aux channels under this split, "
+                    "not production detector superiority."
+                    if passed
+                    else "Do not claim the trained DNN uses Aux evidence until input-ablation required checks pass."
+                ),
+                "next_evidence": "Repeat this gate on larger/adverse native RAW splits and with a stronger production detector.",
             }
         )
 
@@ -2698,6 +2759,28 @@ def _rgb_aux_dnn_sweep_evidence_row(label: str, row: Mapping[str, Any]) -> str:
     )
 
 
+def _dense_input_ablation_evidence(gate: Mapping[str, Any]) -> str:
+    means = gate.get("mean_by_mode", {}) if isinstance(gate.get("mean_by_mode"), Mapping) else {}
+    full = means.get("none", {}) if isinstance(means.get("none"), Mapping) else {}
+    zero_aux = means.get("zero_aux", {}) if isinstance(means.get("zero_aux"), Mapping) else {}
+    zero_rgb = means.get("zero_rgb", {}) if isinstance(means.get("zero_rgb"), Mapping) else {}
+    deltas = gate.get("deltas_vs_none", {}) if isinstance(gate.get("deltas_vs_none"), Mapping) else {}
+    zero_aux_delta = deltas.get("zero_aux", {}) if isinstance(deltas.get("zero_aux"), Mapping) else {}
+    zero_rgb_delta = deltas.get("zero_rgb", {}) if isinstance(deltas.get("zero_rgb"), Mapping) else {}
+    failed = ", ".join(str(value) for value in gate.get("failed_required_checks", ())) or "none"
+    return (
+        f"claim={gate.get('claim_status', '')}; seeds={int(gate.get('seed_count', 0))}; "
+        f"testSamples={int(gate.get('test_sample_count', 0))}; "
+        f"full P/R/FP={_fmt(full.get('precision'))}/{_fmt(full.get('recall'))}/{_fmt(full.get('fp'))}; "
+        f"zeroAux P/R/FP={_fmt(zero_aux.get('precision'))}/{_fmt(zero_aux.get('recall'))}/{_fmt(zero_aux.get('fp'))}; "
+        f"zeroAux dP={_fmt(zero_aux_delta.get('precision'), signed=True)}, "
+        f"dR={_fmt(zero_aux_delta.get('recall'), signed=True)}, "
+        f"dFP={_fmt(zero_aux_delta.get('fp'), signed=True)}; "
+        f"zeroRGB R={_fmt(zero_rgb.get('recall'))}, dR={_fmt(zero_rgb_delta.get('recall'), signed=True)}; "
+        f"failedRequired={failed}"
+    )
+
+
 def _future_evidence_rows(
     *,
     scene_edge_confidence: Mapping[str, Any] | None,
@@ -2909,6 +2992,7 @@ def _claim_decisions(
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
     rgb_aux_dnn_sweep: Mapping[str, Any] | None,
+    dense_input_ablation_gate: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
     protocol_coverage: Mapping[str, Any] | None,
@@ -3008,6 +3092,25 @@ def _claim_decisions(
                 {
                     "status": "not_supported",
                     "claim": "RGB+Aux DNN confidence sweep found no claim-ready operating point; threshold tuning alone does not support learned RGB+Aux detector improvement.",
+                }
+            )
+    if dense_input_ablation_gate is not None:
+        if bool(dense_input_ablation_gate.get("pass")):
+            decisions.append(
+                {
+                    "status": "supported",
+                    "claim": (
+                        "RGB+Aux dense DNN input-ablation gate passed; the compact trained detector depends on Aux channels "
+                        "at the selected operating point."
+                    ),
+                }
+            )
+        else:
+            failed = ", ".join(str(value) for value in dense_input_ablation_gate.get("failed_required_checks", ())) or "configured input-ablation checks"
+            decisions.append(
+                {
+                    "status": "not_supported",
+                    "claim": f"RGB+Aux dense DNN input-ablation gate failed for {failed}; do not claim the trained detector uses Aux evidence yet.",
                 }
             )
     if mechanism_validation is not None:
@@ -3614,6 +3717,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(rgb_aux_dnn_sweep, Mapping)
         else "<p>No RGB+Aux DNN confidence sweep summary was provided.</p>"
     )
+    dense_input_ablation = dashboard.get("dense_input_ablation_gate")
+    dense_input_ablation_html = (
+        _dense_input_ablation_html(dense_input_ablation, destination)
+        if isinstance(dense_input_ablation, Mapping)
+        else "<p>No dense RGB+Aux DNN input-ablation gate summary was provided.</p>"
+    )
     aux_contribution = dashboard.get("aux_contribution_audit")
     aux_contribution_html = _aux_contribution_html(aux_contribution, destination) if isinstance(aux_contribution, Mapping) else "<p>No aux contribution audit was provided.</p>"
     adverse_native = dashboard.get("adverse_native_slice")
@@ -3749,6 +3858,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {rgb_aux_dnn_gate_html}
   <h2>RGB+Aux DNN Confidence Sweep</h2>
   {rgb_aux_dnn_sweep_html}
+  <h2>RGB+Aux DNN Input Ablation Gate</h2>
+  {dense_input_ablation_html}
   <h2>Aux Contribution Audit</h2>
   {aux_contribution_html}
   <h2>Adverse Native RAW Slice</h2>
@@ -4040,6 +4151,102 @@ def _rgb_aux_dnn_sweep_metric_group(row: Mapping[str, Any]) -> str:
         f"{_fmt(row.get('recall@0.50_mean'))} / "
         f"{_fmt(row.get('small_recall@0.50_mean'))} / "
         f"{_fmt(row.get('fp@0.50_mean'))}"
+    )
+
+
+def _dense_input_ablation_html(gate: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(gate.get("pass")) else "not_supported"
+    failed = ", ".join(str(value) for value in gate.get("failed_required_checks", ())) or "none"
+    means = gate.get("mean_by_mode", {}) if isinstance(gate.get("mean_by_mode"), Mapping) else {}
+    deltas = gate.get("deltas_vs_none", {}) if isinstance(gate.get("deltas_vs_none"), Mapping) else {}
+    modes = [str(value) for value in gate.get("modes", ())] or list(means.keys())
+    mode_rows = "".join(
+        _dense_input_ablation_mode_row(mode, means.get(mode, {}) if isinstance(means.get(mode), Mapping) else {})
+        for mode in modes
+    )
+    if not mode_rows:
+        mode_rows = '<tr><td colspan="6">No input-ablation mode metrics were available.</td></tr>'
+    delta_rows = "".join(
+        _dense_input_ablation_delta_row(mode, deltas.get(mode, {}) if isinstance(deltas.get(mode), Mapping) else {})
+        for mode in modes
+        if mode != "none"
+    )
+    if not delta_rows:
+        delta_rows = '<tr><td colspan="6">No input-ablation deltas were available.</td></tr>'
+    check_rows = "".join(
+        _dense_input_ablation_check_row(row)
+        for row in gate.get("checks", ())
+        if isinstance(row, Mapping)
+    )
+    if not check_rows:
+        check_rows = '<tr><td colspan="5">No input-ablation checks were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(gate.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(gate.get('claim_status', '')))}</code>; "
+        f"failed required: <code>{html_lib.escape(failed)}</code>. "
+        f"{html_lib.escape(str(gate.get('interpretation', '')))} "
+        f"{html_lib.escape(str(gate.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Seeds</th><th>Test Samples</th><th>Modes</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(gate, destination)}</td>"
+        f"<td>{int(gate.get('seed_count', 0))}</td>"
+        f"<td>{int(gate.get('test_sample_count', 0))}</td>"
+        f"<td>{html_lib.escape(', '.join(modes))}</td>"
+        "</tr></tbody></table>"
+        "<table><thead><tr><th>Mode</th><th>Precision</th><th>Recall</th><th>Small Recall</th><th>FP/Sample</th><th>Det/Sample</th></tr></thead>"
+        f"<tbody>{mode_rows}</tbody></table>"
+        "<table><thead><tr><th>Ablation vs Full</th><th>dPrecision</th><th>dRecall</th><th>dSmall Recall</th><th>dFP/Sample</th><th>dDet/Sample</th></tr></thead>"
+        f"<tbody>{delta_rows}</tbody></table>"
+        "<table><thead><tr><th>Check</th><th>Required</th><th>Status</th><th>Description</th><th>Criteria</th></tr></thead>"
+        f"<tbody>{check_rows}</tbody></table>"
+    )
+
+
+def _dense_input_ablation_mode_row(mode: str, row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(mode))}</code></td>"
+        f"<td>{_fmt(row.get('precision'))}</td>"
+        f"<td>{_fmt(row.get('recall'))}</td>"
+        f"<td>{_fmt(row.get('small_recall'))}</td>"
+        f"<td>{_fmt(row.get('fp'))}</td>"
+        f"<td>{_fmt(row.get('det_count'))}</td>"
+        "</tr>"
+    )
+
+
+def _dense_input_ablation_delta_row(mode: str, row: Mapping[str, Any]) -> str:
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(mode))}</code></td>"
+        f"<td>{_fmt(row.get('precision'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('recall'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('small_recall'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('fp'), signed=True)}</td>"
+        f"<td>{_fmt(row.get('det_count'), signed=True)}</td>"
+        "</tr>"
+    )
+
+
+def _dense_input_ablation_check_row(row: Mapping[str, Any]) -> str:
+    status = str(row.get("status", ""))
+    criteria = []
+    for criterion in row.get("criteria", ()):
+        if not isinstance(criterion, Mapping):
+            continue
+        metric = str(criterion.get("metric", ""))
+        value = _fmt(criterion.get("value"))
+        threshold = criterion.get("threshold")
+        suffix = f" >= {_fmt(threshold)}" if threshold is not None else ""
+        pass_text = "pass" if bool(criterion.get("pass", True)) else "fail"
+        criteria.append(f"{metric}: {value}{suffix} ({pass_text})")
+    return (
+        "<tr>"
+        f"<td><code>{html_lib.escape(str(row.get('id', '')))}</code></td>"
+        f"<td>{html_lib.escape(str(bool(row.get('required'))))}</td>"
+        f"<td class=\"{'supported' if status == 'pass' else 'not_supported'}\">{html_lib.escape(status)}</td>"
+        f"<td>{html_lib.escape(str(row.get('description', '')))}</td>"
+        f"<td>{html_lib.escape('; '.join(criteria) or 'none')}</td>"
+        "</tr>"
     )
 
 

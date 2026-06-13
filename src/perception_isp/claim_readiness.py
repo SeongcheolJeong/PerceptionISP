@@ -38,6 +38,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-rollup", default=None, help="Existing training rollup summary path/dir. Ignored when --training-summary is used.")
     parser.add_argument("--rgb-aux-dnn-gate", default=None, help="Existing RGB+Aux versus RGB-only DNN gate summary path/dir.")
     parser.add_argument("--rgb-aux-dnn-sweep", default=None, help="Existing RGB+Aux versus RGB-only DNN confidence sweep summary path/dir.")
+    parser.add_argument("--dense-input-ablation-gate", default=None, help="Existing dense RGB+Aux DNN input-ablation gate summary path/dir.")
     parser.add_argument("--comparison-rollup", action="append", default=[], help="Existing comparison rollup path/dir, optionally name=path.")
     parser.add_argument("--protocol-comparison-report", action="append", default=[], help="Additional comparison report used only for benchmark-protocol coverage, for example a naive RAW baseline.")
     parser.add_argument("--mechanism-validation", default=None, help="Mechanism validation summary path/dir used for RAW/sensor-native claim coverage.")
@@ -75,6 +76,7 @@ def main(argv: Any = None) -> int:
         training_rollup=args.training_rollup,
         rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
         rgb_aux_dnn_sweep=args.rgb_aux_dnn_sweep,
+        dense_input_ablation_gate=args.dense_input_ablation_gate,
         comparison_rollups=args.comparison_rollup,
         protocol_comparison_reports=args.protocol_comparison_report,
         mechanism_validation=args.mechanism_validation,
@@ -116,6 +118,7 @@ def run_claim_readiness(
     training_rollup: str | Path | None = None,
     rgb_aux_dnn_gate: str | Path | None = None,
     rgb_aux_dnn_sweep: str | Path | None = None,
+    dense_input_ablation_gate: str | Path | None = None,
     comparison_rollups: Sequence[str | Path] = (),
     protocol_comparison_reports: Sequence[str | Path] = (),
     mechanism_validation: str | Path | None = None,
@@ -262,6 +265,7 @@ def run_claim_readiness(
         training_rollup=training_rollup_path,
         rgb_aux_dnn_gate=rgb_aux_dnn_gate,
         rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
+        dense_input_ablation_gate=dense_input_ablation_gate,
         task_metrics=task_metrics_dir,
         task_gate=task_gate_dir,
         protocol_coverage=protocol_dir,
@@ -316,6 +320,7 @@ def run_claim_readiness(
         "training_rollup": "" if training_rollup_path is None else str(training_rollup_path),
         "rgb_aux_dnn_gate": _rgb_aux_dnn_gate_summary(rgb_aux_dnn_gate),
         "rgb_aux_dnn_sweep": _rgb_aux_dnn_sweep_summary(rgb_aux_dnn_sweep),
+        "dense_input_ablation_gate": _dense_input_ablation_gate_summary(dense_input_ablation_gate),
         "task_metrics": {
             "report": str(task_html),
             "summary_json": str(task_html.parent / "task_metrics_summary.json"),
@@ -822,6 +827,46 @@ def _rgb_aux_dnn_sweep_summary(path: str | Path | None) -> Dict[str, Any]:
     }
 
 
+def _dense_input_ablation_gate_summary(path: str | Path | None) -> Dict[str, Any]:
+    if path is None:
+        return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
+    candidate = Path(path).expanduser()
+    if candidate.is_dir():
+        candidate = candidate / "dense_input_ablation_summary.json"
+    if not candidate.exists():
+        raise FileNotFoundError(f"dense input-ablation gate summary not found: {candidate}")
+    data = json.loads(candidate.read_text())
+    html_path = candidate.with_name("index.html")
+    checks = [row for row in data.get("checks", ()) if isinstance(row, Mapping)]
+    failed_required = [
+        row.get("id")
+        for row in checks
+        if bool(row.get("required")) and str(row.get("status", "")) != "pass"
+    ]
+    means = data.get("mean_by_mode", {}) if isinstance(data.get("mean_by_mode"), Mapping) else {}
+    deltas = data.get("deltas_vs_none", {}) if isinstance(data.get("deltas_vs_none"), Mapping) else {}
+    full = means.get("none", {}) if isinstance(means.get("none"), Mapping) else {}
+    zero_aux_delta = deltas.get("zero_aux", {}) if isinstance(deltas.get("zero_aux"), Mapping) else {}
+    zero_rgb_delta = deltas.get("zero_rgb", {}) if isinstance(deltas.get("zero_rgb"), Mapping) else {}
+    return {
+        "report": str(html_path) if html_path.exists() else "",
+        "summary_json": str(candidate),
+        "pass": str(data.get("status", "")) == "pass" and not failed_required,
+        "status": data.get("status"),
+        "claim_status": data.get("claim_status"),
+        "seed_count": int(data.get("seed_count", 0)),
+        "test_sample_count": int(data.get("test_sample_count", 0)),
+        "failed_required_checks": failed_required,
+        "full_precision": _optional_float(full.get("precision")),
+        "full_recall": _optional_float(full.get("recall")),
+        "full_fp": _optional_float(full.get("fp")),
+        "zero_aux_delta_recall": _optional_float(zero_aux_delta.get("recall")),
+        "zero_aux_delta_precision": _optional_float(zero_aux_delta.get("precision")),
+        "zero_aux_delta_fp": _optional_float(zero_aux_delta.get("fp")),
+        "zero_rgb_delta_recall": _optional_float(zero_rgb_delta.get("recall")),
+    }
+
+
 def _adverse_native_slice_summary(path: str | Path | None) -> Dict[str, Any]:
     if path is None:
         return {"report": "", "summary_json": "", "pass": False, "status": "missing"}
@@ -1109,6 +1154,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "aux_contribution_audit": summary.get("aux_contribution_audit"),
         "rgb_aux_dnn_gate": summary.get("rgb_aux_dnn_gate"),
         "rgb_aux_dnn_sweep": summary.get("rgb_aux_dnn_sweep"),
+        "dense_input_ablation_gate": summary.get("dense_input_ablation_gate"),
         "adverse_native_slice": summary.get("adverse_native_slice"),
         "adverse_task_slice": summary.get("adverse_task_slice"),
         "cfa_lenspsf_detector_sweep": summary.get("cfa_lenspsf_detector_sweep"),
