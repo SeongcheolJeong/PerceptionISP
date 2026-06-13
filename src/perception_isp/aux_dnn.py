@@ -337,7 +337,7 @@ def make_aux_dense_detector_model(
     import torch.nn as nn
 
     normalized_architecture = str(architecture or "early_fusion").lower().replace("-", "_")
-    if normalized_architecture not in {"early_fusion", "late_fusion"}:
+    if normalized_architecture not in {"early_fusion", "early_fusion_multiscale", "late_fusion"}:
         raise ValueError(f"unsupported RGB+aux dense detector architecture: {architecture!r}")
 
     class RGBAuxDenseDetectorModel(nn.Module):
@@ -365,6 +365,48 @@ def make_aux_dense_detector_model(
 
         def forward(self, value: Any) -> Any:
             return self.head(self.features(value))
+
+    class RGBAuxMultiScaleDenseDetectorModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            channels = int(base_channels)
+            self.grid_size = (int(grid_size[0]), int(grid_size[1]))
+            self.num_classes = int(num_classes)
+            self.stem1 = nn.Sequential(
+                nn.Conv2d(int(in_channels), channels, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels),
+                nn.SiLU(inplace=True),
+            )
+            self.stem2 = nn.Sequential(
+                nn.Conv2d(channels, channels * 2, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 2),
+                nn.SiLU(inplace=True),
+            )
+            self.stem3 = nn.Sequential(
+                nn.Conv2d(channels * 2, channels * 4, kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 4),
+                nn.SiLU(inplace=True),
+                nn.Conv2d(channels * 4, channels * 4, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 4),
+                nn.SiLU(inplace=True),
+            )
+            self.mid_pool = nn.AdaptiveAvgPool2d(self.grid_size)
+            self.deep_pool = nn.AdaptiveAvgPool2d(self.grid_size)
+            self.fusion = nn.Sequential(
+                nn.Conv2d(channels * 6, channels * 4, kernel_size=3, stride=1, padding=1, bias=False),
+                nn.BatchNorm2d(channels * 4),
+                nn.SiLU(inplace=True),
+            )
+            self.head = nn.Conv2d(channels * 4, 5 + self.num_classes, kernel_size=1)
+
+        def forward(self, value: Any) -> Any:
+            import torch
+
+            low = self.stem1(value)
+            mid = self.stem2(low)
+            deep = self.stem3(mid)
+            fused = self.fusion(torch.cat((self.mid_pool(mid), self.deep_pool(deep)), dim=1))
+            return self.head(fused)
 
     class RGBLateAuxDenseDetectorModel(nn.Module):
         def __init__(self) -> None:
@@ -417,6 +459,8 @@ def make_aux_dense_detector_model(
 
     if int(num_classes) <= 0:
         raise ValueError("num_classes must be positive")
+    if normalized_architecture == "early_fusion_multiscale":
+        return RGBAuxMultiScaleDenseDetectorModel()
     if normalized_architecture == "late_fusion":
         return RGBLateAuxDenseDetectorModel()
     return RGBAuxDenseDetectorModel()

@@ -42,7 +42,12 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--batch-size", type=int, default=1, help="Number of samples per optimizer/eval step.")
     parser.add_argument("--grid", default="15x20", help="Detector grid as HxW.")
     parser.add_argument("--base-channels", type=int, default=24)
-    parser.add_argument("--model-architecture", default="early_fusion", choices=["early_fusion", "late_fusion"], help="Dense detector architecture.")
+    parser.add_argument(
+        "--model-architecture",
+        default="early_fusion",
+        choices=["early_fusion", "early_fusion_multiscale", "late_fusion"],
+        help="Dense detector architecture.",
+    )
     parser.add_argument("--box-encoding", default=DEFAULT_BOX_ENCODING, choices=BOX_ENCODINGS)
     parser.add_argument(
         "--positive-cell-radius",

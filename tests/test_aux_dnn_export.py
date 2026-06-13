@@ -594,6 +594,38 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("aggregate", direct)
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_multiscale_detector_trains_and_evaluates(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp, include_extended=False, include_preview=False, compress=False)
+            summary = train_dense(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                model_architecture="early_fusion_multiscale",
+                channel_mode="rgb_aux",
+                eval_fraction=0.34,
+                include_labels=("car", "person"),
+                output_dir=Path(tmp) / "dense_multiscale",
+            )
+            self.assertEqual(summary["model_architecture"], "early_fusion_multiscale")
+            detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
+            self.assertIsInstance(detector, RGBAuxTorchDenseDetector)
+            self.assertEqual(detector.model_architecture, "early_fusion_multiscale")
+            direct = evaluate_dense_manifest(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_multiscale_eval",
+            )
+            self.assertEqual(direct["checkpoint_summary"]["model_architecture"], "early_fusion_multiscale")
+            self.assertIn("aggregate", direct)
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_extended_dense_detector_trains_and_evaluates(self) -> None:
         samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
         with tempfile.TemporaryDirectory() as tmp:
