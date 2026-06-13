@@ -30,6 +30,8 @@ perception-isp-proposal-calibration = "perception_isp.proposal_calibration:main"
 perception-isp-apply-proposal-calibration = "perception_isp.proposal_calibration_apply:main"
 perception-isp-scene-edge-casebook = "perception_isp.scene_edge_casebook:main"
 perception-isp-scene-edge-aux-sweep = "perception_isp.scene_edge_aux_sweep:main"
+perception-isp-yolo-aux-dataset = "perception_isp.yolo_aux_dataset:main"
+perception-isp-yolo-aux-train = "perception_isp.yolo_aux_train:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
