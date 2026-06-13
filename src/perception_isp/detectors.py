@@ -24,6 +24,39 @@ class DetectorAdapter:
         raise NotImplementedError
 
 
+class LabelMapDetector(DetectorAdapter):
+    """Adapter that remaps detector output labels without changing boxes or scores."""
+
+    def __init__(self, detector: DetectorAdapter, label_map: Mapping[str, str]) -> None:
+        self.detector = detector
+        self.label_map = {str(key): str(value) for key, value in dict(label_map).items()}
+        self.name = getattr(detector, "name", "detector")
+        for attr in ("channels", "tensor_key", "input_channels", "channel_mode"):
+            if hasattr(detector, attr):
+                setattr(self, attr, getattr(detector, attr))
+
+    def detect(self, image: Any, *, input_name: str = "image") -> DetectorResult:
+        result = self.detector.detect(image, input_name=input_name)
+        if not self.label_map:
+            return result
+        detections = []
+        for detection in result.detections:
+            original = detection.box.label
+            mapped = self.label_map.get(original, original)
+            metadata = dict(detection.metadata)
+            if mapped != original:
+                metadata["original_label"] = original
+                metadata["label_mapped"] = True
+            detections.append(
+                Detection(
+                    BoundingBox(detection.box.xyxy, label=mapped),
+                    score=detection.score,
+                    metadata=metadata,
+                )
+            )
+        return DetectorResult(result.detector_name, result.input_name, tuple(detections), result.elapsed_ms)
+
+
 class NumpyRiskObjectDetector(DetectorAdapter):
     """Small connected-component detector for synthetic smoke tests.
 

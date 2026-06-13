@@ -21,7 +21,7 @@ from .camerae2e_bridge import (
 )
 from .cfa_lenspsf_detector_sweep import raw_condition_summary
 from .comparison import compare_dataset, write_comparison_report
-from .detectors import UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
+from .detectors import LabelMapDetector, UltralyticsYOLODetector, detector_from_name, rgb_aux_detector_from_checkpoint
 from .eval_cli import apply_psf_sigma_to_samples, parse_label_map, remap_sample_labels
 from .eval_types import EvaluationSample
 from .proposal_calibration import load_proposal_calibration_artifact, proposal_calibration_run_config
@@ -74,6 +74,14 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-detector", default="aux")
     parser.add_argument("--rgb-aux-detector-checkpoint", default=None)
     parser.add_argument("--rgb-aux-detector-confidence", type=float, default=None)
+    parser.add_argument("--rgb-aux-detector-nms-iou", type=float, default=None)
+    parser.add_argument("--rgb-aux-detector-max-detections", type=int, default=None)
+    parser.add_argument("--rgb-aux-detector-device", default="auto", choices=("auto", "cpu", "mps", "cuda"))
+    parser.add_argument(
+        "--rgb-aux-detector-label-map",
+        default=None,
+        help="Optional label map for RGB+Aux detector outputs, using the same syntax as --ground-truth-label-map.",
+    )
     parser.add_argument("--tone-mapping", default="detector_log")
     parser.add_argument("--denoise-strength", type=float, default=0.30)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=("edge_aware", "bilinear"))
@@ -87,6 +95,14 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-visuals", action="store_true")
     parser.add_argument("--no-fusion", action="store_true")
     parser.add_argument("--proposal-calibration-model", default=None)
+    parser.add_argument(
+        "--primary-input",
+        default=None,
+        help=(
+            "Input name used for aggregate adverse claim deltas. "
+            "Defaults to calibrated fusion when available, then fusion, then perception_rgb."
+        ),
+    )
     parser.add_argument("--progress-interval", type=int, default=0)
     parser.add_argument("--load-progress-interval", type=int, default=0)
     parser.add_argument("--raw-cache-dir", default=None, help="Cache for base dataset RAW samples.")
@@ -98,6 +114,7 @@ def main(argv: Any = None) -> int:
 
     conditions = parse_conditions(args.condition or DEFAULT_CONDITIONS)
     label_map = parse_label_map(args.ground_truth_label_map)
+    rgb_aux_detector_label_map = parse_label_map(args.rgb_aux_detector_label_map)
     config = PerceptionISPConfig(
         tone_mapping=str(args.tone_mapping),
         denoise_strength=float(args.denoise_strength),
@@ -120,10 +137,15 @@ def main(argv: Any = None) -> int:
         rgb_aux_detector_from_checkpoint(
             args.rgb_aux_detector_checkpoint,
             confidence=args.rgb_aux_detector_confidence,
+            nms_iou=args.rgb_aux_detector_nms_iou,
+            max_detections=args.rgb_aux_detector_max_detections,
+            device=str(args.rgb_aux_detector_device),
         )
         if args.rgb_aux_detector_checkpoint
         else None
     )
+    if rgb_aux_detector is not None and rgb_aux_detector_label_map:
+        rgb_aux_detector = LabelMapDetector(rgb_aux_detector, rgb_aux_detector_label_map)
     proposal_calibration_artifact = (
         load_proposal_calibration_artifact(args.proposal_calibration_model)
         if args.proposal_calibration_model
@@ -186,8 +208,10 @@ def main(argv: Any = None) -> int:
         runs=runs,
         conditions=conditions,
         label_map=label_map,
+        rgb_aux_detector_label_map=rgb_aux_detector_label_map,
         config=config,
         human_config=human_config,
+        primary_input=args.primary_input,
     )
     (destination / SUMMARY_FILENAME).write_text(json.dumps(json_ready(summary), indent=2) + "\n")
     (destination / "index.html").write_text(_render_html(summary, destination))
@@ -354,10 +378,19 @@ def build_adverse_summary(
     label_map: Mapping[str, str],
     config: PerceptionISPConfig,
     human_config: PerceptionISPConfig,
+    rgb_aux_detector_label_map: Mapping[str, str] | None = None,
+    primary_input: str | None = None,
 ) -> Dict[str, Any]:
     run_list = [dict(run) for run in runs]
-    aggregate = _aggregate_advantage(run_list)
-    checks = _checks(run_list, expected_run_count=len(conditions), aggregate=aggregate)
+    selected_primary_input = _normalize_primary_input(primary_input)
+    _validate_primary_input(run_list, selected_primary_input)
+    aggregate = _aggregate_advantage(run_list, primary_input=selected_primary_input)
+    checks = _checks(
+        run_list,
+        expected_run_count=len(conditions),
+        aggregate=aggregate,
+        primary_input=selected_primary_input,
+    )
     return {
         "name": "Adverse-condition native RAW detector slice",
         "status": "pass" if all(row["status"] in {"pass", "warning"} for row in checks) else "fail",
@@ -380,12 +413,14 @@ def build_adverse_summary(
         "condition_raw_cache_dir": args.condition_raw_cache_dir,
         "label_agnostic": not bool(args.label_aware),
         "ground_truth_label_map": dict(label_map),
+        "rgb_aux_detector_label_map": dict(rgb_aux_detector_label_map or {}),
         "proposal_calibration_model": getattr(args, "proposal_calibration_model", None),
+        "primary_input": selected_primary_input or "auto",
         "perception_config": _config_dict(config),
         "human_baseline_config": _config_dict(human_config),
         "aggregate": aggregate,
         "checks": checks,
-        "rankings": _rankings(run_list),
+        "rankings": _rankings(run_list, primary_input=selected_primary_input),
         "runs": run_list,
         "interpretation": (
             "This report applies simulated adverse scene conditions before CameraE2E native CFA RAW generation, "
@@ -514,8 +549,8 @@ def _load_base_samples(args: Any) -> Tuple[EvaluationSample, ...]:
     )
 
 
-def _aggregate_advantage(runs: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
-    rows = [_primary_delta_row(run) for run in runs]
+def _aggregate_advantage(runs: Sequence[Mapping[str, Any]], *, primary_input: str | None = None) -> Dict[str, Any]:
+    rows = [_primary_delta_row(run, primary_input=primary_input) for run in runs]
     rows = [row for row in rows if row]
     adverse_rows = [row for row in rows if str(row.get("condition", "")) != "nominal"]
     fp_wins = [row for row in adverse_rows if float(row.get("delta_fp@0.50", 0.0)) < 0.0]
@@ -540,8 +575,8 @@ def _aggregate_advantage(runs: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def _primary_delta_row(run: Mapping[str, Any]) -> Dict[str, Any]:
-    input_name = _primary_downstream_input(run)
+def _primary_delta_row(run: Mapping[str, Any], *, primary_input: str | None = None) -> Dict[str, Any]:
+    input_name = _primary_downstream_input(run, primary_input=primary_input)
     delta = run.get("delta_vs_human", {}).get(input_name)
     if not isinstance(delta, Mapping):
         return {}
@@ -561,10 +596,12 @@ def _checks(
     *,
     expected_run_count: int,
     aggregate: Mapping[str, Any],
+    primary_input: str | None = None,
 ) -> Tuple[Dict[str, Any], ...]:
     total_samples = sum(int(run.get("raw_condition_summary", {}).get("sample_count", 0)) for run in runs)
     true_native = sum(int(run.get("raw_condition_summary", {}).get("true_sensor_cfa_mosaic_count", 0)) for run in runs)
     remapped = sum(int(run.get("raw_condition_summary", {}).get("pattern_remapped_count", 0)) for run in runs)
+    primary_available = _primary_input_available_count(runs, primary_input)
     return (
         {
             "id": "condition_grid_complete",
@@ -580,6 +617,14 @@ def _checks(
             "id": "detector_metrics_available",
             "status": "pass" if all(run.get("metrics", {}).get("human_rgb") for run in runs) else "fail",
             "evidence": f"metric_runs={sum(1 for run in runs if run.get('metrics', {}).get('human_rgb'))}/{len(runs)}",
+        },
+        {
+            "id": "primary_input_metrics_available",
+            "status": "pass" if primary_available == len(runs) else "fail",
+            "evidence": (
+                f"primary_input={primary_input or 'auto'} "
+                f"metric_runs={primary_available}/{len(runs)}"
+            ),
         },
         {
             "id": "adverse_conditions_included",
@@ -605,10 +650,20 @@ def _claim_status(aggregate: Mapping[str, Any]) -> str:
     return "adverse_diagnostic_only"
 
 
-def _rankings(runs: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+def _rankings(runs: Sequence[Mapping[str, Any]], *, primary_input: str | None = None) -> Dict[str, Any]:
     return {
-        "primary_by_delta_fp@0.50": _rank_conditions(runs, "fp@0.50_mean", higher_is_better=False),
-        "primary_by_delta_recall@0.50": _rank_conditions(runs, "recall@0.50_mean", higher_is_better=True),
+        "primary_by_delta_fp@0.50": _rank_conditions(
+            runs,
+            "fp@0.50_mean",
+            input_name=primary_input,
+            higher_is_better=False,
+        ),
+        "primary_by_delta_recall@0.50": _rank_conditions(
+            runs,
+            "recall@0.50_mean",
+            input_name=primary_input,
+            higher_is_better=True,
+        ),
         "perception_rgb_by_delta_recall@0.50": _rank_conditions(runs, "recall@0.50_mean", input_name="perception_rgb", higher_is_better=True),
     }
 
@@ -668,10 +723,15 @@ def _run_config(
         "aux_detector": str(args.aux_detector),
         "rgb_aux_detector_checkpoint": args.rgb_aux_detector_checkpoint,
         "rgb_aux_detector_confidence": args.rgb_aux_detector_confidence,
+        "rgb_aux_detector_nms_iou": args.rgb_aux_detector_nms_iou,
+        "rgb_aux_detector_max_detections": args.rgb_aux_detector_max_detections,
+        "rgb_aux_detector_device": args.rgb_aux_detector_device,
+        "rgb_aux_detector_label_map": getattr(args, "rgb_aux_detector_label_map", None),
         "label_agnostic": not bool(args.label_aware),
         "visuals": not bool(args.no_visuals),
         "fusion": not bool(args.no_fusion),
         "proposal_calibration_model": getattr(args, "proposal_calibration_model", None),
+        "primary_input": getattr(args, "primary_input", None),
         "load_progress_interval": int(args.load_progress_interval),
         "raw_cache_dir": args.raw_cache_dir,
         "condition_raw_cache_dir": args.condition_raw_cache_dir,
@@ -714,14 +774,47 @@ def _deltas_vs_human(metrics: Mapping[str, Mapping[str, float]]) -> Dict[str, Di
     return deltas
 
 
-def _primary_downstream_input(run: Mapping[str, Any]) -> str:
+def _primary_downstream_input(run: Mapping[str, Any], *, primary_input: str | None = None) -> str:
     metrics = run.get("metrics", {})
+    if primary_input:
+        return str(primary_input)
     for name in _input_names(metrics):
         if name.startswith("perception_calibrated"):
             return name
     if "perception_fusion_rgb_aux" in metrics:
         return "perception_fusion_rgb_aux"
     return "perception_rgb"
+
+
+def _normalize_primary_input(value: str | None) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized or normalized.lower() in {"auto", "default"}:
+        return None
+    return normalized
+
+
+def _primary_input_available_count(runs: Sequence[Mapping[str, Any]], primary_input: str | None) -> int:
+    if primary_input:
+        return sum(1 for run in runs if isinstance(run.get("metrics"), Mapping) and primary_input in run.get("metrics", {}))
+    return sum(
+        1
+        for run in runs
+        if isinstance(run.get("delta_vs_human", {}).get(_primary_downstream_input(run)), Mapping)
+    )
+
+
+def _validate_primary_input(runs: Sequence[Mapping[str, Any]], primary_input: str | None) -> None:
+    if not primary_input:
+        return
+    missing = [
+        str(run.get("run_id", run.get("condition", index)))
+        for index, run in enumerate(runs)
+        if not isinstance(run.get("metrics"), Mapping) or primary_input not in run.get("metrics", {})
+    ]
+    if missing:
+        preview = ", ".join(missing[:6])
+        suffix = "" if len(missing) <= 6 else f", ... ({len(missing)} total)"
+        raise ValueError(f"primary input {primary_input!r} missing from condition metrics: {preview}{suffix}")
 
 
 def _input_names(aggregate: Mapping[str, Any]) -> Tuple[str, ...]:
@@ -800,6 +893,7 @@ def _render_html(summary: Mapping[str, Any], destination: Path) -> str:
   Dataset: <code>{html_lib.escape(str(summary.get('dataset', '')))}</code> / <code>{html_lib.escape(str(summary.get('split', '')))}</code>,
   samples/run={int(summary.get('count', 0))}, size={int(summary.get('width', 0))}x{int(summary.get('height', 0))},
   CFA=<code>{html_lib.escape(str(summary.get('cfa_pattern', '')))}</code>,
+  primary=<code>{html_lib.escape(str(summary.get('primary_input', 'auto')))}</code>,
   conditions=<code>{html_lib.escape(', '.join(str(value) for value in summary.get('conditions', ())))}</code>.</p>
   <h2>Aggregate Adverse Primary Delta</h2>
   <table><tbody>

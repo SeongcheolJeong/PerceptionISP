@@ -8,13 +8,23 @@ from io import StringIO
 import numpy as np
 
 from perception_isp.comparison import build_pipeline_images, compare_dataset, write_comparison_report
-from perception_isp.detectors import fuse_rgb_aux_results
+from perception_isp.detectors import DetectorAdapter, LabelMapDetector, fuse_rgb_aux_results
 from perception_isp.eval_types import BoundingBox, Detection, DetectorResult
 from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
 from perception_isp.types import PerceptionISPConfig
 
 
 class ComparisonHarnessTest(unittest.TestCase):
+    def test_label_map_detector_remaps_output_labels(self) -> None:
+        detector = LabelMapDetector(_StaticDetector("pedestrian"), {"pedestrian": "person"})
+
+        result = detector.detect(np.zeros((4, 4, 3), dtype=np.float64), input_name="perception_rgb_aux_dnn")
+
+        self.assertEqual(result.input_name, "perception_rgb_aux_dnn")
+        self.assertEqual(result.detections[0].box.label, "person")
+        self.assertEqual(result.detections[0].metadata["original_label"], "pedestrian")
+        self.assertTrue(result.detections[0].metadata["label_mapped"])
+
     def test_synthetic_comparison_produces_default_input_metrics(self) -> None:
         samples = make_synthetic_evaluation_samples(count=1, width=96, height=64)
         result = compare_dataset(samples, fusion_options={"low_score_threshold": 0.50, "low_support_threshold": 0.10})
@@ -173,6 +183,21 @@ class ComparisonHarnessTest(unittest.TestCase):
             json_text = (html_path.parent / "comparison_summary.json").read_text()
             self.assertNotIn("_visuals", json_text)
             self.assertIn("visuals", json_text)
+
+
+class _StaticDetector(DetectorAdapter):
+    name = "static"
+
+    def __init__(self, label: str) -> None:
+        self.label = label
+
+    def detect(self, image, *, input_name: str = "image") -> DetectorResult:
+        return DetectorResult(
+            self.name,
+            input_name,
+            (Detection(BoundingBox((0.0, 0.0, 2.0, 2.0), label=self.label), score=0.5),),
+            1.0,
+        )
 
 
 if __name__ == "__main__":

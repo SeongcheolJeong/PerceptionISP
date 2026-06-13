@@ -92,6 +92,72 @@ class AdverseNativeSliceTest(unittest.TestCase):
         self.assertEqual(summary["checks"][1]["status"], "pass")
         self.assertEqual(summary["ground_truth_label_map"]["pedestrian"], "person")
 
+    def test_build_summary_uses_explicit_dnn_primary_input(self) -> None:
+        args = _args()
+        runs = [
+            summarize_condition_run(
+                _comparison_result(
+                    condition="nominal",
+                    human_fp=1.0,
+                    primary_fp=0.9,
+                    primary_recall=0.40,
+                    dnn_fp=0.8,
+                    dnn_recall=0.41,
+                ),
+                Path("001_condition-nominal/index.html"),
+            ),
+            summarize_condition_run(
+                _comparison_result(
+                    condition="fog",
+                    human_fp=1.0,
+                    primary_fp=1.3,
+                    primary_recall=0.42,
+                    dnn_fp=0.7,
+                    dnn_recall=0.40,
+                ),
+                Path("002_condition-fog/index.html"),
+            ),
+        ]
+
+        summary = build_adverse_summary(
+            args=args,
+            runs=runs,
+            conditions=("nominal", "fog"),
+            label_map={},
+            config=PerceptionISPConfig(),
+            human_config=PerceptionISPConfig(),
+            primary_input="perception_rgb_aux_dnn",
+        )
+
+        self.assertEqual(summary["primary_input"], "perception_rgb_aux_dnn")
+        self.assertEqual(summary["aggregate"]["primary_rows"][0]["input"], "perception_rgb_aux_dnn")
+        self.assertEqual(summary["aggregate"]["adverse_fp_win_count"], 1)
+        self.assertEqual(summary["claim_status"], "adverse_fp_reducer_supported")
+        self.assertEqual(
+            [row for row in summary["checks"] if row["id"] == "primary_input_metrics_available"][0]["status"],
+            "pass",
+        )
+
+    def test_explicit_primary_input_must_exist(self) -> None:
+        args = _args()
+        runs = [
+            summarize_condition_run(
+                _comparison_result(condition="nominal", human_fp=1.0, primary_fp=0.9, primary_recall=0.40),
+                Path("001_condition-nominal/index.html"),
+            ),
+        ]
+
+        with self.assertRaisesRegex(ValueError, "primary input"):
+            build_adverse_summary(
+                args=args,
+                runs=runs,
+                conditions=("nominal",),
+                label_map={},
+                config=PerceptionISPConfig(),
+                human_config=PerceptionISPConfig(),
+                primary_input="perception_rgb_aux_dnn",
+            )
+
     def test_summary_filename_is_stable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / SUMMARY_FILENAME
@@ -141,7 +207,39 @@ def _args() -> Namespace:
     )
 
 
-def _comparison_result(*, condition: str, human_fp: float, primary_fp: float, primary_recall: float) -> dict:
+def _comparison_result(
+    *,
+    condition: str,
+    human_fp: float,
+    primary_fp: float,
+    primary_recall: float,
+    dnn_fp: float | None = None,
+    dnn_recall: float | None = None,
+) -> dict:
+    aggregate = {
+        "human_rgb": {
+            "precision@0.50_mean": 0.50,
+            "recall@0.50_mean": 0.40,
+            "small_recall@0.50_mean": 0.20,
+            "fp@0.50_mean": human_fp,
+            "det_count_mean": 2.0,
+        },
+        "perception_calibrated_score_label_aux_fusion_rgb_aux": {
+            "precision@0.50_mean": 0.55,
+            "recall@0.50_mean": primary_recall,
+            "small_recall@0.50_mean": 0.20,
+            "fp@0.50_mean": primary_fp,
+            "det_count_mean": 1.7,
+        },
+    }
+    if dnn_fp is not None and dnn_recall is not None:
+        aggregate["perception_rgb_aux_dnn"] = {
+            "precision@0.50_mean": 0.57,
+            "recall@0.50_mean": float(dnn_recall),
+            "small_recall@0.50_mean": 0.21,
+            "fp@0.50_mean": float(dnn_fp),
+            "det_count_mean": 1.6,
+        }
     return {
         "sample_count": 2,
         "run_config": {
@@ -150,22 +248,7 @@ def _comparison_result(*, condition: str, human_fp: float, primary_fp: float, pr
             "adverse_condition": condition,
             "count": 2,
         },
-        "aggregate": {
-            "human_rgb": {
-                "precision@0.50_mean": 0.50,
-                "recall@0.50_mean": 0.40,
-                "small_recall@0.50_mean": 0.20,
-                "fp@0.50_mean": human_fp,
-                "det_count_mean": 2.0,
-            },
-            "perception_calibrated_score_label_aux_fusion_rgb_aux": {
-                "precision@0.50_mean": 0.55,
-                "recall@0.50_mean": primary_recall,
-                "small_recall@0.50_mean": 0.20,
-                "fp@0.50_mean": primary_fp,
-                "det_count_mean": 1.7,
-            },
-        },
+        "aggregate": aggregate,
         "samples": [
             _sample_summary(condition),
             _sample_summary(condition),
