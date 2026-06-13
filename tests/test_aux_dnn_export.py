@@ -23,7 +23,7 @@ from perception_isp.aux_dnn import (
     make_aux_early_fusion_stem,
     make_torch_dataset,
 )
-from perception_isp.aux_eval_dense import evaluate_dense_manifest
+from perception_isp.aux_eval_dense import _apply_input_ablation, _shuffle_indices, evaluate_dense_manifest
 from perception_isp.aux_export import _load_samples, export_aux_dataset, main as aux_export_main
 from perception_isp.aux_train_dense import train_dense
 from perception_isp.aux_train_smoke import train_smoke
@@ -72,6 +72,26 @@ class AuxDNNExportTest(unittest.TestCase):
         )
         self.assertTrue(np.all(extended_aux_only[:3] == 0.0))
         self.assertTrue(np.all(extended_aux_only[3:] == 1.0))
+
+    def test_dense_eval_input_ablation_transforms_expected_channels(self) -> None:
+        tensor = np.arange(2 * 3 * 6, dtype=np.float32).reshape(2, 3, 6)
+        source = tensor + 100.0
+
+        zero_aux = _apply_input_ablation(tensor, mode="zero_aux")
+        self.assertTrue(np.allclose(zero_aux[:, :, :3], tensor[:, :, :3]))
+        self.assertTrue(np.allclose(zero_aux[:, :, 3:], 0.0))
+
+        zero_rgb = _apply_input_ablation(tensor, mode="zero_rgb")
+        self.assertTrue(np.allclose(zero_rgb[:, :, :3], 0.0))
+        self.assertTrue(np.allclose(zero_rgb[:, :, 3:], tensor[:, :, 3:]))
+
+        shuffled_aux = _apply_input_ablation(tensor, mode="shuffle_aux", aux_source_tensor=source)
+        self.assertTrue(np.allclose(shuffled_aux[:, :, :3], tensor[:, :, :3]))
+        self.assertTrue(np.allclose(shuffled_aux[:, :, 3:], source[:, :, 3:]))
+
+        mapping = _shuffle_indices((1, 2, 3), seed=7)
+        self.assertEqual(set(mapping), {1, 2, 3})
+        self.assertEqual(set(mapping.values()), {1, 2, 3})
 
     def test_export_aux_dataset_writes_manifest_tensors_and_labels(self) -> None:
         samples = make_synthetic_evaluation_samples(count=2, width=64, height=48)
@@ -417,9 +437,22 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(direct["checkpoint_summary"]["channel_mode"], "aux_only")
             self.assertEqual(direct["checkpoint_summary"]["model_architecture"], "early_fusion")
             self.assertTrue(all(sample["gt_count"] == 2 for sample in direct["samples"]))
+            self.assertEqual(direct["input_ablation"], "none")
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
             self.assertTrue((Path(tmp) / "dense_eval" / "index.html").exists())
+            zero_aux = evaluate_dense_manifest(
+                manifest_path=manifest,
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                label_agnostic=False,
+                input_ablation="zero_aux",
+                output_dir=Path(tmp) / "dense_eval_zero_aux",
+            )
+            self.assertEqual(zero_aux["input_ablation"], "zero_aux")
+            self.assertTrue(all(sample["input_ablation"] == "zero_aux" for sample in zero_aux["samples"]))
+            self.assertTrue((Path(tmp) / "dense_eval_zero_aux" / "dense_eval_summary.json").exists())
             subset = evaluate_dense_manifest(
                 manifest_path=manifest,
                 checkpoint_path=summary["checkpoint"],

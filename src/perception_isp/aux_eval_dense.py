@@ -31,6 +31,13 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to evaluate; default uses checkpoint labels.")
     parser.add_argument("--indices-file", default=None, help="Optional JSON file containing explicit sample indices to evaluate.")
     parser.add_argument("--indices-key", default=None, help="Key to read when --indices-file is a JSON object.")
+    parser.add_argument(
+        "--input-ablation",
+        default="none",
+        choices=["none", "zero_aux", "zero_rgb", "shuffle_aux"],
+        help="Optional inference-time input ablation for RGB+Aux contribution checks.",
+    )
+    parser.add_argument("--ablation-seed", type=int, default=0, help="Deterministic seed for shuffle_aux input ablation.")
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_dense_eval")
     args = parser.parse_args(argv)
 
@@ -45,6 +52,8 @@ def main(argv: Any = None) -> int:
         label_agnostic=not bool(args.label_aware),
         include_labels=parse_label_list(args.include_labels),
         indices=_load_indices_file(args.indices_file, args.indices_key),
+        input_ablation=str(args.input_ablation),
+        ablation_seed=int(args.ablation_seed),
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -63,6 +72,8 @@ def evaluate_dense_manifest(
     label_agnostic: bool = False,
     include_labels: Sequence[str] | None = None,
     indices: Sequence[int] | None = None,
+    input_ablation: str = "none",
+    ablation_seed: int = 0,
     output_dir: str | Path | None = None,
 ) -> Dict[str, Any]:
     import torch
@@ -80,6 +91,8 @@ def evaluate_dense_manifest(
         summary=checkpoint_summary if isinstance(checkpoint_summary, Mapping) else {},
     ) if indices is None else tuple(int(index) for index in indices)
     _validate_indices(selected_indices, sample_count=len(manifest))
+    ablation_mode = _normalize_input_ablation(input_ablation)
+    shuffle_indices = _shuffle_indices(selected_indices, seed=int(ablation_seed)) if ablation_mode == "shuffle_aux" else {}
     detector = rgb_aux_detector_from_checkpoint(
         str(checkpoint_path),
         confidence=confidence,
@@ -97,6 +110,17 @@ def evaluate_dense_manifest(
             if tensor_key not in payload:
                 raise KeyError(f"tensor payload does not contain {tensor_key!r}: {tensor_path}")
             tensor = np.asarray(payload[tensor_key], dtype=np.float32)
+        aux_source_tensor = None
+        aux_source_index = None
+        if ablation_mode == "shuffle_aux":
+            aux_source_index = int(shuffle_indices[int(index)])
+            aux_source_item = manifest[aux_source_index]
+            aux_source_path = manifest_root / str(aux_source_item["tensor_path"])
+            with np.load(aux_source_path) as payload:
+                if tensor_key not in payload:
+                    raise KeyError(f"tensor payload does not contain {tensor_key!r}: {aux_source_path}")
+                aux_source_tensor = np.asarray(payload[tensor_key], dtype=np.float32)
+        tensor = _apply_input_ablation(tensor, mode=ablation_mode, aux_source_tensor=aux_source_tensor)
         ground_truth = _filter_boxes(_read_boxes(label_path), eval_labels)
         result = detector.detect(tensor, input_name="perception_rgb_aux_dnn")
         detections = _filter_boxes(result.detections, eval_labels)
@@ -113,6 +137,8 @@ def evaluate_dense_manifest(
                 "tensor_path": str(item["tensor_path"]),
                 "label_path": str(item["label_path"]),
                 "gt_count": int(len(ground_truth)),
+                "input_ablation": ablation_mode,
+                "aux_source_index": aux_source_index,
                 "detector": {**result.to_dict(), "detections": [box.to_dict() for box in detections]},
                 "metrics": metrics,
             }
@@ -128,6 +154,8 @@ def evaluate_dense_manifest(
         "sample_count": int(len(sample_rows)),
         "selected_indices": [int(index) for index in selected_indices],
         "indices_override": indices is not None,
+        "input_ablation": ablation_mode,
+        "ablation_seed": int(ablation_seed),
         "detector_name": detector.name,
         "detector_config": {
             "confidence": None if confidence is None else float(confidence),
@@ -172,6 +200,63 @@ def _indices_for_split(split: str, *, sample_count: int, summary: Mapping[str, A
     return tuple(range(int(sample_count)))
 
 
+def _normalize_input_ablation(value: str | None) -> str:
+    normalized = str(value or "none").lower().replace("-", "_")
+    if normalized in {"none", "off", "identity"}:
+        return "none"
+    if normalized in {"zero_aux", "aux_zero", "no_aux"}:
+        return "zero_aux"
+    if normalized in {"zero_rgb", "rgb_zero", "no_rgb"}:
+        return "zero_rgb"
+    if normalized in {"shuffle_aux", "aux_shuffle", "shuffled_aux"}:
+        return "shuffle_aux"
+    raise ValueError(f"unsupported input_ablation: {value!r}")
+
+
+def _shuffle_indices(indices: Sequence[int], *, seed: int) -> Dict[int, int]:
+    values = [int(index) for index in indices]
+    if not values:
+        return {}
+    shuffled = list(values)
+    rng = np.random.default_rng(int(seed))
+    rng.shuffle(shuffled)
+    if len(values) > 1 and all(left == right for left, right in zip(values, shuffled)):
+        shuffled = shuffled[1:] + shuffled[:1]
+    return {int(index): int(source) for index, source in zip(values, shuffled)}
+
+
+def _apply_input_ablation(
+    tensor: np.ndarray,
+    *,
+    mode: str,
+    aux_source_tensor: np.ndarray | None = None,
+) -> np.ndarray:
+    arr = np.asarray(tensor, dtype=np.float32).copy()
+    if arr.ndim != 3:
+        raise ValueError("RGB+aux tensor must be HWC for dense eval")
+    if arr.shape[2] < 4 and mode in {"zero_aux", "shuffle_aux"}:
+        raise ValueError("RGB+aux tensor must have at least one aux channel")
+    if arr.shape[2] < 3 and mode == "zero_rgb":
+        raise ValueError("RGB+aux tensor must have at least three RGB channels")
+    if mode == "none":
+        return arr
+    if mode == "zero_aux":
+        arr[:, :, 3:] = 0.0
+        return arr
+    if mode == "zero_rgb":
+        arr[:, :, :3] = 0.0
+        return arr
+    if mode == "shuffle_aux":
+        if aux_source_tensor is None:
+            raise ValueError("shuffle_aux requires aux_source_tensor")
+        source = np.asarray(aux_source_tensor, dtype=np.float32)
+        if source.shape != arr.shape:
+            raise ValueError(f"shuffle_aux source shape {source.shape} does not match tensor shape {arr.shape}")
+        arr[:, :, 3:] = source[:, :, 3:]
+        return arr
+    raise ValueError(f"unsupported input ablation mode: {mode!r}")
+
+
 def _load_indices_file(path: str | Path | None, key: str | None = None) -> Tuple[int, ...] | None:
     if path is None:
         return None
@@ -204,6 +289,8 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "eval_labels": summary.get("eval_labels"),
         "sample_count": summary.get("sample_count"),
         "indices_override": summary.get("indices_override"),
+        "input_ablation": summary.get("input_ablation"),
+        "ablation_seed": summary.get("ablation_seed"),
         "detector_name": summary.get("detector_name"),
         "detector_config": summary.get("detector_config"),
         "elapsed_seconds": summary.get("elapsed_seconds"),
@@ -302,6 +389,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   <div class=\"note\">Direct tensor-manifest evaluation. CameraE2E and ISP are not recomputed in this report.</div>
   <p>Split: <code>{html_lib.escape(str(summary.get('split', '')))}</code>, samples: {int(summary.get('sample_count', 0))}, label agnostic: {bool(summary.get('label_agnostic', False))}.</p>
   <p>Channel mode: <code>{html_lib.escape(str(summary.get('checkpoint_summary', {}).get('channel_mode') or 'rgb_aux'))}</code>.</p>
+  <p>Input ablation: <code>{html_lib.escape(str(summary.get('input_ablation', 'none')))}</code>, seed: <code>{int(summary.get('ablation_seed', 0))}</code>.</p>
   <p>Eval labels: <code>{html_lib.escape(eval_labels or 'none')}</code>.</p>
   <p>Recall@0.50 mean: {float(aggregate.get('recall@0.50_mean', 0.0)):.3f}, precision@0.50 mean: {float(aggregate.get('precision@0.50_mean', 0.0)):.3f}, detections/sample: {float(aggregate.get('det_count_mean', 0.0)):.2f}.</p>
   <p>Missing eval classes from train: <code>{html_lib.escape(missing or 'none')}</code>.</p>
