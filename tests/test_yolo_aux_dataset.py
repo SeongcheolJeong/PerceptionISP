@@ -63,6 +63,38 @@ class YoloAuxDatasetTest(unittest.TestCase):
             arr = np.load(sorted((root / "images").rglob("*.npy"))[0])
             self.assertEqual(arr.shape, (24, 40, 3))
 
+    def test_exports_selected_rgb_aux_channels(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=40, height=24)
+        selected = (
+            "rgb_r",
+            "rgb_g",
+            "rgb_b",
+            "aux_edge_strength",
+            "aux_edge_evidence",
+            "aux_psf_edge_likelihood",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            export_root = Path(tmp) / "aux_export"
+            export_aux_dataset(samples, export_root, include_extended=True, include_preview=False, compress=False)
+
+            summary = export_yolo_aux_dataset(
+                manifest_path=export_root / "manifest.jsonl",
+                output_dir=Path(tmp) / "yolo_selected",
+                tensor_key="rgb_aux_extended_hwc",
+                channel_mode="rgb_aux",
+                selected_channels=selected,
+                include_labels=("car", "person"),
+                eval_fraction=0.34,
+            )
+
+            root = Path(summary["output_dir"])
+            self.assertEqual(summary["channels"], 6)
+            self.assertEqual(tuple(summary["selected_channels"]), selected)
+            self.assertEqual(tuple(summary["channel_names"]), selected)
+            self.assertIn("channels: 6", (root / "data.yaml").read_text())
+            arr = np.load(sorted((root / "images").rglob("*.npy"))[0])
+            self.assertEqual(arr.shape, (24, 40, 6))
+
     def test_drops_labels_outside_include_list(self) -> None:
         samples = make_synthetic_evaluation_samples(count=2, width=40, height=24)
         with tempfile.TemporaryDirectory() as tmp:

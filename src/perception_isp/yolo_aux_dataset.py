@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Mapping, Sequence, Tuple
 import numpy as np
 from PIL import Image
 
-from .aux_dnn import load_manifest, normalize_channel_mode
+from .aux_dnn import channels_for_tensor_key, load_manifest, normalize_channel_mode
 from .types import json_ready
 
 
@@ -21,6 +21,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--manifest", required=True, help="PerceptionISP aux_export manifest.jsonl.")
     parser.add_argument("--tensor-key", default="rgb_aux_extended_hwc", help="Tensor key inside each exported NPZ.")
     parser.add_argument("--channel-mode", default="rgb_aux", choices=["rgb_aux", "rgb_only", "aux_only"])
+    parser.add_argument("--select-channels", default=None, help="Comma-separated tensor channel names to keep, e.g. RGB plus selected aux maps.")
     parser.add_argument("--include-labels", default=None, help="Comma-separated labels to keep and class-order.")
     parser.add_argument("--count", type=int, default=None, help="Maximum manifest rows to export after offset.")
     parser.add_argument("--offset", type=int, default=0)
@@ -34,6 +35,7 @@ def main(argv: Any = None) -> int:
         output_dir=args.output_dir,
         tensor_key=str(args.tensor_key),
         channel_mode=str(args.channel_mode),
+        selected_channels=_parse_channel_list(args.select_channels),
         include_labels=_parse_label_list(args.include_labels),
         count=args.count,
         offset=int(args.offset),
@@ -50,6 +52,7 @@ def export_yolo_aux_dataset(
     *,
     tensor_key: str = "rgb_aux_extended_hwc",
     channel_mode: str = "rgb_aux",
+    selected_channels: Sequence[str] | None = None,
     include_labels: Sequence[str] | None = None,
     count: int | None = None,
     offset: int = 0,
@@ -89,6 +92,7 @@ def export_yolo_aux_dataset(
                     destination=destination,
                     tensor_key=tensor_key,
                     channel_mode=channel_mode,
+                    selected_channels=selected_channels,
                     label_to_id=label_to_id,
                 )
             )
@@ -101,6 +105,8 @@ def export_yolo_aux_dataset(
         "output_dir": str(destination),
         "tensor_key": str(tensor_key),
         "channel_mode": normalize_channel_mode(channel_mode),
+        "selected_channels": list(selected_channels or ()),
+        "channel_names": list(exported[0].get("channel_names", ())),
         "channels": channel_count,
         "class_names": list(label_order),
         "class_count": int(len(label_order)),
@@ -127,13 +133,14 @@ def _export_one(
     destination: Path,
     tensor_key: str,
     channel_mode: str,
+    selected_channels: Sequence[str] | None,
     label_to_id: Mapping[str, int],
 ) -> Dict[str, Any]:
     tensor_path = _resolve_manifest_path(manifest_file, row.get("tensor_path"))
     label_path = _resolve_manifest_path(manifest_file, row.get("label_path"))
     tensor_npz = np.load(tensor_path)
     tensor = _tensor_hwc(tensor_npz, tensor_key=tensor_key)
-    tensor = _select_channels(tensor, mode=channel_mode)
+    tensor, channel_names = _select_channels(tensor, mode=channel_mode, tensor_key=tensor_key, selected_channels=selected_channels)
     yolo_tensor = _to_uint8_hwc(tensor, channel_mode=channel_mode)
 
     stem = _safe_stem(str(row.get("sample_id", f"sample_{row_index:05d}")), row_index)
@@ -156,6 +163,7 @@ def _export_one(
         "npy": str(npy_path.relative_to(destination)),
         "label": str(yolo_label_path.relative_to(destination)),
         "channels": int(yolo_tensor.shape[2]),
+        "channel_names": list(channel_names),
         "height": int(yolo_tensor.shape[0]),
         "width": int(yolo_tensor.shape[1]),
         "kept_boxes": int(kept),
@@ -184,17 +192,35 @@ def _tensor_hwc(npz: Any, *, tensor_key: str) -> np.ndarray:
     return np.asarray(arr, dtype=np.float32)
 
 
-def _select_channels(tensor: np.ndarray, *, mode: str) -> np.ndarray:
+def _select_channels(
+    tensor: np.ndarray,
+    *,
+    mode: str,
+    tensor_key: str,
+    selected_channels: Sequence[str] | None = None,
+) -> Tuple[np.ndarray, Tuple[str, ...]]:
+    available_channels = channels_for_tensor_key(tensor_key)
+    if len(available_channels) != int(tensor.shape[2]):
+        available_channels = tuple(f"channel_{index}" for index in range(int(tensor.shape[2])))
+    requested_channels = tuple(str(value).strip() for value in (selected_channels or ()) if str(value).strip())
+    if requested_channels:
+        channel_to_index = {name: index for index, name in enumerate(available_channels)}
+        missing = tuple(name for name in requested_channels if name not in channel_to_index)
+        if missing:
+            raise ValueError(f"selected channels not present in {tensor_key!r}: {missing}")
+        indices = tuple(channel_to_index[name] for name in requested_channels)
+        return tensor[:, :, indices], requested_channels
+
     normalized = normalize_channel_mode(mode)
     if normalized == "rgb_only":
         if tensor.shape[2] < 3:
             raise ValueError("rgb_only export requires at least 3 tensor channels")
-        return tensor[:, :, :3]
+        return tensor[:, :, :3], tuple(available_channels[:3])
     if normalized == "aux_only":
         if tensor.shape[2] <= 3:
             raise ValueError("aux_only export requires aux channels after RGB")
-        return tensor[:, :, 3:]
-    return tensor
+        return tensor[:, :, 3:], tuple(available_channels[3:])
+    return tensor, available_channels
 
 
 def _to_uint8_hwc(tensor: np.ndarray, *, channel_mode: str) -> np.ndarray:
@@ -270,6 +296,13 @@ def _parse_label_list(value: str | None) -> Tuple[str, ...] | None:
         return None
     labels = tuple(item.strip() for item in str(value).split(",") if item.strip())
     return labels or None
+
+
+def _parse_channel_list(value: str | None) -> Tuple[str, ...] | None:
+    if value is None:
+        return None
+    channels = tuple(item.strip() for item in str(value).split(",") if item.strip())
+    return channels or None
 
 
 def _data_yaml(*, destination: Path, label_order: Sequence[str], channel_count: int) -> str:
