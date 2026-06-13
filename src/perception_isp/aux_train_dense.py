@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import random
 import time
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
@@ -48,6 +49,14 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--no-object-weight", type=float, default=0.15)
     parser.add_argument("--box-weight", type=float, default=5.0)
     parser.add_argument("--class-weight", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=None, help="Optional deterministic seed for dense training.")
+    parser.add_argument("--initial-checkpoint", default=None, help="Optional dense-detector checkpoint to warm-start from.")
+    parser.add_argument(
+        "--zero-aux-input-weights",
+        action="store_true",
+        help="After warm-start loading, zero the first early-fusion conv weights for aux channels so RGB-only behavior is preserved initially.",
+    )
+    parser.add_argument("--save-epoch-checkpoints", action="store_true", help="Save one dense-detector checkpoint per completed epoch.")
     parser.add_argument("--estimate-samples", default="100,1000,10000")
     parser.add_argument("--output-dir", default="exports/perception_rgb_aux_train_dense")
     args = parser.parse_args(argv)
@@ -68,6 +77,10 @@ def main(argv: Any = None) -> int:
         no_object_weight=float(args.no_object_weight),
         box_weight=float(args.box_weight),
         class_weight=float(args.class_weight),
+        seed=args.seed,
+        initial_checkpoint=args.initial_checkpoint,
+        zero_aux_input_weights=bool(args.zero_aux_input_weights),
+        save_epoch_checkpoints=bool(args.save_epoch_checkpoints),
         estimate_samples=parse_estimate_samples(args.estimate_samples),
         output_dir=args.output_dir,
     )
@@ -92,12 +105,17 @@ def train_dense(
     no_object_weight: float = 0.15,
     box_weight: float = 5.0,
     class_weight: float = 1.0,
+    seed: int | None = None,
+    initial_checkpoint: str | Path | None = None,
+    zero_aux_input_weights: bool = False,
+    save_epoch_checkpoints: bool = False,
     estimate_samples: Sequence[int] = (100, 1000, 10000),
     output_dir: str | Path | None = None,
 ) -> Dict[str, Any]:
     import torch
     import torch.nn.functional as F
 
+    seed_info = _set_training_seed(seed, torch)
     resolved_tensor_key = chw_tensor_key(tensor_key)
     channels = channels_for_tensor_key(resolved_tensor_key)
     dataset = make_torch_dataset(manifest_path, tensor_key=resolved_tensor_key)
@@ -120,6 +138,13 @@ def train_dense(
         in_channels=len(channels),
         architecture=str(model_architecture),
     ).to(device)
+    initialization = _apply_initial_checkpoint(
+        model,
+        initial_checkpoint,
+        torch,
+        input_channels=len(channels),
+        zero_aux_input_weights=bool(zero_aux_input_weights),
+    )
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(learning_rate), weight_decay=5.0e-4)
     history = []
     first_loss = None
@@ -129,6 +154,7 @@ def train_dense(
     best_epoch = -1
     best_loss = None
     best_loss_kind = "eval_loss" if eval_indices else "train_loss"
+    saved_epoch_states = []
     epoch_count = max(int(epochs), 1)
     start_time = time.perf_counter()
     initial_eval_loss = _evaluate_loss(
@@ -190,6 +216,15 @@ def train_dense(
                 "eval_loss": eval_mean,
             }
         )
+        if bool(save_epoch_checkpoints):
+            saved_epoch_states.append(
+                {
+                    "epoch": int(epoch),
+                    "train_loss": train_mean,
+                    "eval_loss": eval_mean,
+                    "model_state": _clone_state_dict_cpu(model),
+                }
+            )
         selected_loss = eval_mean if eval_mean is not None else train_mean
         if selected_loss is not None and (best_loss is None or float(selected_loss) < float(best_loss)):
             best_loss = float(selected_loss)
@@ -227,6 +262,13 @@ def train_dense(
         "object_loss_mode": "balanced_positive_negative",
         "box_weight": float(box_weight),
         "class_weight": float(class_weight),
+        "seed": None if seed is None else int(seed),
+        "seed_info": seed_info,
+        "initial_checkpoint": None if initial_checkpoint is None else str(initial_checkpoint),
+        "initialization": initialization,
+        "zero_aux_input_weights": bool(zero_aux_input_weights),
+        "save_epoch_checkpoints": bool(save_epoch_checkpoints),
+        "epoch_checkpoints": [],
         "first_loss": float(first_loss if first_loss is not None else 0.0),
         "last_loss": float(last_loss if last_loss is not None else 0.0),
         "initial_eval_loss": initial_eval_loss,
@@ -251,6 +293,7 @@ def train_dense(
         destination = Path(output_dir).expanduser()
         destination.mkdir(parents=True, exist_ok=True)
         final_state = _clone_state_dict_cpu(model)
+        epoch_checkpoint_rows = []
         checkpoint = {
             "model_type": "rgb_aux_dense_detector_v1",
             "model_state": best_state if best_state is not None else _clone_state_dict_cpu(model),
@@ -266,6 +309,28 @@ def train_dense(
             "box_encoding": BOX_ENCODING,
             "summary": summary,
         }
+        if bool(save_epoch_checkpoints):
+            epoch_dir = destination / "epoch_checkpoints"
+            epoch_dir.mkdir(parents=True, exist_ok=True)
+            for epoch_state in saved_epoch_states:
+                epoch = int(epoch_state["epoch"])
+                epoch_checkpoint = dict(checkpoint)
+                epoch_checkpoint["model_state"] = epoch_state["model_state"]
+                epoch_checkpoint["checkpoint_kind"] = "epoch"
+                epoch_checkpoint["epoch"] = epoch
+                epoch_checkpoint["train_loss"] = epoch_state["train_loss"]
+                epoch_checkpoint["eval_loss"] = epoch_state["eval_loss"]
+                epoch_path = epoch_dir / f"epoch_{epoch:03d}.pt"
+                torch.save(epoch_checkpoint, epoch_path)
+                epoch_checkpoint_rows.append(
+                    {
+                        "epoch": epoch,
+                        "checkpoint": str(epoch_path),
+                        "train_loss": epoch_state["train_loss"],
+                        "eval_loss": epoch_state["eval_loss"],
+                    }
+                )
+            summary["epoch_checkpoints"] = epoch_checkpoint_rows
         checkpoint_path = destination / "rgb_aux_dense_detector.pt"
         torch.save(checkpoint, checkpoint_path)
         summary["checkpoint"] = str(checkpoint_path)
@@ -486,6 +551,121 @@ def _evaluate_loss(
     if was_training:
         model.train()
     return float(sum(losses) / max(len(losses), 1))
+
+
+def _apply_initial_checkpoint(
+    model: Any,
+    checkpoint_path: str | Path | None,
+    torch: Any,
+    *,
+    input_channels: int,
+    zero_aux_input_weights: bool,
+) -> Dict[str, Any]:
+    if checkpoint_path is None:
+        return {
+            "loaded": False,
+            "checkpoint": None,
+            "zero_aux_input_weights": bool(zero_aux_input_weights),
+        }
+    path = Path(checkpoint_path).expanduser()
+    checkpoint = torch.load(str(path), map_location="cpu")
+    if not isinstance(checkpoint, Mapping):
+        raise ValueError(f"initial checkpoint must be a mapping: {path}")
+    state = checkpoint.get("model_state")
+    if state is None:
+        raise ValueError(f"initial checkpoint does not contain model_state: {path}")
+    model.load_state_dict(state, strict=True)
+    zero_result = None
+    if bool(zero_aux_input_weights):
+        zero_result = _zero_aux_input_channel_weights(
+            model,
+            torch,
+            input_channels=int(input_channels),
+            aux_start_channel=3,
+        )
+    return {
+        "loaded": True,
+        "checkpoint": str(path),
+        "checkpoint_channel_mode": checkpoint.get("channel_mode"),
+        "checkpoint_tensor_key": checkpoint.get("tensor_key"),
+        "checkpoint_model_architecture": checkpoint.get("model_architecture"),
+        "checkpoint_input_channels": checkpoint.get("input_channels"),
+        "zero_aux_input_weights": bool(zero_aux_input_weights),
+        "zero_aux_input_weight_result": zero_result,
+    }
+
+
+def _set_training_seed(seed: int | None, torch: Any) -> Dict[str, Any]:
+    if seed is None:
+        return {"set": False, "seed": None}
+    value = int(seed)
+    random.seed(value)
+    try:
+        import numpy as np
+
+        np.random.seed(value)
+        numpy_seeded = True
+    except Exception:
+        numpy_seeded = False
+    torch.manual_seed(value)
+    cuda_seeded = False
+    if hasattr(torch, "cuda") and callable(getattr(torch.cuda, "manual_seed_all", None)):
+        try:
+            torch.cuda.manual_seed_all(value)
+            cuda_seeded = True
+        except Exception:
+            cuda_seeded = False
+    return {
+        "set": True,
+        "seed": value,
+        "python_random": True,
+        "numpy": bool(numpy_seeded),
+        "torch": True,
+        "torch_cuda": bool(cuda_seeded),
+    }
+
+
+def _zero_aux_input_channel_weights(
+    model: Any,
+    torch: Any,
+    *,
+    input_channels: int,
+    aux_start_channel: int = 3,
+) -> Dict[str, Any]:
+    total_channels = int(input_channels)
+    start_channel = int(aux_start_channel)
+    if total_channels <= start_channel:
+        return {
+            "status": "skipped",
+            "reason": "input channel count does not include aux channels",
+            "input_channels": total_channels,
+            "aux_start_channel": start_channel,
+        }
+    for name, module in model.named_modules():
+        weight = getattr(module, "weight", None)
+        if weight is None or int(getattr(weight, "ndim", 0)) != 4:
+            continue
+        if int(weight.shape[1]) != total_channels:
+            continue
+        with torch.no_grad():
+            before_abs_sum = float(weight[:, start_channel:, :, :].detach().abs().sum().cpu())
+            weight[:, start_channel:, :, :].zero_()
+            after_abs_sum = float(weight[:, start_channel:, :, :].detach().abs().sum().cpu())
+        return {
+            "status": "zeroed",
+            "module": str(name),
+            "input_channels": total_channels,
+            "aux_start_channel": start_channel,
+            "zeroed_channel_count": int(total_channels - start_channel),
+            "abs_sum_before": before_abs_sum,
+            "abs_sum_after": after_abs_sum,
+        }
+    return {
+        "status": "not_found",
+        "reason": "no early-fusion convolution consumes the full input channel set",
+        "input_channels": total_channels,
+        "aux_start_channel": start_channel,
+    }
 
 
 def _clone_state_dict_cpu(model: Any) -> Dict[str, Any]:

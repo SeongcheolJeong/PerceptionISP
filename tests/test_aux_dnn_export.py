@@ -456,6 +456,56 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(summary["missing_eval_class_names"], [])
 
     @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_training_can_warm_start_from_rgb_only_checkpoint(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp, include_preview=False, compress=False)
+            manifest = Path(tmp) / "manifest.jsonl"
+            rgb_only = train_dense(
+                manifest_path=manifest,
+                tensor_key="rgb_aux_extended_chw",
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                channel_mode="rgb_only",
+                eval_fraction=0.34,
+                include_labels=("car", "person"),
+                seed=7,
+                output_dir=Path(tmp) / "rgb_only",
+            )
+            warm = train_dense(
+                manifest_path=manifest,
+                tensor_key="rgb_aux_extended_chw",
+                epochs=1,
+                device_name="cpu",
+                grid_size=(4, 6),
+                base_channels=8,
+                channel_mode="rgb_aux",
+                eval_fraction=0.34,
+                include_labels=("car", "person"),
+                seed=11,
+                initial_checkpoint=rgb_only["checkpoint"],
+                zero_aux_input_weights=True,
+                save_epoch_checkpoints=True,
+                output_dir=Path(tmp) / "warm",
+            )
+            self.assertEqual(warm["initial_checkpoint"], rgb_only["checkpoint"])
+            self.assertEqual(warm["seed"], 11)
+            self.assertTrue(warm["seed_info"]["set"])
+            self.assertTrue(warm["initialization"]["loaded"])
+            self.assertEqual(warm["initialization"]["checkpoint_channel_mode"], "rgb_only")
+            zero_result = warm["initialization"]["zero_aux_input_weight_result"]
+            self.assertEqual(zero_result["status"], "zeroed")
+            self.assertEqual(zero_result["input_channels"], len(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertEqual(zero_result["aux_start_channel"], 3)
+            self.assertEqual(zero_result["abs_sum_after"], 0.0)
+            self.assertTrue(warm["save_epoch_checkpoints"])
+            self.assertEqual(len(warm["epoch_checkpoints"]), 1)
+            self.assertTrue(Path(warm["epoch_checkpoints"][0]["checkpoint"]).exists())
+            self.assertTrue((Path(tmp) / "warm" / "rgb_aux_dense_detector.pt").exists())
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
     def test_dense_late_fusion_detector_trains_and_evaluates(self) -> None:
         samples = make_synthetic_evaluation_samples(count=3, width=48, height=32)
         with tempfile.TemporaryDirectory() as tmp:
