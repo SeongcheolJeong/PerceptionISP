@@ -21,6 +21,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--project", default="outputs/yolo_aux_train")
     parser.add_argument("--name", default="train")
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--exist-ok", action="store_true")
     parser.add_argument("--plots", action="store_true")
     parser.add_argument("--zero-aux-input-weights", action="store_true")
@@ -38,6 +39,7 @@ def main(argv: Any = None) -> int:
         workers=int(args.workers),
         project=str(args.project),
         name=str(args.name),
+        seed=int(args.seed),
         exist_ok=bool(args.exist_ok),
         plots=bool(args.plots),
         zero_aux_input_weights=bool(args.zero_aux_input_weights),
@@ -59,6 +61,7 @@ def train_yolo_aux(
     workers: int = 0,
     project: str = "outputs/yolo_aux_train",
     name: str = "train",
+    seed: int = 0,
     exist_ok: bool = False,
     plots: bool = False,
     zero_aux_input_weights: bool = False,
@@ -92,6 +95,7 @@ def train_yolo_aux(
         "workers": int(workers),
         "project": str(project),
         "name": str(name),
+        "seed": int(seed),
         "exist_ok": bool(exist_ok),
         "plots": bool(plots),
         "cache": False,
@@ -127,6 +131,7 @@ def train_yolo_aux(
         "device": str(device),
         "project": str(project),
         "name": str(name),
+        "seed": int(seed),
         "save_dir": str(save_dir),
         "zero_aux_input_weights": zero_result,
         "results_dict": results_dict,
