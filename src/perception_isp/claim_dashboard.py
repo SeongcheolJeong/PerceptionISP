@@ -16,6 +16,7 @@ CLAIM_GATE_SUMMARY = "claim_gate_summary.json"
 TRAINING_ROLLUP_SUMMARY = "training_rollup_summary.json"
 RGB_AUX_DNN_GATE_SUMMARY = "rgb_aux_dnn_gate_summary.json"
 RGB_AUX_DNN_SWEEP_SUMMARY = "rgb_aux_dnn_sweep_summary.json"
+DENSE_SELECT_TEST_GATE_SUMMARY = "summary.json"
 DENSE_INPUT_ABLATION_SUMMARY = "dense_input_ablation_summary.json"
 COMPARISON_ROLLUP_SUMMARY = "rollup_summary.json"
 TASK_METRICS_SUMMARY = "task_metrics_summary.json"
@@ -50,6 +51,7 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--training-rollup", default=None, help="RGB+aux training rollup summary path/dir.")
     parser.add_argument("--rgb-aux-dnn-gate", default=None, help="RGB+Aux versus RGB-only DNN gate summary path/dir.")
     parser.add_argument("--rgb-aux-dnn-sweep", default=None, help="RGB+Aux versus RGB-only DNN confidence sweep summary path/dir.")
+    parser.add_argument("--dense-select-test-gate", default=None, help="Selection/test-separated RGB+Aux dense detector gate summary path/dir.")
     parser.add_argument("--dense-input-ablation-gate", default=None, help="Dense RGB+Aux DNN input-ablation gate summary path/dir.")
     parser.add_argument("--task-metrics", default=None, help="Task metrics summary path/dir.")
     parser.add_argument("--task-gate", default=None, help="Task gate summary path/dir.")
@@ -83,6 +85,7 @@ def main(argv: Any = None) -> int:
         training_rollup=args.training_rollup,
         rgb_aux_dnn_gate=args.rgb_aux_dnn_gate,
         rgb_aux_dnn_sweep=args.rgb_aux_dnn_sweep,
+        dense_select_test_gate=args.dense_select_test_gate,
         dense_input_ablation_gate=args.dense_input_ablation_gate,
         task_metrics=args.task_metrics,
         task_gate=args.task_gate,
@@ -132,6 +135,7 @@ def build_claim_dashboard(
     training_rollup: str | Path | None = None,
     rgb_aux_dnn_gate: str | Path | None = None,
     rgb_aux_dnn_sweep: str | Path | None = None,
+    dense_select_test_gate: str | Path | None = None,
     dense_input_ablation_gate: str | Path | None = None,
     task_metrics: str | Path | None = None,
     task_gate: str | Path | None = None,
@@ -162,6 +166,11 @@ def build_claim_dashboard(
     training = _load_training_rollup(training_rollup) if training_rollup is not None else None
     rgb_aux_dnn = _load_rgb_aux_dnn_gate(rgb_aux_dnn_gate) if rgb_aux_dnn_gate is not None else None
     rgb_aux_dnn_sweep_data = _load_rgb_aux_dnn_sweep(rgb_aux_dnn_sweep) if rgb_aux_dnn_sweep is not None else None
+    dense_select_test = (
+        _load_dense_select_test_gate(dense_select_test_gate)
+        if dense_select_test_gate is not None
+        else None
+    )
     dense_input_ablation = (
         _load_dense_input_ablation_gate(dense_input_ablation_gate)
         if dense_input_ablation_gate is not None
@@ -220,6 +229,7 @@ def build_claim_dashboard(
         training,
         rgb_aux_dnn,
         rgb_aux_dnn_sweep_data,
+        dense_select_test,
         dense_input_ablation,
         task,
         task_gate_data,
@@ -250,6 +260,7 @@ def build_claim_dashboard(
         training,
         rgb_aux_dnn,
         rgb_aux_dnn_sweep_data,
+        dense_select_test,
         dense_input_ablation,
         task,
         task_gate_data,
@@ -280,6 +291,7 @@ def build_claim_dashboard(
         "training": training,
         "rgb_aux_dnn_gate": rgb_aux_dnn,
         "rgb_aux_dnn_sweep": rgb_aux_dnn_sweep_data,
+        "dense_select_test_gate": dense_select_test,
         "dense_input_ablation_gate": dense_input_ablation,
         "task_metrics": task,
         "task_gate": task_gate_data,
@@ -448,6 +460,47 @@ def _load_rgb_aux_dnn_sweep(path: str | Path) -> Dict[str, Any]:
         ),
         "interpretation": str(data.get("interpretation", "")),
         "claim_boundary": str(data.get("claim_boundary", "")),
+    }
+
+
+def _load_dense_select_test_gate(path: str | Path) -> Dict[str, Any]:
+    summary_path = _summary_path(path, DENSE_SELECT_TEST_GATE_SUMMARY)
+    data = json.loads(summary_path.read_text())
+    rows = [row for row in data.get("rows", ()) if isinstance(row, Mapping)]
+    mean_test = data.get("mean_test_deltas", {}) if isinstance(data.get("mean_test_deltas"), Mapping) else {}
+    mean_selection = data.get("mean_selection_deltas", {}) if isinstance(data.get("mean_selection_deltas"), Mapping) else {}
+    return {
+        "name": _default_name(summary_path),
+        "summary_path": str(summary_path),
+        "html_path": _sibling_html(summary_path),
+        "status": str(data.get("status", "")),
+        "pass": str(data.get("status", "")) == "pass"
+        and int(data.get("pass_test_seed_count", 0)) == int(data.get("seed_count", 0))
+        and int(data.get("seed_count", 0)) > 0,
+        "claim_status": str(data.get("claim_status", "")),
+        "seed_count": int(data.get("seed_count", 0)),
+        "pass_test_seed_count": int(data.get("pass_test_seed_count", 0)),
+        "selection_sample_count": int(data.get("selection_sample_count", 0)),
+        "test_sample_count": int(data.get("test_sample_count", 0)),
+        "source_eval_count": int(data.get("source_eval_count", 0)),
+        "candidate_epochs": [int(value) for value in data.get("candidate_epochs", ())],
+        "candidate_thresholds": [float(value) for value in data.get("candidate_thresholds", ())],
+        "candidate_max_detections": [
+            None if value is None else int(value)
+            for value in data.get("candidate_max_detections", ())
+        ],
+        "tune_rgb_baseline": bool(data.get("tune_rgb_baseline", False)),
+        "cache_detections": bool(data.get("cache_detections", False)),
+        "aux_fp_budget_source": str(data.get("aux_fp_budget_source", "")),
+        "mean_selection_deltas": dict(mean_selection),
+        "mean_test_deltas": dict(mean_test),
+        "rows": rows,
+        "interpretation": (
+            "Operating points are selected on the selection subset and applied unchanged to the held-out test subset."
+        ),
+        "claim_boundary": (
+            "Selection/test-separated compact dense-detector evidence; not production detector superiority."
+        ),
     }
 
 
@@ -1744,6 +1797,7 @@ def _build_evidence_map(
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
     rgb_aux_dnn_sweep: Mapping[str, Any] | None,
+    dense_select_test_gate: Mapping[str, Any] | None,
     dense_input_ablation_gate: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
@@ -2165,6 +2219,24 @@ def _build_evidence_map(
             }
         )
 
+    if dense_select_test_gate is not None:
+        passed = bool(dense_select_test_gate.get("pass"))
+        current.append(
+            {
+                "area": "RGB+Aux dense select/test gate",
+                "status": "supported" if passed else "not_supported",
+                "claim_strength": str(dense_select_test_gate.get("claim_status", "")),
+                "evidence": _dense_select_test_gate_evidence(dense_select_test_gate),
+                "claim_boundary": (
+                    "Selection/test-separated compact dense-DNN evidence only; this supports learned RGB+Aux feasibility, "
+                    "not production detector superiority or broad HumanISP superiority."
+                    if passed
+                    else "Do not claim learned RGB+Aux detector improvement until this selection/test gate passes across seeds."
+                ),
+                "next_evidence": "Scale the same gate to larger/adverse native RAW splits and stronger production detector architectures.",
+            }
+        )
+
     if dense_input_ablation_gate is not None:
         passed = bool(dense_input_ablation_gate.get("pass"))
         current.append(
@@ -2202,6 +2274,7 @@ def _build_evidence_map(
             training=training,
             rgb_aux_dnn_gate=rgb_aux_dnn_gate,
             rgb_aux_dnn_sweep=rgb_aux_dnn_sweep,
+            dense_select_test_gate=dense_select_test_gate,
         ),
     }
 
@@ -2759,6 +2832,20 @@ def _rgb_aux_dnn_sweep_evidence_row(label: str, row: Mapping[str, Any]) -> str:
     )
 
 
+def _dense_select_test_gate_evidence(gate: Mapping[str, Any]) -> str:
+    mean_test = gate.get("mean_test_deltas", {}) if isinstance(gate.get("mean_test_deltas"), Mapping) else {}
+    return (
+        f"claim={gate.get('claim_status', '')}; seeds={int(gate.get('pass_test_seed_count', 0))}/"
+        f"{int(gate.get('seed_count', 0))}; selection/test="
+        f"{int(gate.get('selection_sample_count', 0))}/{int(gate.get('test_sample_count', 0))}; "
+        f"tunedRGB={bool(gate.get('tune_rgb_baseline'))}; cache={bool(gate.get('cache_detections'))}; "
+        f"dP={_fmt(mean_test.get('precision'), signed=True)}, "
+        f"dR={_fmt(mean_test.get('recall'), signed=True)}, "
+        f"dFP={_fmt(mean_test.get('fp'), signed=True)}, "
+        f"dDet={_fmt(mean_test.get('det_count'), signed=True)}"
+    )
+
+
 def _dense_input_ablation_evidence(gate: Mapping[str, Any]) -> str:
     means = gate.get("mean_by_mode", {}) if isinstance(gate.get("mean_by_mode"), Mapping) else {}
     full = means.get("none", {}) if isinstance(means.get("none"), Mapping) else {}
@@ -2798,6 +2885,7 @@ def _future_evidence_rows(
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
     rgb_aux_dnn_sweep: Mapping[str, Any] | None,
+    dense_select_test_gate: Mapping[str, Any] | None,
 ) -> list[Dict[str, Any]]:
     edge_correlation = _sample_bridge_edge_correlation(aux_contribution_audit)
     scene_edge_correlation = _sample_bridge_scene_edge_correlation(aux_contribution_audit)
@@ -2871,7 +2959,14 @@ def _future_evidence_rows(
     else:
         cfa_gap = "Need CFA/LensPSF front-end diagnostics first."
     training_status = str(training.get("status", "")) if training is not None else "missing"
-    if rgb_aux_dnn_gate is not None:
+    if dense_select_test_gate is not None and bool(dense_select_test_gate.get("pass")):
+        dnn_gate_gap = (
+            f"Selection/test RGB+Aux dense gate passed across "
+            f"{int(dense_select_test_gate.get('pass_test_seed_count', 0))}/"
+            f"{int(dense_select_test_gate.get('seed_count', 0))} seeds; "
+            "next step is larger/adverse held-out scale and a stronger production detector architecture."
+        )
+    elif rgb_aux_dnn_gate is not None:
         failed = ", ".join(str(value) for value in rgb_aux_dnn_gate.get("failed_criteria", ())) or "none"
         if bool(rgb_aux_dnn_gate.get("pass")):
             dnn_gate_gap = (
@@ -2992,6 +3087,7 @@ def _claim_decisions(
     training: Mapping[str, Any] | None,
     rgb_aux_dnn_gate: Mapping[str, Any] | None,
     rgb_aux_dnn_sweep: Mapping[str, Any] | None,
+    dense_select_test_gate: Mapping[str, Any] | None,
     dense_input_ablation_gate: Mapping[str, Any] | None,
     task_metrics: Mapping[str, Any] | None,
     task_gate: Mapping[str, Any] | None,
@@ -3092,6 +3188,24 @@ def _claim_decisions(
                 {
                     "status": "not_supported",
                     "claim": "RGB+Aux DNN confidence sweep found no claim-ready operating point; threshold tuning alone does not support learned RGB+Aux detector improvement.",
+                }
+            )
+    if dense_select_test_gate is not None:
+        if bool(dense_select_test_gate.get("pass")):
+            decisions.append(
+                {
+                    "status": "supported",
+                    "claim": (
+                        "Selection/test-separated RGB+Aux dense gate passed versus tuned RGB-only across "
+                        f"{int(dense_select_test_gate.get('pass_test_seed_count', 0))}/{int(dense_select_test_gate.get('seed_count', 0))} seeds."
+                    ),
+                }
+            )
+        else:
+            decisions.append(
+                {
+                    "status": "not_supported",
+                    "claim": "Selection/test-separated RGB+Aux dense gate did not pass across all evaluated seeds.",
                 }
             )
     if dense_input_ablation_gate is not None:
@@ -3717,6 +3831,12 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
         if isinstance(rgb_aux_dnn_sweep, Mapping)
         else "<p>No RGB+Aux DNN confidence sweep summary was provided.</p>"
     )
+    dense_select_test = dashboard.get("dense_select_test_gate")
+    dense_select_test_html = (
+        _dense_select_test_gate_html(dense_select_test, destination)
+        if isinstance(dense_select_test, Mapping)
+        else "<p>No dense RGB+Aux selection/test gate summary was provided.</p>"
+    )
     dense_input_ablation = dashboard.get("dense_input_ablation_gate")
     dense_input_ablation_html = (
         _dense_input_ablation_html(dense_input_ablation, destination)
@@ -3858,6 +3978,8 @@ def _render_html(dashboard: Mapping[str, Any], destination: Path) -> str:
   {rgb_aux_dnn_gate_html}
   <h2>RGB+Aux DNN Confidence Sweep</h2>
   {rgb_aux_dnn_sweep_html}
+  <h2>RGB+Aux Dense Select/Test Gate</h2>
+  {dense_select_test_html}
   <h2>RGB+Aux DNN Input Ablation Gate</h2>
   {dense_input_ablation_html}
   <h2>Aux Contribution Audit</h2>
@@ -4151,6 +4273,55 @@ def _rgb_aux_dnn_sweep_metric_group(row: Mapping[str, Any]) -> str:
         f"{_fmt(row.get('recall@0.50_mean'))} / "
         f"{_fmt(row.get('small_recall@0.50_mean'))} / "
         f"{_fmt(row.get('fp@0.50_mean'))}"
+    )
+
+
+def _dense_select_test_gate_html(gate: Mapping[str, Any], destination: Path) -> str:
+    status_class = "supported" if bool(gate.get("pass")) else "not_supported"
+    mean = gate.get("mean_test_deltas", {}) if isinstance(gate.get("mean_test_deltas"), Mapping) else {}
+    rows = "".join(
+        _dense_select_test_gate_seed_row(row)
+        for row in gate.get("rows", ())
+        if isinstance(row, Mapping)
+    )
+    if not rows:
+        rows = '<tr><td colspan="10">No seed rows were available.</td></tr>'
+    return (
+        f"<p>Status: <code class=\"{status_class}\">{html_lib.escape(str(gate.get('status', '')))}</code>; "
+        f"claim status: <code>{html_lib.escape(str(gate.get('claim_status', '')))}</code>. "
+        f"{html_lib.escape(str(gate.get('interpretation', '')))} "
+        f"{html_lib.escape(str(gate.get('claim_boundary', '')))}</p>"
+        "<table><thead><tr><th>Report</th><th>Seeds Passed</th><th>Selection/Test Samples</th><th>Tuned RGB</th><th>Cached Sweep</th><th>Mean dP</th><th>Mean dR</th><th>Mean dFP</th><th>Mean dDet</th></tr></thead><tbody><tr>"
+        f"<td>{_report_link(gate, destination)}</td>"
+        f"<td>{int(gate.get('pass_test_seed_count', 0))}/{int(gate.get('seed_count', 0))}</td>"
+        f"<td>{int(gate.get('selection_sample_count', 0))}/{int(gate.get('test_sample_count', 0))}</td>"
+        f"<td>{html_lib.escape(str(bool(gate.get('tune_rgb_baseline'))))}</td>"
+        f"<td>{html_lib.escape(str(bool(gate.get('cache_detections'))))}</td>"
+        f"<td>{_fmt(mean.get('precision'), signed=True)}</td>"
+        f"<td>{_fmt(mean.get('recall'), signed=True)}</td>"
+        f"<td>{_fmt(mean.get('fp'), signed=True)}</td>"
+        f"<td>{_fmt(mean.get('det_count'), signed=True)}</td>"
+        "</tr></tbody></table>"
+        "<table><thead><tr><th>Seed</th><th>Aux Epoch</th><th>Aux Conf</th><th>Aux MaxDet</th><th>RGB Conf</th><th>RGB MaxDet</th><th>dP</th><th>dR</th><th>dFP</th><th>Status</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table>"
+    )
+
+
+def _dense_select_test_gate_seed_row(row: Mapping[str, Any]) -> str:
+    deltas = row.get("test_deltas", {}) if isinstance(row.get("test_deltas"), Mapping) else {}
+    return (
+        "<tr>"
+        f"<td>{int(row.get('seed', 0))}</td>"
+        f"<td>{int(row.get('selected_epoch', 0))}</td>"
+        f"<td>{_fmt(row.get('selected_confidence'))}</td>"
+        f"<td>{'' if row.get('selected_max_detections') is None else int(row.get('selected_max_detections', 0))}</td>"
+        f"<td>{_fmt(row.get('selected_rgb_confidence'))}</td>"
+        f"<td>{'' if row.get('selected_rgb_max_detections') is None else int(row.get('selected_rgb_max_detections', 0))}</td>"
+        f"<td>{_fmt(deltas.get('precision'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('recall'), signed=True)}</td>"
+        f"<td>{_fmt(deltas.get('fp'), signed=True)}</td>"
+        f"<td><code>{html_lib.escape(str(row.get('test_status', '')))}</code></td>"
+        "</tr>"
     )
 
 

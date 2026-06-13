@@ -199,6 +199,7 @@ class ClaimReadinessTest(unittest.TestCase):
             cfa_lenspsf_aux_ablation = _write_cfa_lenspsf_aux_ablation(root / "cfa_lenspsf_aux_ablation")
             rgb_aux_dnn_gate = _write_rgb_aux_dnn_gate(root / "rgb_aux_dnn_gate", passed=False)
             rgb_aux_dnn_sweep = _write_rgb_aux_dnn_sweep(root / "rgb_aux_dnn_sweep", passed=False)
+            dense_select_test = _write_dense_select_test_gate(root / "dense_select_test", passed=True)
             dense_input_ablation = _write_dense_input_ablation_gate(root / "dense_input_ablation", passed=True)
             object_boundary = _write_object_boundary_edge(root / "object_boundary")
             object_boundary_bridge = _write_object_boundary_detection_bridge(root / "object_boundary_bridge")
@@ -222,6 +223,8 @@ class ClaimReadinessTest(unittest.TestCase):
                         str(rgb_aux_dnn_gate),
                         "--rgb-aux-dnn-sweep",
                         str(rgb_aux_dnn_sweep),
+                        "--dense-select-test-gate",
+                        str(dense_select_test),
                         "--dense-input-ablation-gate",
                         str(dense_input_ablation),
                         "--object-boundary-edge",
@@ -246,6 +249,8 @@ class ClaimReadinessTest(unittest.TestCase):
             self.assertIn("condition_gate", printed)
             self.assertFalse(printed["rgb_aux_dnn_gate"]["pass"])
             self.assertFalse(printed["rgb_aux_dnn_sweep"]["pass"])
+            self.assertTrue(printed["dense_select_test_gate"]["pass"])
+            self.assertEqual(printed["dense_select_test_gate"]["claim_status"], "strict_fair_tuned_rgb_baseline_heldout_pass")
             self.assertTrue(printed["dense_input_ablation_gate"]["pass"])
             self.assertEqual(printed["dense_input_ablation_gate"]["claim_status"], "aux_input_used_by_dense_dnn")
             self.assertTrue(printed["object_boundary_edge"]["pass"])
@@ -575,6 +580,47 @@ def _write_rgb_aux_dnn_sweep(path: Path, *, passed: bool) -> Path:
                 "lowest_fp_positive_recall_delta_row": rows[1],
                 "interpretation": "unit RGB+Aux DNN sweep",
                 "claim_boundary": "unit confidence-sweep boundary",
+            }
+        )
+        + "\n"
+    )
+    return path
+
+
+def _write_dense_select_test_gate(path: Path, *, passed: bool) -> Path:
+    path.mkdir()
+    (path / "index.html").write_text("<html></html>")
+    (path / "summary.json").write_text(
+        json.dumps(
+            {
+                "status": "pass" if passed else "mixed",
+                "claim_status": "strict_fair_tuned_rgb_baseline_heldout_pass" if passed else "strict_fair_tuned_rgb_baseline_mixed",
+                "pass_test_seed_count": 3 if passed else 2,
+                "seed_count": 3,
+                "source_eval_count": 395,
+                "selection_sample_count": 197,
+                "test_sample_count": 198,
+                "candidate_epochs": [0, 1, 2, 3],
+                "candidate_thresholds": [0.12, 0.20, 0.28],
+                "candidate_max_detections": [20, 30],
+                "tune_rgb_baseline": True,
+                "cache_detections": True,
+                "aux_fp_budget_source": "selected_rgb",
+                "mean_selection_deltas": {"precision": 0.01, "recall": 0.03, "fp": -4.0, "det_count": -4.0, "small_recall": 0.0},
+                "mean_test_deltas": {"precision": 0.011, "recall": 0.045, "fp": -7.2, "det_count": -7.1, "small_recall": 0.0},
+                "rows": [
+                    {
+                        "seed": 101,
+                        "selection_status": "pass",
+                        "test_status": "pass" if passed else "mixed",
+                        "selected_epoch": 3,
+                        "selected_confidence": 0.5,
+                        "selected_max_detections": 30,
+                        "selected_rgb_confidence": 0.28,
+                        "selected_rgb_max_detections": 30,
+                        "test_deltas": {"precision": 0.01, "recall": 0.04, "fp": -7.0, "det_count": -7.0, "small_recall": 0.0},
+                    }
+                ],
             }
         )
         + "\n"
