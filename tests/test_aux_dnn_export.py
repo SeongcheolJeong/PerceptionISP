@@ -381,6 +381,8 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("checkpoint_loss_kind", summary)
             self.assertEqual(summary["box_encoding"], "cell_center_size")
             self.assertEqual(summary["channel_mode"], "aux_only")
+            self.assertEqual(summary["object_loss_mode"], "balanced_positive_negative")
+            self.assertEqual(summary["negative_focal_gamma"], 2.0)
             self.assertEqual(summary["model_architecture"], "early_fusion")
             self.assertEqual(summary["channel_mask"], [0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
             self.assertIn("train_class_names", summary)
@@ -459,9 +461,13 @@ class AuxDNNExportTest(unittest.TestCase):
                 eval_fraction=0.5,
                 split_strategy="hash",
                 include_labels=("car", "person"),
+                object_loss_mode="negative_focal",
+                negative_focal_gamma=1.5,
                 output_dir=Path(tmp) / "dense_hash",
             )
             self.assertEqual(summary["split_strategy"], "hash")
+            self.assertEqual(summary["object_loss_mode"], "negative_focal")
+            self.assertEqual(summary["negative_focal_gamma"], 1.5)
             self.assertEqual(summary["train_sample_count"], 4)
             self.assertEqual(summary["eval_sample_count"], 4)
             self.assertNotEqual(summary["train_indices"], [0, 1, 2, 3])

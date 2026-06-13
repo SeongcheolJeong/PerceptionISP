@@ -47,6 +47,13 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--split-strategy", default="coverage", choices=["coverage", "hash", "sequential"])
     parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to train/evaluate; default uses all labels.")
     parser.add_argument("--no-object-weight", type=float, default=0.15)
+    parser.add_argument(
+        "--object-loss-mode",
+        default="balanced_positive_negative",
+        choices=["balanced_positive_negative", "negative_focal"],
+        help="Objectness loss mode. negative_focal focuses the no-object term on hard false-positive cells.",
+    )
+    parser.add_argument("--negative-focal-gamma", type=float, default=2.0, help="Gamma for --object-loss-mode negative_focal.")
     parser.add_argument("--box-weight", type=float, default=5.0)
     parser.add_argument("--class-weight", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=None, help="Optional deterministic seed for dense training.")
@@ -75,6 +82,8 @@ def main(argv: Any = None) -> int:
         split_strategy=str(args.split_strategy),
         include_labels=parse_label_list(args.include_labels),
         no_object_weight=float(args.no_object_weight),
+        object_loss_mode=str(args.object_loss_mode),
+        negative_focal_gamma=float(args.negative_focal_gamma),
         box_weight=float(args.box_weight),
         class_weight=float(args.class_weight),
         seed=args.seed,
@@ -103,6 +112,8 @@ def train_dense(
     split_strategy: str = "coverage",
     include_labels: Sequence[str] | None = None,
     no_object_weight: float = 0.15,
+    object_loss_mode: str = "balanced_positive_negative",
+    negative_focal_gamma: float = 2.0,
     box_weight: float = 5.0,
     class_weight: float = 1.0,
     seed: int | None = None,
@@ -166,6 +177,8 @@ def train_dense(
         torch,
         F,
         no_object_weight=no_object_weight,
+        object_loss_mode=object_loss_mode,
+        negative_focal_gamma=negative_focal_gamma,
         box_weight=box_weight,
         class_weight=class_weight,
         channel_mask=channel_mask,
@@ -183,6 +196,8 @@ def train_dense(
                 torch,
                 F,
                 no_object_weight=no_object_weight,
+                object_loss_mode=object_loss_mode,
+                negative_focal_gamma=negative_focal_gamma,
                 box_weight=box_weight,
                 class_weight=class_weight,
                 channel_mask=channel_mask,
@@ -205,6 +220,8 @@ def train_dense(
             torch,
             F,
             no_object_weight=no_object_weight,
+            object_loss_mode=object_loss_mode,
+            negative_focal_gamma=negative_focal_gamma,
             box_weight=box_weight,
             class_weight=class_weight,
             channel_mask=channel_mask,
@@ -259,7 +276,8 @@ def train_dense(
         "eval_class_names": list(eval_class_names),
         "missing_eval_class_names": list(missing_eval_class_names),
         "no_object_weight": float(no_object_weight),
-        "object_loss_mode": "balanced_positive_negative",
+        "object_loss_mode": str(object_loss_mode),
+        "negative_focal_gamma": float(negative_focal_gamma),
         "box_weight": float(box_weight),
         "class_weight": float(class_weight),
         "seed": None if seed is None else int(seed),
@@ -395,6 +413,8 @@ def _sample_loss(
     functional: Any,
     *,
     no_object_weight: float,
+    object_loss_mode: str,
+    negative_focal_gamma: float,
     box_weight: float,
     class_weight: float,
     channel_mask: Sequence[float],
@@ -421,7 +441,18 @@ def _sample_loss(
         positive_object_loss = object_loss_raw[0, positive].mean()
     else:
         positive_object_loss = object_logits.sum() * 0.0
-    negative_object_loss = object_loss_raw[0, negative].mean() if bool(torch.any(negative)) else object_logits.sum() * 0.0
+    if bool(torch.any(negative)):
+        negative_losses = object_loss_raw[0, negative]
+        if str(object_loss_mode) == "negative_focal":
+            negative_probs = torch.sigmoid(object_logits[0, negative])
+            focal_weight = torch.pow(negative_probs.clamp(0.0, 1.0), float(negative_focal_gamma))
+            negative_object_loss = (focal_weight * negative_losses).mean()
+        elif str(object_loss_mode) == "balanced_positive_negative":
+            negative_object_loss = negative_losses.mean()
+        else:
+            raise ValueError(f"unsupported object_loss_mode: {object_loss_mode}")
+    else:
+        negative_object_loss = object_logits.sum() * 0.0
     object_loss = positive_object_loss + float(no_object_weight) * negative_object_loss
 
     if bool(torch.any(positive)):
@@ -518,6 +549,8 @@ def _evaluate_loss(
     functional: Any,
     *,
     no_object_weight: float,
+    object_loss_mode: str,
+    negative_focal_gamma: float,
     box_weight: float,
     class_weight: float,
     channel_mask: Sequence[float],
@@ -540,6 +573,8 @@ def _evaluate_loss(
                         torch,
                         functional,
                         no_object_weight=no_object_weight,
+                        object_loss_mode=object_loss_mode,
+                        negative_focal_gamma=negative_focal_gamma,
                         box_weight=box_weight,
                         class_weight=class_weight,
                         channel_mask=channel_mask,
