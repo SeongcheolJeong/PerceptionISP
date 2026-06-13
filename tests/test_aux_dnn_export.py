@@ -418,6 +418,18 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("aggregate", direct)
             self.assertTrue((Path(tmp) / "dense_eval" / "dense_eval_summary.json").exists())
             self.assertTrue((Path(tmp) / "dense_eval" / "index.html").exists())
+            subset = evaluate_dense_manifest(
+                manifest_path=manifest,
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                indices=summary["eval_indices"][:1],
+                confidence=0.0,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_eval_subset",
+            )
+            self.assertEqual(subset["sample_count"], 1)
+            self.assertTrue(subset["indices_override"])
+            self.assertEqual(subset["selected_indices"], summary["eval_indices"][:1])
             capped = evaluate_dense_manifest(
                 manifest_path=manifest,
                 checkpoint_path=summary["checkpoint"],

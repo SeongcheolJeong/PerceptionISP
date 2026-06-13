@@ -29,6 +29,8 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--label-aware", action="store_true")
     parser.add_argument("--include-labels", default=None, help="Comma-separated class labels to evaluate; default uses checkpoint labels.")
+    parser.add_argument("--indices-file", default=None, help="Optional JSON file containing explicit sample indices to evaluate.")
+    parser.add_argument("--indices-key", default=None, help="Key to read when --indices-file is a JSON object.")
     parser.add_argument("--output-dir", default="reports/perception_rgb_aux_dense_eval")
     args = parser.parse_args(argv)
 
@@ -42,6 +44,7 @@ def main(argv: Any = None) -> int:
         device=str(args.device),
         label_agnostic=not bool(args.label_aware),
         include_labels=parse_label_list(args.include_labels),
+        indices=_load_indices_file(args.indices_file, args.indices_key),
         output_dir=args.output_dir,
     )
     print(json.dumps(json_ready(_compact_summary(summary)), indent=2))
@@ -59,6 +62,7 @@ def evaluate_dense_manifest(
     device: str = "auto",
     label_agnostic: bool = False,
     include_labels: Sequence[str] | None = None,
+    indices: Sequence[int] | None = None,
     output_dir: str | Path | None = None,
 ) -> Dict[str, Any]:
     import torch
@@ -70,11 +74,12 @@ def evaluate_dense_manifest(
     checkpoint_summary = checkpoint.get("summary", {}) if isinstance(checkpoint, Mapping) else {}
     tensor_key = hwc_tensor_key(checkpoint.get("tensor_key", checkpoint_summary.get("tensor_key", "rgb_aux_chw")) if isinstance(checkpoint, Mapping) else "rgb_aux_chw")
     eval_labels = _eval_labels(checkpoint, checkpoint_summary, include_labels)
-    indices = _indices_for_split(
+    selected_indices = _indices_for_split(
         split,
         sample_count=len(manifest),
         summary=checkpoint_summary if isinstance(checkpoint_summary, Mapping) else {},
-    )
+    ) if indices is None else tuple(int(index) for index in indices)
+    _validate_indices(selected_indices, sample_count=len(manifest))
     detector = rgb_aux_detector_from_checkpoint(
         str(checkpoint_path),
         confidence=confidence,
@@ -84,7 +89,7 @@ def evaluate_dense_manifest(
     )
     sample_rows = []
     metric_rows = []
-    for index in indices:
+    for index in selected_indices:
         item = manifest[int(index)]
         tensor_path = manifest_root / str(item["tensor_path"])
         label_path = manifest_root / str(item["label_path"])
@@ -121,7 +126,8 @@ def evaluate_dense_manifest(
         "label_agnostic": bool(label_agnostic),
         "eval_labels": list(eval_labels),
         "sample_count": int(len(sample_rows)),
-        "selected_indices": [int(index) for index in indices],
+        "selected_indices": [int(index) for index in selected_indices],
+        "indices_override": indices is not None,
         "detector_name": detector.name,
         "detector_config": {
             "confidence": None if confidence is None else float(confidence),
@@ -166,6 +172,29 @@ def _indices_for_split(split: str, *, sample_count: int, summary: Mapping[str, A
     return tuple(range(int(sample_count)))
 
 
+def _load_indices_file(path: str | Path | None, key: str | None = None) -> Tuple[int, ...] | None:
+    if path is None:
+        return None
+    payload = json.loads(Path(path).expanduser().read_text())
+    if isinstance(payload, Mapping):
+        selected_key = str(key) if key is not None else "indices"
+        if selected_key not in payload:
+            available = ", ".join(str(value) for value in sorted(payload.keys()))
+            raise KeyError(f"indices file does not contain key {selected_key!r}; available keys: {available}")
+        payload = payload[selected_key]
+    if isinstance(payload, (str, bytes)) or not isinstance(payload, Sequence):
+        raise ValueError("indices payload must be a JSON array of integer sample indices")
+    return tuple(int(index) for index in payload)
+
+
+def _validate_indices(indices: Sequence[int], *, sample_count: int) -> None:
+    limit = int(sample_count)
+    for index in indices:
+        value = int(index)
+        if value < 0 or value >= limit:
+            raise IndexError(f"sample index out of range: {value} for sample_count={limit}")
+
+
 def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "manifest": summary.get("manifest"),
@@ -174,6 +203,7 @@ def _compact_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         "label_agnostic": summary.get("label_agnostic"),
         "eval_labels": summary.get("eval_labels"),
         "sample_count": summary.get("sample_count"),
+        "indices_override": summary.get("indices_override"),
         "detector_name": summary.get("detector_name"),
         "detector_config": summary.get("detector_config"),
         "elapsed_seconds": summary.get("elapsed_seconds"),
