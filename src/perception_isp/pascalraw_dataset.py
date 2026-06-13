@@ -17,6 +17,7 @@ from .types import json_ready
 
 
 DEFAULT_CONDITION = "daylight_raw_derived_downsampled"
+DEFAULT_NATIVE_CONDITION = "native_nef_union"
 DEFAULT_IMAGE_ARCHIVE = "JPEGImages.zip"
 DEFAULT_IMAGE_DIR = "images"
 DEFAULT_IMAGE_EXTENSION = ".png"
@@ -78,6 +79,15 @@ def main(argv: Any = None) -> int:
     plan.add_argument("--allow-empty-boxes", action="store_true")
     plan.add_argument("--output-dir", default="reports/perception_pascalraw_subset_plan")
 
+    native_plan = subparsers.add_parser("native-plan", help="Build a deduplicated native NEF manifest from one or more RAW roots.")
+    native_plan.add_argument("annotations", help="PASCALRAW VOC XML annotation directory, zip, or single XML file.")
+    native_plan.add_argument("--raw-root", action="append", required=True, help="Directory containing PASCALRAW .nef files. Repeatable.")
+    native_plan.add_argument("--reference-root", action="append", default=[], help="Optional directory containing reference PNG/JPG files. Repeatable.")
+    native_plan.add_argument("--max-total", type=int, default=0, help="Maximum selected rows; 0 means all eligible native RAW rows.")
+    native_plan.add_argument("--condition", default=DEFAULT_NATIVE_CONDITION)
+    native_plan.add_argument("--allow-empty-boxes", action="store_true")
+    native_plan.add_argument("--output-dir", default="reports/perception_pascalraw_native_union_plan")
+
     availability = subparsers.add_parser("availability", help="Audit required PASCALRAW image files.")
     availability.add_argument("manifest", help="PASCALRAW subset manifest JSON or summary JSON containing a manifest key.")
     availability.add_argument("--dataset-root", default="data/raw_datasets/pascalraw")
@@ -108,6 +118,24 @@ def main(argv: Any = None) -> int:
             "manifest_json": str(html_path.parent / MANIFEST_FILENAME),
             "status": summary["status"],
             "selected_count": summary["selected_count"],
+        }
+    elif args.command == "native-plan":
+        summary = build_pascalraw_native_union_plan(
+            args.annotations,
+            raw_roots=args.raw_root,
+            reference_roots=args.reference_root,
+            max_total=int(args.max_total),
+            selection_condition=str(args.condition),
+            require_boxes=not bool(args.allow_empty_boxes),
+        )
+        html_path = write_pascalraw_subset_plan(summary, args.output_dir)
+        printed = {
+            "report": str(html_path),
+            "summary_json": str(html_path.parent / SUMMARY_FILENAME),
+            "manifest_json": str(html_path.parent / MANIFEST_FILENAME),
+            "status": summary["status"],
+            "selected_count": summary["selected_count"],
+            "native_raw_file_count": summary["native_raw_file_count"],
         }
     elif args.command == "availability":
         summary = build_pascalraw_image_availability(
@@ -202,6 +230,94 @@ def build_pascalraw_subset_plan(
         "claim_boundary": (
             "PASCALRAW here is the 10x downsampled PNG release derived from RAW, not full native Bayer RAW. "
             "It is useful for fast annotated detector sanity checks, but weak evidence for CFA/PSF/native RAW claims."
+        ),
+    }
+
+
+def build_pascalraw_native_union_plan(
+    annotations: str | Path,
+    *,
+    raw_roots: Sequence[str | Path],
+    reference_roots: Sequence[str | Path] = (),
+    max_total: int = 0,
+    selection_condition: str = DEFAULT_NATIVE_CONDITION,
+    require_boxes: bool = True,
+) -> Dict[str, Any]:
+    records = load_pascalraw_annotation_records(annotations)
+    record_by_id = {record.sample_id: record for record in records}
+    raw_index, raw_root_counts, duplicate_raw_files = _native_raw_index(raw_roots)
+    reference_index = _reference_image_index(reference_roots)
+    selected = []
+    missing_annotation = []
+    empty_box_rows = []
+    for sample_id in sorted(raw_index):
+        record = record_by_id.get(sample_id)
+        if record is None:
+            missing_annotation.append(sample_id)
+            continue
+        if require_boxes and not record.boxes:
+            empty_box_rows.append(sample_id)
+            continue
+        raw_path = raw_index[sample_id]
+        row = record.to_manifest_row(image_dir=DEFAULT_IMAGE_DIR, selection_condition=selection_condition)
+        tags = sorted({*list(row.get("tags", ()) or ()), "native_nef", "true_sensor_cfa_mosaic"})
+        row.update(
+            {
+                "selection_condition": str(selection_condition),
+                "tags": tags,
+                "expected_native_raw_path": str(raw_path),
+                "expected_native_raw_relative_path": str(raw_path),
+                "native_raw_file_name": raw_path.name,
+                "native_raw_root": str(_matched_root(raw_path, raw_roots)),
+            }
+        )
+        reference_path = reference_index.get(sample_id)
+        if reference_path is not None:
+            row["expected_reference_rgb_path"] = str(reference_path)
+            row["expected_reference_rgb_relative_path"] = str(reference_path)
+        selected.append(row)
+        if max_total > 0 and len(selected) >= max_total:
+            break
+    label_counts = collections.Counter(label for row in selected for label in row.get("labels", ()))
+    checks = _native_subset_checks(
+        records,
+        selected,
+        raw_index,
+        max_total=max_total,
+        require_boxes=require_boxes,
+    )
+    status = "pass" if checks and all(row["status"] == "pass" for row in checks) else "warning"
+    return {
+        "name": "PASCALRAW native RAW union plan",
+        "status": status,
+        "source": str(Path(annotations).expanduser()),
+        "selection_condition": str(selection_condition),
+        "max_total": int(max_total),
+        "record_count": len(records),
+        "native_raw_file_count": len(raw_index),
+        "duplicate_native_raw_file_count": len(duplicate_raw_files),
+        "missing_annotation_count": len(missing_annotation),
+        "empty_box_raw_count": len(empty_box_rows),
+        "selected_count": len(selected),
+        "label_counts": dict(label_counts.most_common()),
+        "manifest": selected,
+        "checks": checks,
+        "native_raw_requirements": {
+            "raw_roots": [str(Path(path).expanduser()) for path in raw_roots],
+            "raw_root_counts": raw_root_counts,
+            "reference_roots": [str(Path(path).expanduser()) for path in reference_roots],
+            "manifest_paths_are_absolute": True,
+            "duplicate_policy": "first raw-root wins",
+        },
+        "diagnostics": {
+            "missing_annotation_sample_ids": missing_annotation[:100],
+            "empty_box_sample_ids": empty_box_rows[:100],
+            "duplicate_native_raw_sample_ids": [row["sample_id"] for row in duplicate_raw_files[:100]],
+        },
+        "next_action": "Run aux_export with --source pascalraw-dataset --pascalraw-native-raw using this manifest to build the larger RGB+Aux training set.",
+        "claim_boundary": (
+            "This manifest only deduplicates locally available PASCALRAW native NEF files and joins VOC boxes. "
+            "It improves training/evaluation scale, but does not by itself prove detector performance."
         ),
     }
 
@@ -464,6 +580,65 @@ def _file_checks(
     return checks
 
 
+def _native_raw_index(raw_roots: Sequence[str | Path]) -> tuple[dict[str, Path], dict[str, int], list[Dict[str, Any]]]:
+    index: dict[str, Path] = {}
+    root_counts: dict[str, int] = {}
+    duplicates: list[Dict[str, Any]] = []
+    for root_value in raw_roots:
+        root = Path(root_value).expanduser().resolve()
+        files = tuple(_iter_native_raw_files(root))
+        root_counts[str(root)] = len(files)
+        for path in files:
+            sample_id = path.stem
+            if sample_id in index:
+                duplicates.append(
+                    {
+                        "sample_id": sample_id,
+                        "kept_path": str(index[sample_id]),
+                        "duplicate_path": str(path),
+                        "duplicate_root": str(root),
+                    }
+                )
+                continue
+            index[sample_id] = path
+    return index, root_counts, duplicates
+
+
+def _iter_native_raw_files(root: Path) -> tuple[Path, ...]:
+    if not root.exists():
+        return ()
+    files = [path.resolve() for path in root.rglob("*") if path.is_file() and path.suffix.lower() == ".nef"]
+    return tuple(sorted(files, key=lambda path: (path.stem, str(path))))
+
+
+def _reference_image_index(reference_roots: Sequence[str | Path]) -> dict[str, Path]:
+    index: dict[str, Path] = {}
+    for root_value in reference_roots:
+        root = Path(root_value).expanduser().resolve()
+        if not root.exists():
+            continue
+        files = [
+            path.resolve()
+            for path in root.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg"}
+        ]
+        for path in sorted(files, key=lambda item: (item.stem, str(item))):
+            index.setdefault(path.stem, path)
+    return index
+
+
+def _matched_root(path: Path, roots: Sequence[str | Path]) -> str:
+    resolved = path.resolve()
+    for root_value in roots:
+        root = Path(root_value).expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+            return str(root)
+        except ValueError:
+            continue
+    return ""
+
+
 def _subset_checks(records: Sequence[PascalRawAnnotationRecord], manifest: Sequence[Mapping[str, Any]], *, max_total: int) -> list[Dict[str, Any]]:
     empty_box_rows = [row for row in manifest if int(row.get("box_count", 0)) <= 0]
     duplicates = [
@@ -479,6 +654,48 @@ def _subset_checks(records: Sequence[PascalRawAnnotationRecord], manifest: Seque
             "id": "selected_count_within_limit",
             "status": "pass" if max_total <= 0 or len(manifest) <= max_total else "fail",
             "evidence": f"selected={len(manifest)} max_total={max_total}",
+        },
+    ]
+
+
+def _native_subset_checks(
+    records: Sequence[PascalRawAnnotationRecord],
+    manifest: Sequence[Mapping[str, Any]],
+    raw_index: Mapping[str, Path],
+    *,
+    max_total: int,
+    require_boxes: bool,
+) -> list[Dict[str, Any]]:
+    empty_box_rows = [row for row in manifest if int(row.get("box_count", 0)) <= 0]
+    duplicates = [
+        sample_id
+        for sample_id, count in collections.Counter(str(row.get("sample_id", "")) for row in manifest).items()
+        if count > 1
+    ]
+    missing_raw_paths = [
+        str(row.get("expected_native_raw_path", ""))
+        for row in manifest
+        if not Path(str(row.get("expected_native_raw_path", ""))).is_file()
+    ]
+    return [
+        {"id": "source_annotations_available", "status": "pass" if records else "fail", "evidence": f"records={len(records)}"},
+        {"id": "native_raw_files_available", "status": "pass" if raw_index else "fail", "evidence": f"native_raw_files={len(raw_index)}"},
+        {"id": "selected_rows_available", "status": "pass" if manifest else "fail", "evidence": f"selected={len(manifest)}"},
+        {
+            "id": "selected_rows_have_boxes",
+            "status": "pass" if (not require_boxes or not empty_box_rows) else "fail",
+            "evidence": f"empty_box_rows={len(empty_box_rows)}",
+        },
+        {"id": "selected_rows_unique", "status": "pass" if not duplicates else "fail", "evidence": f"duplicates={duplicates}"},
+        {
+            "id": "selected_count_within_limit",
+            "status": "pass" if max_total <= 0 or len(manifest) <= max_total else "fail",
+            "evidence": f"selected={len(manifest)} max_total={max_total}",
+        },
+        {
+            "id": "selected_native_raw_paths_exist",
+            "status": "pass" if not missing_raw_paths else "fail",
+            "evidence": f"missing_native_raw_paths={len(missing_raw_paths)}",
         },
     ]
 
@@ -528,11 +745,12 @@ def _normalize_label(value: str) -> str:
 
 
 def _render_subset_html(summary: Mapping[str, Any]) -> str:
+    requirements_key = "native_raw_requirements" if "native_raw_requirements" in summary else "image_requirements"
     return _render_common_html(
         "PASCALRAW Subset Plan",
         summary,
         sections=[
-            ("Image Requirements", f"<pre>{html_lib.escape(json.dumps(json_ready(summary.get('image_requirements', {})), indent=2))}</pre>"),
+            ("Input Requirements", f"<pre>{html_lib.escape(json.dumps(json_ready(summary.get(requirements_key, {})), indent=2))}</pre>"),
             ("Checks", _checks_table(summary.get("checks", ()))),
             ("Manifest", _manifest_table(summary.get("manifest", ()))),
         ],
@@ -614,7 +832,7 @@ def _check_row(row: Mapping[str, Any]) -> str:
 def _manifest_table(rows: Any) -> str:
     manifest_rows = "".join(_manifest_row(row) for row in rows if isinstance(row, Mapping))
     return (
-        "<table><thead><tr><th>Sample</th><th>Image Path</th><th>Zip Member</th><th>Boxes</th><th>Labels</th></tr></thead>"
+        "<table><thead><tr><th>Sample</th><th>Image Path</th><th>Native RAW Path</th><th>Zip Member</th><th>Boxes</th><th>Labels</th></tr></thead>"
         f"<tbody>{manifest_rows}</tbody></table>"
     )
 
@@ -624,6 +842,7 @@ def _manifest_row(row: Mapping[str, Any]) -> str:
         "<tr>"
         f"<td><code>{html_lib.escape(str(row.get('sample_id', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(row.get('expected_image_relative_path', '')))}</code></td>"
+        f"<td><code>{html_lib.escape(str(row.get('expected_native_raw_path', '')))}</code></td>"
         f"<td><code>{html_lib.escape(str(row.get('expected_zip_member', '')))}</code></td>"
         f"<td>{int(row.get('box_count', 0))}</td>"
         f"<td>{html_lib.escape(', '.join(str(value) for value in row.get('labels', ())))}</td>"

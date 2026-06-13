@@ -10,6 +10,7 @@ from pathlib import Path
 
 from perception_isp.pascalraw_dataset import (
     build_pascalraw_image_availability,
+    build_pascalraw_native_union_plan,
     build_pascalraw_subset_plan,
     extract_pascalraw_images,
     load_pascalraw_annotation_records,
@@ -51,6 +52,36 @@ class PascalRawDatasetTest(unittest.TestCase):
             self.assertEqual(row["expected_image_relative_path"], "images/2014_000001.png")
             self.assertEqual(row["expected_zip_member"], "2014_000001.png")
             self.assertEqual(row["labels"], ["car"])
+
+    def test_native_union_plan_deduplicates_raw_roots_and_adds_absolute_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ann = root / "Annotations"
+            ann.mkdir()
+            for sample_id in ("2014_000001", "2014_000002", "2014_000003"):
+                (ann / f"{sample_id}.xml").write_text(_voc_xml(f"{sample_id}.png", label="car"))
+            raw_a = root / "raw_a" / "PASCALRAW" / "original" / "raw"
+            raw_b = root / "raw_b" / "PASCALRAW" / "original" / "raw"
+            raw_a.mkdir(parents=True)
+            raw_b.mkdir(parents=True)
+            for sample_id in ("2014_000001", "2014_000002"):
+                (raw_a / f"{sample_id}.nef").write_bytes(b"nef")
+            for sample_id in ("2014_000002", "2014_000003"):
+                (raw_b / f"{sample_id}.nef").write_bytes(b"nef")
+            refs = root / "refs"
+            refs.mkdir()
+            (refs / "2014_000001.png").write_bytes(b"png")
+
+            summary = build_pascalraw_native_union_plan(ann, raw_roots=[root / "raw_a", root / "raw_b"], reference_roots=[refs])
+
+            self.assertEqual(summary["status"], "pass")
+            self.assertEqual(summary["native_raw_file_count"], 3)
+            self.assertEqual(summary["duplicate_native_raw_file_count"], 1)
+            self.assertEqual(summary["selected_count"], 3)
+            by_id = {row["sample_id"]: row for row in summary["manifest"]}
+            self.assertTrue(Path(by_id["2014_000001"]["expected_native_raw_path"]).is_absolute())
+            self.assertTrue(Path(by_id["2014_000001"]["expected_reference_rgb_path"]).is_absolute())
+            self.assertIn("raw_a", by_id["2014_000002"]["expected_native_raw_path"])
 
     def test_availability_and_extract_use_zip_members(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -104,6 +135,26 @@ class PascalRawDatasetTest(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(printed["selected_count"], 1)
             self.assertTrue((root / "cli" / "pascalraw_subset_plan_summary.json").exists())
+
+            raw = root / "raw" / "PASCALRAW" / "original" / "raw"
+            raw.mkdir(parents=True)
+            (raw / "2014_000001.nef").write_bytes(b"nef")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                exit_code = pascalraw_dataset_main(
+                    [
+                        "native-plan",
+                        str(ann),
+                        "--raw-root",
+                        str(root / "raw"),
+                        "--output-dir",
+                        str(root / "native_cli"),
+                    ]
+                )
+            printed = json.loads(stdout.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(printed["selected_count"], 1)
+            self.assertTrue((root / "native_cli" / "pascalraw_subset_manifest.json").exists())
 
 
 def _voc_xml(filename: str, *, label: str) -> str:

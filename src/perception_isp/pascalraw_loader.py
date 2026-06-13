@@ -186,11 +186,12 @@ def load_pascalraw_native_manifest_row(
     if not sample_id:
         raise ValueError("PASCALRAW native row is missing sample_id")
     raw_relative = str(
-        row.get("expected_native_raw_relative_path")
+        row.get("expected_native_raw_path")
+        or row.get("expected_native_raw_relative_path")
         or row.get("expected_raw_relative_path")
         or f"PASCALRAW/original/raw/{sample_id}.nef"
     )
-    raw_path = root / raw_relative
+    raw_path = _resolve_dataset_path(root, raw_relative)
     if not raw_path.is_file():
         raise FileNotFoundError(f"PASCALRAW native NEF not found: {raw_path}")
 
@@ -388,11 +389,17 @@ def _match_parity(source_indices: np.ndarray, target_indices: np.ndarray, limit:
 
 def _reference_rgb_path(root: Path, row: Mapping[str, Any], sample_id: str) -> Path:
     reference_relative = str(
-        row.get("expected_reference_rgb_relative_path")
+        row.get("expected_reference_rgb_path")
+        or row.get("expected_reference_rgb_relative_path")
         or row.get("expected_original_jpg_relative_path")
         or f"PASCALRAW/original/jpg/{sample_id}.jpg"
     )
-    return root / reference_relative
+    return _resolve_dataset_path(root, reference_relative)
+
+
+def _resolve_dataset_path(root: Path, value: str | Path) -> Path:
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else root / path
 
 
 def _load_optional_reference_rgb(
