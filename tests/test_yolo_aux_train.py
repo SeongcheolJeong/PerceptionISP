@@ -65,6 +65,10 @@ class YoloAuxTrainTest(unittest.TestCase):
                     project=temp_dir,
                     name="seed7",
                     seed=7,
+                    optimizer="AdamW",
+                    lr0=0.0005,
+                    lrf=0.05,
+                    warmup_epochs=1.0,
                     disable_augment=False,
                 )
         finally:
@@ -74,7 +78,13 @@ class YoloAuxTrainTest(unittest.TestCase):
                 sys.modules["ultralytics"] = previous
 
         self.assertEqual(calls[0]["seed"], 7)
+        self.assertEqual(calls[0]["optimizer"], "AdamW")
+        self.assertEqual(calls[0]["lr0"], 0.0005)
+        self.assertEqual(calls[0]["lrf"], 0.05)
+        self.assertEqual(calls[0]["warmup_epochs"], 1.0)
         self.assertEqual(summary["seed"], 7)
+        self.assertEqual(summary["train_overrides"]["optimizer"], "AdamW")
+        self.assertEqual(summary["train_overrides"]["lr0"], 0.0005)
         self.assertEqual(summary["results_dict"]["metrics/mAP50(B)"], 0.5)
 
 

@@ -22,6 +22,13 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--project", default="outputs/yolo_aux_train")
     parser.add_argument("--name", default="train")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--optimizer", default=None, help="Optional Ultralytics optimizer override, e.g. AdamW.")
+    parser.add_argument("--lr0", type=float, default=None, help="Optional initial learning rate override.")
+    parser.add_argument("--lrf", type=float, default=None, help="Optional final LR fraction override.")
+    parser.add_argument("--momentum", type=float, default=None)
+    parser.add_argument("--weight-decay", type=float, default=None)
+    parser.add_argument("--warmup-epochs", type=float, default=None)
+    parser.add_argument("--freeze", type=int, default=None, help="Optional Ultralytics freeze setting.")
     parser.add_argument("--exist-ok", action="store_true")
     parser.add_argument("--plots", action="store_true")
     parser.add_argument("--zero-aux-input-weights", action="store_true")
@@ -40,6 +47,13 @@ def main(argv: Any = None) -> int:
         project=str(args.project),
         name=str(args.name),
         seed=int(args.seed),
+        optimizer=args.optimizer,
+        lr0=args.lr0,
+        lrf=args.lrf,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+        warmup_epochs=args.warmup_epochs,
+        freeze=args.freeze,
         exist_ok=bool(args.exist_ok),
         plots=bool(args.plots),
         zero_aux_input_weights=bool(args.zero_aux_input_weights),
@@ -62,6 +76,13 @@ def train_yolo_aux(
     project: str = "outputs/yolo_aux_train",
     name: str = "train",
     seed: int = 0,
+    optimizer: str | None = None,
+    lr0: float | None = None,
+    lrf: float | None = None,
+    momentum: float | None = None,
+    weight_decay: float | None = None,
+    warmup_epochs: float | None = None,
+    freeze: int | None = None,
     exist_ok: bool = False,
     plots: bool = False,
     zero_aux_input_weights: bool = False,
@@ -101,6 +122,16 @@ def train_yolo_aux(
         "cache": False,
         "amp": False,
     }
+    train_overrides = _optional_train_overrides(
+        optimizer=optimizer,
+        lr0=lr0,
+        lrf=lrf,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        warmup_epochs=warmup_epochs,
+        freeze=freeze,
+    )
+    train_kwargs.update(train_overrides)
     if disable_augment:
         train_kwargs.update(
             {
@@ -132,6 +163,7 @@ def train_yolo_aux(
         "project": str(project),
         "name": str(name),
         "seed": int(seed),
+        "train_overrides": train_overrides,
         "save_dir": str(save_dir),
         "zero_aux_input_weights": zero_result,
         "results_dict": results_dict,
@@ -140,6 +172,34 @@ def train_yolo_aux(
         save_dir.mkdir(parents=True, exist_ok=True)
         (save_dir / "perception_yolo_aux_train_summary.json").write_text(json.dumps(json_ready(summary), indent=2) + "\n")
     return summary
+
+
+def _optional_train_overrides(
+    *,
+    optimizer: str | None = None,
+    lr0: float | None = None,
+    lrf: float | None = None,
+    momentum: float | None = None,
+    weight_decay: float | None = None,
+    warmup_epochs: float | None = None,
+    freeze: int | None = None,
+) -> Dict[str, Any]:
+    overrides: Dict[str, Any] = {}
+    if optimizer:
+        overrides["optimizer"] = str(optimizer)
+    if lr0 is not None:
+        overrides["lr0"] = float(lr0)
+    if lrf is not None:
+        overrides["lrf"] = float(lrf)
+    if momentum is not None:
+        overrides["momentum"] = float(momentum)
+    if weight_decay is not None:
+        overrides["weight_decay"] = float(weight_decay)
+    if warmup_epochs is not None:
+        overrides["warmup_epochs"] = float(warmup_epochs)
+    if freeze is not None:
+        overrides["freeze"] = int(freeze)
+    return overrides
 
 
 def zero_aux_input_weights_for_model(model: Any, *, aux_start_channel: int = 3) -> Dict[str, Any]:
