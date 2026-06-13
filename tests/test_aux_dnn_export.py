@@ -402,6 +402,7 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertIn("checkpoint_loss", summary)
             self.assertIn("checkpoint_loss_kind", summary)
             self.assertEqual(summary["box_encoding"], "cell_center_size")
+            self.assertEqual(summary["positive_cell_radius"], 0)
             self.assertEqual(summary["channel_mode"], "aux_only")
             self.assertEqual(summary["object_loss_mode"], "balanced_positive_negative")
             self.assertEqual(summary["negative_focal_gamma"], 2.0)
@@ -629,6 +630,39 @@ class AuxDNNExportTest(unittest.TestCase):
             )
             self.assertEqual(direct["checkpoint_summary"]["tensor_key"], "rgb_aux_extended_chw")
             self.assertEqual(direct["checkpoint_summary"]["input_channels"], len(RGB_AUX_EXTENDED_CHANNELS))
+            self.assertIn("aggregate", direct)
+
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_dense_xyxy_radius_training_writes_matching_checkpoint(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=4, width=48, height=32)
+        with tempfile.TemporaryDirectory() as tmp:
+            export_aux_dataset(samples, tmp, include_extended=False, include_preview=False, compress=False)
+            summary = train_dense(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                epochs=1,
+                device_name="cpu",
+                batch_size=2,
+                grid_size=(4, 6),
+                base_channels=8,
+                box_encoding="xyxy",
+                positive_cell_radius=1,
+                eval_fraction=0.25,
+                include_labels=("car", "person"),
+                output_dir=Path(tmp) / "dense_xyxy",
+            )
+            self.assertEqual(summary["box_encoding"], "xyxy")
+            self.assertEqual(summary["positive_cell_radius"], 1)
+            detector = rgb_aux_detector_from_checkpoint(summary["checkpoint"], confidence=0.0)
+            self.assertEqual(detector.box_encoding, "xyxy")
+            direct = evaluate_dense_manifest(
+                manifest_path=Path(tmp) / "manifest.jsonl",
+                checkpoint_path=summary["checkpoint"],
+                split="eval",
+                confidence=0.0,
+                label_agnostic=False,
+                output_dir=Path(tmp) / "dense_xyxy_eval",
+            )
+            self.assertEqual(direct["checkpoint_summary"]["tensor_key"], "rgb_aux_chw")
             self.assertIn("aggregate", direct)
 
 

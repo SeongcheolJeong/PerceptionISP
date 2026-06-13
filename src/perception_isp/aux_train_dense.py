@@ -29,7 +29,8 @@ from .aux_dnn import (
 from .types import json_ready
 
 
-BOX_ENCODING = "cell_center_size"
+DEFAULT_BOX_ENCODING = "cell_center_size"
+BOX_ENCODINGS = ("cell_center_size", "xyxy")
 
 
 def main(argv: Any = None) -> int:
@@ -42,6 +43,13 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--grid", default="15x20", help="Detector grid as HxW.")
     parser.add_argument("--base-channels", type=int, default=24)
     parser.add_argument("--model-architecture", default="early_fusion", choices=["early_fusion", "late_fusion"], help="Dense detector architecture.")
+    parser.add_argument("--box-encoding", default=DEFAULT_BOX_ENCODING, choices=BOX_ENCODINGS)
+    parser.add_argument(
+        "--positive-cell-radius",
+        type=int,
+        default=0,
+        help="For xyxy box encoding, also train neighboring grid cells around each object center.",
+    )
     parser.add_argument("--tensor-key", default=RGB_AUX_TENSOR_KEY, help="Tensor key to train on: rgb_aux_chw or rgb_aux_extended_chw.")
     parser.add_argument("--channel-mode", default="rgb_aux", choices=["rgb_aux", "rgb_only", "aux_only"], help="Input ablation mode.")
     parser.add_argument("--eval-fraction", type=float, default=0.25)
@@ -78,6 +86,8 @@ def main(argv: Any = None) -> int:
         grid_size=parse_grid_size(args.grid),
         base_channels=int(args.base_channels),
         model_architecture=str(args.model_architecture),
+        box_encoding=str(args.box_encoding),
+        positive_cell_radius=int(args.positive_cell_radius),
         tensor_key=str(args.tensor_key),
         channel_mode=str(args.channel_mode),
         eval_fraction=float(args.eval_fraction),
@@ -109,6 +119,8 @@ def train_dense(
     grid_size: Tuple[int, int] = (15, 20),
     base_channels: int = 24,
     model_architecture: str = "early_fusion",
+    box_encoding: str = DEFAULT_BOX_ENCODING,
+    positive_cell_radius: int = 0,
     tensor_key: str = RGB_AUX_TENSOR_KEY,
     channel_mode: str = "rgb_aux",
     eval_fraction: float = 0.25,
@@ -138,6 +150,11 @@ def train_dense(
     class_names = _selected_class_names(labels_from_manifest(manifest_path), include_labels)
     class_to_index = {name: index for index, name in enumerate(class_names)}
     normalized_channel_mode = normalize_channel_mode(channel_mode)
+    normalized_box_encoding = _normalize_box_encoding(box_encoding)
+    effective_positive_cell_radius = _normalize_positive_cell_radius(
+        positive_cell_radius,
+        box_encoding=normalized_box_encoding,
+    )
     channel_mask = channel_mask_for_mode(normalized_channel_mode, channels=channels)
     device = _select_device(torch, device_name)
     effective_batch_size = max(int(batch_size), 1)
@@ -187,6 +204,8 @@ def train_dense(
         class_weight=class_weight,
         channel_mask=channel_mask,
         batch_size=effective_batch_size,
+        box_encoding=normalized_box_encoding,
+        positive_cell_radius=effective_positive_cell_radius,
     )
     for epoch in range(epoch_count):
         model.train()
@@ -206,6 +225,8 @@ def train_dense(
                 box_weight=box_weight,
                 class_weight=class_weight,
                 channel_mask=channel_mask,
+                box_encoding=normalized_box_encoding,
+                positive_cell_radius=effective_positive_cell_radius,
             )
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -231,6 +252,8 @@ def train_dense(
             class_weight=class_weight,
             channel_mask=channel_mask,
             batch_size=effective_batch_size,
+            box_encoding=normalized_box_encoding,
+            positive_cell_radius=effective_positive_cell_radius,
         )
         history.append(
             {
@@ -267,6 +290,8 @@ def train_dense(
         "grid_size": [int(grid_size[0]), int(grid_size[1])],
         "base_channels": int(base_channels),
         "model_architecture": str(model_architecture),
+        "box_encoding": normalized_box_encoding,
+        "positive_cell_radius": int(effective_positive_cell_radius),
         "tensor_key": resolved_tensor_key,
         "input_channels": len(channels),
         "channel_mode": normalized_channel_mode,
@@ -301,7 +326,6 @@ def train_dense(
         "checkpoint_epoch": int(best_epoch),
         "checkpoint_loss": best_loss,
         "checkpoint_loss_kind": best_loss_kind,
-        "box_encoding": BOX_ENCODING,
         "elapsed_seconds": float(elapsed_seconds),
         "total_sample_epochs": int(total_steps),
         "sample_epochs_per_second": sample_epochs_per_second,
@@ -331,7 +355,7 @@ def train_dense(
             "base_channels": int(base_channels),
             "model_architecture": str(model_architecture),
             "class_names": list(class_names),
-            "box_encoding": BOX_ENCODING,
+            "box_encoding": normalized_box_encoding,
             "summary": summary,
         }
         if bool(save_epoch_checkpoints):
@@ -410,6 +434,20 @@ def _selected_class_names(all_labels: Sequence[str], include_labels: Sequence[st
     return selected
 
 
+def _normalize_box_encoding(value: str | None) -> str:
+    normalized = str(value or DEFAULT_BOX_ENCODING).lower().replace("-", "_")
+    if normalized not in BOX_ENCODINGS:
+        raise ValueError(f"unsupported box_encoding: {value!r}")
+    return normalized
+
+
+def _normalize_positive_cell_radius(value: int | float | str | None, *, box_encoding: str) -> int:
+    radius = max(int(value or 0), 0)
+    if radius > 0 and str(box_encoding) != "xyxy":
+        raise ValueError("positive_cell_radius > 0 requires box_encoding='xyxy'")
+    return radius
+
+
 def _sample_loss(
     model: Any,
     dataset: Any,
@@ -425,6 +463,8 @@ def _sample_loss(
     box_weight: float,
     class_weight: float,
     channel_mask: Sequence[float],
+    box_encoding: str = DEFAULT_BOX_ENCODING,
+    positive_cell_radius: int = 0,
 ) -> Any:
     return _batch_loss(
         model,
@@ -440,6 +480,8 @@ def _sample_loss(
         box_weight=box_weight,
         class_weight=class_weight,
         channel_mask=channel_mask,
+        box_encoding=box_encoding,
+        positive_cell_radius=positive_cell_radius,
     )
 
 
@@ -458,6 +500,8 @@ def _batch_loss(
     box_weight: float,
     class_weight: float,
     channel_mask: Sequence[float],
+    box_encoding: str = DEFAULT_BOX_ENCODING,
+    positive_cell_radius: int = 0,
 ) -> Any:
     if not indices:
         raise ValueError("batch loss requires at least one index")
@@ -473,6 +517,8 @@ def _batch_loss(
             grid_size,
             device,
             torch,
+            box_encoding=box_encoding,
+            positive_cell_radius=positive_cell_radius,
         )
         for _, target in batch
     ]
@@ -552,8 +598,13 @@ def _dense_targets(
     grid_size: Tuple[int, int],
     device: Any,
     torch: Any,
+    *,
+    box_encoding: str = DEFAULT_BOX_ENCODING,
+    positive_cell_radius: int = 0,
 ) -> Tuple[Any, Any, Any]:
     rows, cols = int(grid_size[0]), int(grid_size[1])
+    encoding = _normalize_box_encoding(box_encoding)
+    radius = _normalize_positive_cell_radius(positive_cell_radius, box_encoding=encoding)
     object_target = torch.zeros((1, rows, cols), dtype=torch.float32, device=device)
     box_target = torch.zeros((4, rows, cols), dtype=torch.float32, device=device)
     class_target = torch.zeros((rows, cols), dtype=torch.long, device=device)
@@ -577,19 +628,48 @@ def _dense_targets(
         center_y = 0.5 * (y1 + y2)
         row = min(max(int(center_y * rows), 0), rows - 1)
         col = min(max(int(center_x * cols), 0), cols - 1)
-        cell = _nearest_free_cell(row, col, rows, cols, occupied)
-        if cell is None:
+        cells = _target_cells(row, col, rows, cols, occupied, radius=radius)
+        if not cells:
             continue
-        row, col = cell
-        occupied.add(cell)
-        object_target[0, row, col] = 1.0
         width = max(x2 - x1, 1.0e-6)
         height = max(y2 - y1, 1.0e-6)
-        offset_x = max(0.0, min(1.0, center_x * cols - col))
-        offset_y = max(0.0, min(1.0, center_y * rows - row))
-        box_target[:, row, col] = torch.tensor((offset_x, offset_y, width, height), dtype=torch.float32, device=device)
-        class_target[row, col] = int(class_index)
+        for cell_row, cell_col in cells:
+            occupied.add((cell_row, cell_col))
+            object_target[0, cell_row, cell_col] = 1.0
+            if encoding == "xyxy":
+                encoded_box = (x1, y1, x2, y2)
+            else:
+                offset_x = max(0.0, min(1.0, center_x * cols - cell_col))
+                offset_y = max(0.0, min(1.0, center_y * rows - cell_row))
+                encoded_box = (offset_x, offset_y, width, height)
+            box_target[:, cell_row, cell_col] = torch.tensor(encoded_box, dtype=torch.float32, device=device)
+            class_target[cell_row, cell_col] = int(class_index)
     return object_target, box_target, class_target
+
+
+def _target_cells(
+    row: int,
+    col: int,
+    rows: int,
+    cols: int,
+    occupied: set[Tuple[int, int]],
+    *,
+    radius: int,
+) -> Tuple[Tuple[int, int], ...]:
+    center = _nearest_free_cell(row, col, rows, cols, occupied)
+    if center is None:
+        return ()
+    if int(radius) <= 0:
+        return (center,)
+    candidates = []
+    for dy in range(-int(radius), int(radius) + 1):
+        for dx in range(-int(radius), int(radius) + 1):
+            rr, cc = row + dy, col + dx
+            if 0 <= rr < rows and 0 <= cc < cols and (rr, cc) not in occupied:
+                candidates.append((abs(dy) + abs(dx), abs(dy), abs(dx), rr, cc))
+    if not candidates:
+        return (center,)
+    return tuple((rr, cc) for _, _, _, rr, cc in sorted(candidates))
 
 
 def _nearest_free_cell(
@@ -633,6 +713,8 @@ def _evaluate_loss(
     class_weight: float,
     channel_mask: Sequence[float],
     batch_size: int = 1,
+    box_encoding: str = DEFAULT_BOX_ENCODING,
+    positive_cell_radius: int = 0,
 ) -> Optional[float]:
     if not indices:
         return None
@@ -655,6 +737,8 @@ def _evaluate_loss(
                 box_weight=box_weight,
                 class_weight=class_weight,
                 channel_mask=channel_mask,
+                box_encoding=box_encoding,
+                positive_cell_radius=positive_cell_radius,
             )
             losses.extend([float(loss.detach().cpu())] * len(batch_indices))
     if was_training:
