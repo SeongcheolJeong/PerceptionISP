@@ -36,6 +36,12 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--aux-checkpoint-template", required=True, help="str.format template with {seed} and {epoch}.")
     parser.add_argument("--epochs", default="0-11", help="Comma-separated epoch ids or ranges, for example 0-11.")
     parser.add_argument("--thresholds", default=",".join(str(value) for value in DEFAULT_THRESHOLDS))
+    parser.add_argument("--rgb-thresholds", default=None, help="RGB-only thresholds used when --tune-rgb-baseline is enabled; defaults to --thresholds.")
+    parser.add_argument(
+        "--tune-rgb-baseline",
+        action="store_true",
+        help="Also select the RGB-only operating point on the selection subset under the same FP budget.",
+    )
     parser.add_argument("--split-seed", default="native1000-select-test-v1")
     parser.add_argument("--selection-fraction", type=float, default=0.5)
     parser.add_argument("--include-labels", default=None)
@@ -55,6 +61,8 @@ def main(argv: Any = None) -> int:
         aux_checkpoint_template=str(args.aux_checkpoint_template),
         epochs=parse_int_list(args.epochs),
         thresholds=parse_float_list(args.thresholds),
+        rgb_thresholds=parse_float_list(args.rgb_thresholds) if args.rgb_thresholds is not None else None,
+        tune_rgb_baseline=bool(args.tune_rgb_baseline),
         split_seed=str(args.split_seed),
         selection_fraction=float(args.selection_fraction),
         include_labels=parse_label_list(args.include_labels),
@@ -91,6 +99,8 @@ def build_dense_select_test_gate(
     aux_checkpoint_template: str,
     epochs: Sequence[int],
     thresholds: Sequence[float] = DEFAULT_THRESHOLDS,
+    rgb_thresholds: Sequence[float] | None = None,
+    tune_rgb_baseline: bool = False,
     split_seed: str = "native1000-select-test-v1",
     selection_fraction: float = 0.5,
     include_labels: Sequence[str] | None = None,
@@ -113,6 +123,8 @@ def build_dense_select_test_gate(
                 aux_checkpoint_template=aux_checkpoint_template,
                 epochs=epochs,
                 thresholds=thresholds,
+                rgb_thresholds=rgb_thresholds if rgb_thresholds is not None else thresholds,
+                tune_rgb_baseline=bool(tune_rgb_baseline),
                 selection_indices=selection_indices,
                 test_indices=test_indices,
                 include_labels=include_labels,
@@ -122,10 +134,11 @@ def build_dense_select_test_gate(
     mean_selection_deltas = _mean_deltas(rows, "selection_deltas")
     mean_test_deltas = _mean_deltas(rows, "test_deltas")
     pass_test = [row for row in rows if row.get("test_status") == "pass"]
+    status = "pass" if len(pass_test) == len(rows) else "mixed"
     return {
         "name": "Selection/test-separated RGB+Aux dense detector gate",
-        "status": "pass" if len(pass_test) == len(rows) else "mixed",
-        "claim_status": "heldout_test_equal_fp_3seed_improvement" if len(pass_test) == len(rows) else "heldout_test_mixed_result",
+        "status": status,
+        "claim_status": _claim_status(bool(tune_rgb_baseline), status),
         "manifest": str(manifest_path),
         "split_source_summary": None if split_source_summary is None else str(split_source_summary),
         "split_method": f"sha1({split_seed}:index), first fraction selection, remainder test",
@@ -140,10 +153,19 @@ def build_dense_select_test_gate(
         "seed_count": int(len(rows)),
         "pass_test_seed_count": int(len(pass_test)),
         "candidate_thresholds": [float(value) for value in thresholds],
+        "candidate_rgb_thresholds": [float(value) for value in (rgb_thresholds if rgb_thresholds is not None else thresholds)],
         "candidate_epochs": [int(value) for value in epochs],
+        "tune_rgb_baseline": bool(tune_rgb_baseline),
         "selection_rule": (
-            "choose a candidate on the selection subset with non-increased FP, "
-            "non-decreased precision, and non-decreased recall; maximize recall delta, then precision delta"
+            (
+                "tune RGB-only threshold and RGB+Aux epoch/threshold on the selection subset under the same "
+                "FP budget; maximize recall, then precision"
+            )
+            if bool(tune_rgb_baseline)
+            else (
+                "choose a candidate on the selection subset with non-increased FP, "
+                "non-decreased precision, and non-decreased recall; maximize recall delta, then precision delta"
+            )
         ),
         "mean_selection_deltas": mean_selection_deltas,
         "mean_test_deltas": mean_test_deltas,
@@ -191,6 +213,12 @@ def write_dense_select_test_gate(summary: Mapping[str, Any], output_dir: str | P
     return html_path
 
 
+def _claim_status(tune_rgb_baseline: bool, status: str) -> str:
+    if bool(tune_rgb_baseline):
+        return "fair_tuned_rgb_baseline_heldout_pass" if status == "pass" else "fair_tuned_rgb_baseline_mixed"
+    return "heldout_test_equal_fp_3seed_improvement" if status == "pass" else "heldout_test_mixed_result"
+
+
 def parse_int_list(value: str) -> Tuple[int, ...]:
     values = []
     for token in str(value or "").split(","):
@@ -223,6 +251,8 @@ def _run_seed_gate(
     aux_checkpoint_template: str,
     epochs: Sequence[int],
     thresholds: Sequence[float],
+    rgb_thresholds: Sequence[float],
+    tune_rgb_baseline: bool,
     selection_indices: Sequence[int],
     test_indices: Sequence[int],
     include_labels: Sequence[str] | None,
@@ -236,6 +266,41 @@ def _run_seed_gate(
         include_labels=include_labels,
         device=device,
     )
+    rgb_candidates = [
+        {
+            "seed": int(seed),
+            "model": "rgb_only",
+            "confidence": float(confidence),
+            "checkpoint": str(rgb_only_checkpoint),
+            "metrics": _eval_metrics(
+                manifest_path=manifest_path,
+                checkpoint=rgb_only_checkpoint,
+                confidence=float(confidence),
+                indices=selection_indices,
+                include_labels=include_labels,
+                device=device,
+            ),
+        }
+        for confidence in rgb_thresholds
+    ]
+    if not rgb_candidates:
+        rgb_candidates = [
+            {
+                "seed": int(seed),
+                "model": "rgb_only",
+                "confidence": 0.0,
+                "checkpoint": str(rgb_only_checkpoint),
+                "metrics": rgb_selection,
+            }
+        ]
+    fp_budget = float(rgb_selection["fp"])
+    selected_rgb = _best_under_fp_budget(rgb_candidates, fp_budget) if bool(tune_rgb_baseline) else {
+        "seed": int(seed),
+        "model": "rgb_only",
+        "confidence": 0.0,
+        "checkpoint": str(rgb_only_checkpoint),
+        "metrics": rgb_selection,
+    }
     candidates = []
     for epoch in epochs:
         checkpoint = aux_checkpoint_template.format(seed=int(seed), epoch=int(epoch))
@@ -255,14 +320,18 @@ def _run_seed_gate(
                     "confidence": float(confidence),
                     "checkpoint": str(checkpoint),
                     "metrics": metrics,
-                    "deltas": _metric_deltas(metrics, rgb_selection),
+                    "deltas": _metric_deltas(metrics, selected_rgb["metrics"] if bool(tune_rgb_baseline) else rgb_selection),
                 }
             )
-    selected, selection_status = select_candidate(candidates)
+    if bool(tune_rgb_baseline):
+        selected = _best_under_fp_budget(candidates, fp_budget)
+        selection_status = "pass" if float(selected["metrics"]["recall"]) >= float(selected_rgb["metrics"]["recall"]) else "no_aux_recall_gain"
+    else:
+        selected, selection_status = select_candidate(candidates)
     rgb_test = _eval_metrics(
         manifest_path=manifest_path,
-        checkpoint=rgb_only_checkpoint,
-        confidence=0.0,
+        checkpoint=selected_rgb["checkpoint"],
+        confidence=float(selected_rgb["confidence"]),
         indices=test_indices,
         include_labels=include_labels,
         device=device,
@@ -281,12 +350,17 @@ def _run_seed_gate(
         "selection_status": selection_status,
         "selected_epoch": int(selected["epoch"]),
         "selected_confidence": float(selected["confidence"]),
+        "selected_rgb_confidence": float(selected_rgb["confidence"]),
+        "selection_fp_budget": fp_budget,
+        "tune_rgb_baseline": bool(tune_rgb_baseline),
         "rgb_checkpoint": str(rgb_only_checkpoint),
         "aux_checkpoint": str(selected["checkpoint"]),
-        "selection_rgb_only": rgb_selection,
+        "selection_rgb_only_default": rgb_selection,
+        "selection_rgb_only": selected_rgb["metrics"],
         "selection_rgb_aux": selected["metrics"],
         "selection_deltas": selected["deltas"],
         "selection_candidate_count": int(len(candidates)),
+        "selection_rgb_candidate_count": int(len(rgb_candidates)),
         "selection_valid_count": int(_valid_candidate_count(candidates)),
         "test_rgb_only": rgb_test,
         "test_rgb_aux": aux_test,
@@ -302,6 +376,22 @@ def select_candidate(candidates: Sequence[Mapping[str, Any]]) -> Tuple[Mapping[s
     if not candidates:
         raise ValueError("no candidates provided")
     return max(candidates, key=_fallback_candidate_sort_key), "no_equal_fp_candidate"
+
+
+def _best_under_fp_budget(candidates: Sequence[Mapping[str, Any]], fp_budget: float) -> Mapping[str, Any]:
+    if not candidates:
+        raise ValueError("no candidates provided")
+    valid = [candidate for candidate in candidates if float(candidate.get("metrics", {}).get("fp", 0.0)) <= float(fp_budget) + 1.0e-9]
+    if not valid:
+        valid = list(candidates)
+    return max(
+        valid,
+        key=lambda candidate: (
+            float(candidate.get("metrics", {}).get("recall", 0.0)),
+            float(candidate.get("metrics", {}).get("precision", 0.0)),
+            -float(candidate.get("metrics", {}).get("fp", 0.0)),
+        ),
+    )
 
 
 def _eval_metrics(
@@ -381,6 +471,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
         rows.append(
             "<tr>"
             f"<td>{int(row.get('seed', 0))}</td>"
+            f"<td>{_fmt(row.get('selected_rgb_confidence'), digits=3)}</td>"
             f"<td>{int(row.get('selected_epoch', 0))}</td>"
             f"<td>{_fmt(row.get('selected_confidence'), digits=3)}</td>"
             f"<td>{_fmt(rgb.get('precision'))}</td><td>{_fmt(aux.get('precision'))}</td><td class=\"{_delta_class(deltas.get('precision'), positive_good=True)}\">{_fmt(deltas.get('precision'), signed=True)}</td>"
@@ -431,7 +522,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
   </div>
   <h2>Held-Out Test Results</h2>
   <table>
-    <thead><tr><th>Seed</th><th>Epoch</th><th>Conf.</th><th>RGB P</th><th>Aux P</th><th>Delta P</th><th>RGB R</th><th>Aux R</th><th>Delta R</th><th>RGB FP</th><th>Aux FP</th><th>Delta FP</th><th>Status</th></tr></thead>
+    <thead><tr><th>Seed</th><th>RGB Conf.</th><th>Aux Epoch</th><th>Aux Conf.</th><th>RGB P</th><th>Aux P</th><th>Delta P</th><th>RGB R</th><th>Aux R</th><th>Delta R</th><th>RGB FP</th><th>Aux FP</th><th>Delta FP</th><th>Status</th></tr></thead>
     <tbody>{''.join(rows)}</tbody>
   </table>
   <h2>Protocol</h2>
@@ -439,6 +530,7 @@ def _render_html(summary: Mapping[str, Any]) -> str:
     <li>Source eval samples: {int(summary.get('source_eval_count', 0))}; selection: {int(summary.get('selection_sample_count', 0))}; test: {int(summary.get('test_sample_count', 0))}.</li>
     <li>Candidate epochs: <code>{html_lib.escape(str(summary.get('candidate_epochs', [])))}</code></li>
     <li>Candidate thresholds: <code>{html_lib.escape(str(summary.get('candidate_thresholds', [])))}</code></li>
+    <li>Tuned RGB baseline: <code>{html_lib.escape(str(summary.get('tune_rgb_baseline', False)))}</code>; RGB thresholds: <code>{html_lib.escape(str(summary.get('candidate_rgb_thresholds', [])))}</code></li>
   </ul>
   <p class="note"><strong>Boundary:</strong> this is stronger than same-split metric selection, but still compact-detector feasibility evidence rather than production detector proof.</p>
   <p>Raw JSON: <code>{SUMMARY_FILENAME}</code>; split JSON: <code>{SPLIT_FILENAME}</code></p>

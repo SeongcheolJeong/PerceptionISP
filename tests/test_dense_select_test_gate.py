@@ -4,8 +4,11 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from perception_isp import dense_select_test_gate as gate
 from perception_isp.dense_select_test_gate import (
+    build_dense_select_test_gate,
     parse_int_list,
     select_candidate,
     split_indices_by_hash,
@@ -39,6 +42,48 @@ class DenseSelectTestGateTest(unittest.TestCase):
         self.assertEqual(parse_int_list("0-2,4,2"), (0, 1, 2, 4))
         self.assertEqual(parse_int_list("3-1"), (3, 2, 1))
 
+    def test_build_gate_can_tune_rgb_baseline_threshold(self) -> None:
+        def fake_eval(**kwargs):
+            checkpoint = str(kwargs["checkpoint_path"])
+            confidence = float(kwargs["confidence"])
+            is_aux = "aux" in checkpoint
+            if is_aux:
+                recall = 0.80 if confidence >= 0.2 else 0.40
+                precision = 0.25 if confidence >= 0.2 else 0.10
+                fp = 9.0 if confidence >= 0.2 else 11.0
+            else:
+                recall = 0.60 if confidence >= 0.2 else 0.50
+                precision = 0.20 if confidence >= 0.2 else 0.10
+                fp = 5.0 if confidence >= 0.2 else 10.0
+            return {
+                "aggregate": {
+                    "precision@0.50_mean": precision,
+                    "recall@0.50_mean": recall,
+                    "fp@0.50_mean": fp,
+                    "det_count_mean": fp + 1.0,
+                    "small_recall@0.50_mean": 0.0,
+                }
+            }
+
+        with mock.patch.object(gate, "evaluate_dense_manifest", side_effect=fake_eval):
+            summary = build_dense_select_test_gate(
+                manifest_path="manifest.jsonl",
+                source_eval_indices=(0, 1, 2, 3),
+                seeds=(7,),
+                rgb_only_template="rgb_{seed}.pt",
+                aux_checkpoint_template="aux_{seed}_{epoch:03d}.pt",
+                epochs=(0,),
+                thresholds=(0.0, 0.2),
+                rgb_thresholds=(0.0, 0.2),
+                tune_rgb_baseline=True,
+            )
+        row = summary["rows"][0]
+        self.assertTrue(row["tune_rgb_baseline"])
+        self.assertEqual(row["selected_rgb_confidence"], 0.2)
+        self.assertEqual(row["selected_confidence"], 0.2)
+        self.assertEqual(row["selection_fp_budget"], 10.0)
+        self.assertAlmostEqual(row["test_deltas"]["recall"], 0.20)
+
     def test_write_dense_select_test_gate_outputs_report_files(self) -> None:
         summary = {
             "claim_status": "heldout_test_equal_fp_3seed_improvement",
@@ -57,6 +102,7 @@ class DenseSelectTestGateTest(unittest.TestCase):
                     "seed": 7,
                     "selected_epoch": 0,
                     "selected_confidence": 0.1,
+                    "selected_rgb_confidence": 0.0,
                     "test_status": "pass",
                     "test_rgb_only": {"precision": 0.1, "recall": 0.2, "fp": 5.0},
                     "test_rgb_aux": {"precision": 0.2, "recall": 0.4, "fp": 4.0},
