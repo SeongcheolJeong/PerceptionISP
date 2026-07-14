@@ -8,7 +8,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from perception_isp.lod_dataset import (
+from perception_isp.datasets.lod_dataset import (
     build_lod_image_availability,
     build_lod_local_readiness,
     build_lod_subset_plan,

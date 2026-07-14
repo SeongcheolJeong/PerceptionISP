@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.aodraw_image_availability import (
+from perception_isp.datasets.aodraw_image_availability import (
     build_aodraw_image_availability,
     main as aodraw_image_availability_main,
     write_aodraw_image_availability,

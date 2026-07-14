@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.cfa_lenspsf_casebook import build_cfa_lenspsf_casebook_from_path, write_cfa_lenspsf_casebook
+from perception_isp.reporting.cfa_lenspsf_casebook import build_cfa_lenspsf_casebook_from_path, write_cfa_lenspsf_casebook
 
 
 class CfaLensPsfCasebookTest(unittest.TestCase):

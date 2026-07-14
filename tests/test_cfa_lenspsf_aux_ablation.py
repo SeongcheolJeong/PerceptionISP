@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.cfa_lenspsf_aux_ablation import build_aux_ablation, main as aux_ablation_main, write_aux_ablation
+from perception_isp.evaluation.cfa_lenspsf_aux_ablation import build_aux_ablation, main as aux_ablation_main, write_aux_ablation
 
 
 class CfaLensPsfAuxAblationTest(unittest.TestCase):

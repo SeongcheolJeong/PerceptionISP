@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.claim_readiness import main as readiness_main, run_claim_readiness
+from perception_isp.evaluation.claim_readiness import main as readiness_main, run_claim_readiness
 
 
 class ClaimReadinessTest(unittest.TestCase):

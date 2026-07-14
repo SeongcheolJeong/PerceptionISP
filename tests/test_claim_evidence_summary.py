@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.claim_evidence_summary import (
+from perception_isp.reporting.claim_evidence_summary import (
     build_claim_evidence_summary_from_path,
     main as evidence_main,
     write_claim_evidence_summary,

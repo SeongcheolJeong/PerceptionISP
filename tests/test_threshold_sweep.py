@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.threshold_sweep import build_threshold_sweep, parse_thresholds, write_threshold_sweep
+from perception_isp.evaluation.threshold_sweep import build_threshold_sweep, parse_thresholds, write_threshold_sweep
 
 
 class ThresholdSweepTest(unittest.TestCase):

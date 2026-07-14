@@ -13,7 +13,7 @@ class YoloAuxTrainTest(unittest.TestCase):
     def test_zero_aux_input_weights_for_model(self) -> None:
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import zero_aux_input_weights_for_model
+        from perception_isp.training.yolo_aux_train import zero_aux_input_weights_for_model
 
         model = nn.Sequential(nn.Conv2d(16, 8, kernel_size=3, padding=1), nn.ReLU())
         before_rgb = model[0].weight[:, :3, :, :].detach().clone()
@@ -29,7 +29,7 @@ class YoloAuxTrainTest(unittest.TestCase):
     def test_zero_aux_input_weights_reports_not_found_for_rgb_model(self) -> None:
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import zero_aux_input_weights_for_model
+        from perception_isp.training.yolo_aux_train import zero_aux_input_weights_for_model
 
         model = nn.Sequential(nn.Conv2d(3, 8, kernel_size=3, padding=1), nn.ReLU())
         result = zero_aux_input_weights_for_model(model, aux_start_channel=3)
@@ -39,7 +39,7 @@ class YoloAuxTrainTest(unittest.TestCase):
     def test_gated_stem_replacement_is_idempotent_for_existing_gated_stem(self) -> None:
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import RgbAuxGatedStem, replace_first_stem_with_gated_aux_stem
+        from perception_isp.training.yolo_aux_train import RgbAuxGatedStem, replace_first_stem_with_gated_aux_stem
 
         class FakeStem(nn.Module):
             def __init__(self) -> None:
@@ -70,7 +70,7 @@ class YoloAuxTrainTest(unittest.TestCase):
         import torch
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import replace_first_stem_with_gated_aux_stem
+        from perception_isp.training.yolo_aux_train import replace_first_stem_with_gated_aux_stem
 
         class FakeStem(nn.Module):
             def __init__(self) -> None:
@@ -95,7 +95,7 @@ class YoloAuxTrainTest(unittest.TestCase):
         import torch
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import RgbAuxGatedStem
+        from perception_isp.training.yolo_aux_train import RgbAuxGatedStem
 
         class FakeStem(nn.Module):
             def __init__(self) -> None:
@@ -124,7 +124,7 @@ class YoloAuxTrainTest(unittest.TestCase):
         import torch
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import replace_first_stem_with_gated_aux_stem
+        from perception_isp.training.yolo_aux_train import replace_first_stem_with_gated_aux_stem
 
         class FakeRgbStem(nn.Module):
             def __init__(self) -> None:
@@ -153,7 +153,7 @@ class YoloAuxTrainTest(unittest.TestCase):
     def test_restore_first_stem_from_gated_source_replaces_first_stem(self) -> None:
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import RgbAuxGatedStem, restore_first_stem_from_gated_source
+        from perception_isp.training.yolo_aux_train import RgbAuxGatedStem, restore_first_stem_from_gated_source
 
         class FakeStem(nn.Module):
             def __init__(self) -> None:
@@ -182,7 +182,7 @@ class YoloAuxTrainTest(unittest.TestCase):
         self.assertTrue(hasattr(model.model[0], "gate_logit"))
 
     def test_train_yolo_aux_passes_seed_and_records_summary(self) -> None:
-        from perception_isp.yolo_aux_train import train_yolo_aux
+        from perception_isp.training.yolo_aux_train import train_yolo_aux
 
         calls = []
 
@@ -238,7 +238,7 @@ class YoloAuxTrainTest(unittest.TestCase):
     def test_train_yolo_aux_installs_aux_stem_before_optimizer_path(self) -> None:
         import torch.nn as nn
 
-        from perception_isp.yolo_aux_train import train_yolo_aux
+        from perception_isp.training.yolo_aux_train import train_yolo_aux
 
         calls = []
 

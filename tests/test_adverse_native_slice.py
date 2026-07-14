@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from perception_isp.adverse_native_slice import (
+from perception_isp.evaluation.adverse_native_slice import (
     SUMMARY_FILENAME,
     apply_adverse_condition,
     build_adverse_summary,
@@ -16,9 +16,9 @@ from perception_isp.adverse_native_slice import (
     parse_conditions,
     summarize_condition_run,
 )
-from perception_isp.camerae2e_bridge import raw_from_rgb_direct
-from perception_isp.eval_types import BoundingBox, EvaluationSample
-from perception_isp.types import PerceptionISPConfig
+from perception_isp.core.camerae2e_bridge import raw_from_rgb_direct
+from perception_isp.core.task_types import BoundingBox, EvaluationSample
+from perception_isp.core.types import PerceptionISPConfig
 
 
 class AdverseNativeSliceTest(unittest.TestCase):

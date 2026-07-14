@@ -7,8 +7,8 @@ from zipfile import ZipFile
 
 import numpy as np
 
-from perception_isp.sid_dataset import build_sid_sony_pairs
-from perception_isp.sid_dataset import _resize_bayer_preserving_pattern
+from perception_isp.datasets.sid_dataset import build_sid_sony_pairs
+from perception_isp.datasets.sid_dataset import _resize_bayer_preserving_pattern
 
 
 class SIDDatasetTest(unittest.TestCase):

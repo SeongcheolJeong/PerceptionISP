@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.casebook import build_casebook_from_path, write_casebook
+from perception_isp.reporting.casebook import build_casebook_from_path, write_casebook
 
 
 class CasebookTest(unittest.TestCase):

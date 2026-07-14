@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.rgb_aux_dnn_sweep import build_rgb_aux_dnn_sweep, main as sweep_main, write_rgb_aux_dnn_sweep
+from perception_isp.evaluation.rgb_aux_dnn_sweep import build_rgb_aux_dnn_sweep, main as sweep_main, write_rgb_aux_dnn_sweep
 
 
 class RgbAuxDnnSweepTest(unittest.TestCase):

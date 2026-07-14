@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.task_gate import build_task_gate, main as task_gate_main, write_task_gate
+from perception_isp.evaluation.task_gate import build_task_gate, main as task_gate_main, write_task_gate
 
 
 class TaskGateTest(unittest.TestCase):

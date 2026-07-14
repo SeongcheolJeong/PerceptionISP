@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.prepare_coco_subset import prepare_coco_val_subset
+from perception_isp.datasets.prepare_coco_subset import prepare_coco_val_subset
 
 
 class PrepareCocoSubsetTest(unittest.TestCase):

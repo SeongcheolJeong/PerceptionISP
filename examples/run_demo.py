@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from perception_isp import PerceptionISPPipeline, make_synthetic_raw
+from perception_isp import PerceptionISPPipeline
+from perception_isp.core.synthetic import make_synthetic_raw
 
 
 def main() -> None:

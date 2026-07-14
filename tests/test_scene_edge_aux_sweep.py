@@ -7,15 +7,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.camerae2e_bridge import raw_from_rgb_direct
-from perception_isp.eval_types import EvaluationSample
-from perception_isp.scene_edge_aux_sweep import (
+from perception_isp.core.camerae2e_bridge import raw_from_rgb_direct
+from perception_isp.core.task_types import EvaluationSample
+from perception_isp.evaluation.scene_edge_aux_sweep import (
     SUMMARY_FILENAME,
     build_scene_edge_aux_sweep,
     main as aux_sweep_main,
     write_scene_edge_aux_sweep,
 )
-from perception_isp.synthetic import make_synthetic_scene_rgb
+from perception_isp.core.synthetic import make_synthetic_scene_rgb
 
 
 class SceneEdgeAuxSweepTest(unittest.TestCase):

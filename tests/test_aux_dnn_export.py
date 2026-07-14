@@ -11,7 +11,7 @@ from unittest import mock
 
 import numpy as np
 
-from perception_isp.aux_dnn import (
+from perception_isp.core.aux_dnn import (
     RGB_AUX_CHANNELS,
     RGB_AUX_EXTENDED_CHANNELS,
     apply_channel_mask,
@@ -23,13 +23,13 @@ from perception_isp.aux_dnn import (
     make_aux_early_fusion_stem,
     make_torch_dataset,
 )
-from perception_isp.aux_eval_dense import _apply_input_ablation, _shuffle_indices, evaluate_dense_manifest
-from perception_isp.aux_export import EDGE6_CHANNELS, _load_samples, export_aux_dataset, main as aux_export_main
-from perception_isp.aux_train_dense import _dense_targets, _weighted_mean, train_dense
-from perception_isp.aux_train_smoke import train_smoke
-from perception_isp.comparison import build_pipeline_images, compare_dataset
-from perception_isp.detectors import RGBAuxTorchDenseDetector, RGBAuxTorchSmokeDetector, rgb_aux_detector_from_checkpoint
-from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
+from perception_isp.evaluation.aux_eval_dense import _apply_input_ablation, _shuffle_indices, evaluate_dense_manifest
+from perception_isp.datasets.aux_export import EDGE6_CHANNELS, _load_samples, export_aux_dataset, main as aux_export_main
+from perception_isp.training.aux_train_dense import _dense_targets, _weighted_mean, train_dense
+from perception_isp.training.aux_train_smoke import train_smoke
+from perception_isp.evaluation.comparison import build_pipeline_images, compare_dataset
+from perception_isp.core.detectors import RGBAuxTorchDenseDetector, RGBAuxTorchSmokeDetector, rgb_aux_detector_from_checkpoint
+from perception_isp.evaluation.synthetic_eval import make_synthetic_evaluation_samples
 
 
 class AuxDNNExportTest(unittest.TestCase):
@@ -215,7 +215,7 @@ class AuxDNNExportTest(unittest.TestCase):
                 self.assertNotIn("perception_aux_hwc", keys)
 
     def test_load_samples_for_yolo_dataset_forwards_cache_and_progress_options(self) -> None:
-        with mock.patch("perception_isp.yolo_dataset.load_yolo_detection_samples", return_value=()) as loader:
+        with mock.patch("perception_isp.datasets.yolo_dataset.load_yolo_detection_samples", return_value=()) as loader:
             samples = _load_samples(
                 source="yolo-dataset",
                 dataset="data/unit.yaml",
@@ -240,7 +240,7 @@ class AuxDNNExportTest(unittest.TestCase):
 
     def test_load_samples_for_pascalraw_dataset_forwards_manifest_options(self) -> None:
         manifest = Path("reports/unit_pascalraw_manifest.json")
-        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_detection_samples", return_value=()) as loader:
+        with mock.patch("perception_isp.datasets.pascalraw_loader.load_pascalraw_detection_samples", return_value=()) as loader:
             samples = _load_samples(
                 source="pascalraw-dataset",
                 dataset="data/raw_datasets/pascalraw",
@@ -272,7 +272,7 @@ class AuxDNNExportTest(unittest.TestCase):
 
     def test_load_samples_for_pascalraw_native_dataset_uses_native_loader(self) -> None:
         manifest = Path("reports/unit_pascalraw_native_manifest.json")
-        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_native_detection_samples", return_value=()) as loader:
+        with mock.patch("perception_isp.datasets.pascalraw_loader.load_pascalraw_native_detection_samples", return_value=()) as loader:
             samples = _load_samples(
                 source="pascalraw-dataset",
                 dataset="data/raw_datasets/pascalraw",

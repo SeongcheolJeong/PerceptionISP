@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.aodraw_loader import load_aodraw_detection_samples, load_aodraw_manifest_row
+from perception_isp.datasets.aodraw_loader import load_aodraw_detection_samples, load_aodraw_manifest_row
 
 
 class AODRawLoaderTest(unittest.TestCase):

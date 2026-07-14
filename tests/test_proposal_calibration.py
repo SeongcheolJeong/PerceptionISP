@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.proposal_calibration import (
+from perception_isp.evaluation.proposal_calibration import (
     apply_proposal_calibration_to_report,
     build_proposal_calibration,
     main as proposal_calibration_main,
@@ -15,7 +15,7 @@ from perception_isp.proposal_calibration import (
     split_sample_indices,
     write_proposal_calibration,
 )
-from perception_isp.proposal_calibration_apply import main as proposal_calibration_apply_main
+from perception_isp.evaluation.proposal_calibration_apply import main as proposal_calibration_apply_main
 
 
 class ProposalCalibrationTest(unittest.TestCase):

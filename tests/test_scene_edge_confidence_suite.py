@@ -7,15 +7,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.camerae2e_bridge import raw_from_rgb_direct
-from perception_isp.eval_types import EvaluationSample
-from perception_isp.scene_edge_confidence_suite import (
+from perception_isp.core.camerae2e_bridge import raw_from_rgb_direct
+from perception_isp.core.task_types import EvaluationSample
+from perception_isp.evaluation.scene_edge_confidence_suite import (
     SCENE_EDGE_CONFIDENCE_SUMMARY,
     build_scene_edge_confidence_suite,
     main as scene_edge_main,
     write_scene_edge_confidence_suite,
 )
-from perception_isp.synthetic import make_synthetic_scene_rgb
+from perception_isp.core.synthetic import make_synthetic_scene_rgb
 
 
 class SceneEdgeConfidenceSuiteTest(unittest.TestCase):

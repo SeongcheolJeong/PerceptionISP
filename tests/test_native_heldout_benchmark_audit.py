@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.native_heldout_benchmark_audit import (
+from perception_isp.evaluation.native_heldout_benchmark_audit import (
     build_native_heldout_benchmark_audit,
     main as native_heldout_main,
     write_native_heldout_benchmark_audit,

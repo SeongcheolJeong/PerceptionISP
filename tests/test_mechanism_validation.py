@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.mechanism_validation import build_mechanism_validation, main as mechanism_main, write_mechanism_validation
+from perception_isp.evaluation.mechanism_validation import build_mechanism_validation, main as mechanism_main, write_mechanism_validation
 
 
 class MechanismValidationTest(unittest.TestCase):

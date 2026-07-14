@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.kitti_dataset import load_kitti_detection_samples
+from perception_isp.datasets.kitti_dataset import load_kitti_detection_samples
 
 
 class KittiDatasetAdapterTest(unittest.TestCase):

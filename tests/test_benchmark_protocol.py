@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.benchmark_protocol import build_protocol_coverage, main as protocol_main, write_protocol_coverage
+from perception_isp.evaluation.benchmark_protocol import build_protocol_coverage, main as protocol_main, write_protocol_coverage
 
 
 class BenchmarkProtocolTest(unittest.TestCase):

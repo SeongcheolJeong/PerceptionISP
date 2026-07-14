@@ -7,11 +7,11 @@ from io import StringIO
 
 import numpy as np
 
-from perception_isp.comparison import build_pipeline_images, compare_dataset, write_comparison_report
-from perception_isp.detectors import DetectorAdapter, LabelMapDetector, fuse_rgb_aux_results
-from perception_isp.eval_types import BoundingBox, Detection, DetectorResult
-from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
-from perception_isp.types import PerceptionISPConfig
+from perception_isp.evaluation.comparison import build_pipeline_images, compare_dataset, write_comparison_report
+from perception_isp.core.detectors import DetectorAdapter, LabelMapDetector, fuse_rgb_aux_results
+from perception_isp.core.task_types import BoundingBox, Detection, DetectorResult
+from perception_isp.evaluation.synthetic_eval import make_synthetic_evaluation_samples
+from perception_isp.core.types import PerceptionISPConfig
 
 
 class ComparisonHarnessTest(unittest.TestCase):

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.object_boundary_detection_bridge import (
+from perception_isp.evaluation.object_boundary_detection_bridge import (
     build_object_boundary_detection_bridge,
     main as bridge_main,
     write_object_boundary_detection_bridge,

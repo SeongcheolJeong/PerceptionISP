@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.condition_metrics import build_condition_metrics, main as condition_metrics_main, write_condition_metrics
+from perception_isp.evaluation.condition_metrics import build_condition_metrics, main as condition_metrics_main, write_condition_metrics
 
 
 class ConditionMetricsTest(unittest.TestCase):

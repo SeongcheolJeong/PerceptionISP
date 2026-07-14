@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.scene_information_stress import (
+from perception_isp.evaluation.scene_information_stress import (
     build_scene_information_stress,
     main as scene_information_main,
     write_scene_information_stress,

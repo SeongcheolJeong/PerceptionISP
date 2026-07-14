@@ -5,7 +5,9 @@ import unittest
 
 import numpy as np
 
-from perception_isp import PerceptionISPConfig, PerceptionISPPipeline, PreviousFrameState, RawFrame, make_synthetic_raw
+from perception_isp import PerceptionISPConfig, PerceptionISPPipeline, RawFrame
+from perception_isp.core.synthetic import make_synthetic_raw
+from perception_isp.core.types import PreviousFrameState
 
 
 class PerceptionISPPipelineTest(unittest.TestCase):

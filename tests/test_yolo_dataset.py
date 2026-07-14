@@ -11,7 +11,7 @@ from unittest import mock
 import numpy as np
 from PIL import Image
 
-from perception_isp.yolo_dataset import load_yolo_detection_samples
+from perception_isp.datasets.yolo_dataset import load_yolo_detection_samples
 
 
 class YoloDatasetAdapterTest(unittest.TestCase):
@@ -98,7 +98,7 @@ class YoloDatasetAdapterTest(unittest.TestCase):
                 cache_dir=cache_dir,
             )
 
-            with mock.patch("perception_isp.yolo_dataset.raw_from_rgb_direct", side_effect=AssertionError("cache miss")):
+            with mock.patch("perception_isp.datasets.yolo_dataset.raw_from_rgb_direct", side_effect=AssertionError("cache miss")):
                 second = load_yolo_detection_samples(
                     root / "data.yaml",
                     split="val",

@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perception_isp import dense_input_ablation_gate as gate
-from perception_isp.dense_input_ablation_gate import (
+from perception_isp.evaluation import dense_input_ablation_gate as gate
+from perception_isp.evaluation.dense_input_ablation_gate import (
     build_dense_input_ablation_gate,
     main as dense_input_ablation_main,
     parse_modes,

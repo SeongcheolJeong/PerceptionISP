@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from perception_isp.camerae2e_bridge import (
+from perception_isp.core.camerae2e_bridge import (
     CAMERAE2E_SRC,
     _camerae2e_provenance,
     _camerae2e_camera_type_for_requested_cfa,

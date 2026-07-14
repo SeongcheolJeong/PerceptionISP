@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.cfa_lenspsf_proposal_audit import build_cfa_lenspsf_proposal_audit_from_path, write_cfa_lenspsf_proposal_audit
+from perception_isp.evaluation.cfa_lenspsf_proposal_audit import build_cfa_lenspsf_proposal_audit_from_path, write_cfa_lenspsf_proposal_audit
 
 
 class CfaLensPsfProposalAuditTest(unittest.TestCase):

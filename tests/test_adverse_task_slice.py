@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.adverse_task_slice import (
+from perception_isp.evaluation.adverse_task_slice import (
     SUMMARY_FILENAME,
     build_adverse_task_slice,
     main as adverse_task_main,

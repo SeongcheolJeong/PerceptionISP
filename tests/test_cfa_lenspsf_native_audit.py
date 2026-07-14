@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.cfa_lenspsf_native_audit import build_native_audit_from_path, write_native_audit
+from perception_isp.evaluation.cfa_lenspsf_native_audit import build_native_audit_from_path, write_native_audit
 
 
 class CfaLensPsfNativeAuditTest(unittest.TestCase):

@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perception_isp.aodraw_acquisition import main as aodraw_acquisition_main
-from perception_isp.aodraw_acquisition import run_aodraw_acquisition, write_aodraw_acquisition
-from perception_isp.aodraw_download_plan import CLEANUP_CONFIRM_TOKEN
+from perception_isp.datasets.aodraw_acquisition import main as aodraw_acquisition_main
+from perception_isp.datasets.aodraw_acquisition import run_aodraw_acquisition, write_aodraw_acquisition
+from perception_isp.datasets.aodraw_download_plan import CLEANUP_CONFIRM_TOKEN
 
 
 class AODRawAcquisitionTest(unittest.TestCase):
@@ -184,9 +184,9 @@ def _patch_space(root: Path):
         }
 
     stack = contextlib.ExitStack()
-    stack.enter_context(mock.patch("perception_isp.aodraw_download_plan._disk_summary", side_effect=disk_summary))
-    stack.enter_context(mock.patch("perception_isp.aodraw_storage_cleanup._disk_summary", side_effect=disk_summary))
-    stack.enter_context(mock.patch("perception_isp.aodraw_download_plan._disk_usage_bytes", return_value=int(110 * 1024**3)))
+    stack.enter_context(mock.patch("perception_isp.datasets.aodraw_download_plan._disk_summary", side_effect=disk_summary))
+    stack.enter_context(mock.patch("perception_isp.datasets.aodraw_storage_cleanup._disk_summary", side_effect=disk_summary))
+    stack.enter_context(mock.patch("perception_isp.datasets.aodraw_download_plan._disk_usage_bytes", return_value=int(110 * 1024**3)))
     return stack
 
 

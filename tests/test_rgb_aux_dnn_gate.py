@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.rgb_aux_dnn_gate import build_rgb_aux_dnn_gate, main as gate_main, write_rgb_aux_dnn_gate
+from perception_isp.evaluation.rgb_aux_dnn_gate import build_rgb_aux_dnn_gate, main as gate_main, write_rgb_aux_dnn_gate
 
 
 class RgbAuxDnnGateTest(unittest.TestCase):

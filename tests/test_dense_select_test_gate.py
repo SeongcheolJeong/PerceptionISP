@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perception_isp import dense_select_test_gate as gate
-from perception_isp.dense_select_test_gate import (
+from perception_isp.evaluation import dense_select_test_gate as gate
+from perception_isp.evaluation.dense_select_test_gate import (
     build_dense_select_test_gate,
     parse_int_list,
     parse_optional_float_list,
@@ -16,7 +16,7 @@ from perception_isp.dense_select_test_gate import (
     split_indices_by_hash,
     write_dense_select_test_gate,
 )
-from perception_isp.eval_types import BoundingBox, Detection
+from perception_isp.core.task_types import BoundingBox, Detection
 
 
 class DenseSelectTestGateTest(unittest.TestCase):

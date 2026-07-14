@@ -8,7 +8,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from perception_isp.aodraw_dataset import (
+from perception_isp.datasets.aodraw_dataset import (
     build_aodraw_subset_plan,
     load_aodraw_annotation_records,
     main as aodraw_dataset_main,

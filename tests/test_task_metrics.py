@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.task_metrics import build_task_metrics, main as task_metrics_main, parse_label_groups, write_task_metrics
+from perception_isp.evaluation.task_metrics import build_task_metrics, main as task_metrics_main, parse_label_groups, write_task_metrics
 
 
 class TaskMetricsTest(unittest.TestCase):

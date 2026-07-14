@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.aux_training_rollup import build_training_rollup, main as rollup_main, parse_planning_scenarios, write_training_rollup
+from perception_isp.reporting.aux_training_rollup import build_training_rollup, main as rollup_main, parse_planning_scenarios, write_training_rollup
 
 
 class AuxTrainingRollupTest(unittest.TestCase):

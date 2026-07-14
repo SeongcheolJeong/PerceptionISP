@@ -19,9 +19,14 @@ env/
 .env
 .env.*
 
-# Generated evaluation artifacts
+# Generated evaluation and training artifacts
 reports/
 exports/
+runs/
+outputs/
+logs/
+models/
+imagegen_report/
 
 # Downloaded datasets and images
 data/raw_datasets/
@@ -34,6 +39,9 @@ data/sample_images/
 data/.cache/
 data/coco_val*/
 data/kitti*/
+
+# Local workspace configuration
+.perception-isp/
 
 # Model weights and large ML artifacts
 *.pt

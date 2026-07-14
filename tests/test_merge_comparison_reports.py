@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.merge_comparison_reports import merge_comparison_reports
+from perception_isp.reporting.merge_comparison_reports import merge_comparison_reports
 
 
 class MergeComparisonReportsTest(unittest.TestCase):

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.detector_box_support_audit import (
+from perception_isp.evaluation.detector_box_support_audit import (
     build_detector_box_support_audit,
     main as detector_box_support_main,
     write_detector_box_support_audit,

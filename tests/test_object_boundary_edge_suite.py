@@ -7,12 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.object_boundary_edge_suite import (
+from perception_isp.evaluation.object_boundary_edge_suite import (
     build_object_boundary_edge_suite,
     main as object_boundary_main,
     write_object_boundary_edge_suite,
 )
-from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
+from perception_isp.evaluation.synthetic_eval import make_synthetic_evaluation_samples
 
 
 class ObjectBoundaryEdgeSuiteTest(unittest.TestCase):

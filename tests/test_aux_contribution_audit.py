@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.aux_contribution_audit import (
+from perception_isp.evaluation.aux_contribution_audit import (
     build_aux_contribution_audit,
     build_aux_contribution_audit_from_paths,
     main as aux_audit_main,

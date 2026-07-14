@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.edge_confidence_suite import build_edge_confidence_suite, main as edge_suite_main, write_edge_confidence_suite
+from perception_isp.evaluation.edge_confidence_suite import build_edge_confidence_suite, main as edge_suite_main, write_edge_confidence_suite
 
 
 class EdgeConfidenceSuiteTest(unittest.TestCase):

@@ -4,34 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "perception-isp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Software reference implementation of a perception-oriented automotive ISP."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = ["numpy", "pillow"]
 
 [project.optional-dependencies]
 raw = ["rawpy"]
+ml = ["opencv-python-headless", "pyyaml", "torch", "ultralytics"]
+camerae2e = ["h5py"]
+dev = ["build", "pytest"]
+all = ["h5py", "opencv-python-headless", "pyyaml", "rawpy", "torch", "ultralytics"]
 
 [project.scripts]
 perception-isp = "perception_isp.cli:main"
-perception-isp-eval = "perception_isp.eval_cli:main"
-perception-isp-sweep = "perception_isp.resolution_sweep:main"
-perception-isp-aux-export = "perception_isp.aux_export:main"
-perception-isp-aux-train-smoke = "perception_isp.aux_train_smoke:main"
-perception-isp-aux-train-dense = "perception_isp.aux_train_dense:main"
-perception-isp-aux-eval-dense = "perception_isp.aux_eval_dense:main"
-perception-isp-report-rollup = "perception_isp.report_rollup:main"
-perception-isp-prepare-coco-subset = "perception_isp.prepare_coco_subset:main"
-perception-isp-merge-comparison-reports = "perception_isp.merge_comparison_reports:main"
-perception-isp-isp-sweep = "perception_isp.isp_sweep:main"
-perception-isp-threshold-sweep = "perception_isp.threshold_sweep:main"
-perception-isp-proposal-calibration = "perception_isp.proposal_calibration:main"
-perception-isp-apply-proposal-calibration = "perception_isp.proposal_calibration_apply:main"
-perception-isp-scene-edge-casebook = "perception_isp.scene_edge_casebook:main"
-perception-isp-scene-edge-aux-sweep = "perception_isp.scene_edge_aux_sweep:main"
-perception-isp-yolo-aux-dataset = "perception_isp.yolo_aux_dataset:main"
-perception-isp-yolo-aux-train = "perception_isp.yolo_aux_train:main"
+
+[project.urls]
+Repository = "https://github.com/SeongcheolJeong/PerceptionISP"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

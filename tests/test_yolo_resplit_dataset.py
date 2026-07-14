@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.yolo_resplit_dataset import create_resplit_dataset
+from perception_isp.datasets.yolo_resplit_dataset import create_resplit_dataset
 
 
 class YoloResplitDatasetTest(unittest.TestCase):

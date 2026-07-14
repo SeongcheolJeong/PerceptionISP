@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.claim_gate import build_claim_gate, main as claim_gate_main, write_claim_gate
+from perception_isp.evaluation.claim_gate import build_claim_gate, main as claim_gate_main, write_claim_gate
 
 
 class ClaimGateTest(unittest.TestCase):

@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.scene_edge_casebook import (
+from perception_isp.reporting.scene_edge_casebook import (
     SUMMARY_FILENAME,
     build_scene_edge_casebook_from_path,
     main as casebook_main,

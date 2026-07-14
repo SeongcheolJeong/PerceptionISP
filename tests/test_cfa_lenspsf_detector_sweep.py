@@ -6,7 +6,7 @@ from argparse import Namespace
 from pathlib import Path
 from unittest import mock
 
-from perception_isp.cfa_lenspsf_detector_sweep import (
+from perception_isp.evaluation.cfa_lenspsf_detector_sweep import (
     SUMMARY_FILENAME,
     _load_samples,
     build_sweep_summary,
@@ -16,7 +16,7 @@ from perception_isp.cfa_lenspsf_detector_sweep import (
     raw_condition_summary,
     summarize_condition_run,
 )
-from perception_isp.types import PerceptionISPConfig
+from perception_isp.core.types import PerceptionISPConfig
 
 
 class CfaLensPsfDetectorSweepTest(unittest.TestCase):
@@ -151,7 +151,7 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
 
     def test_load_samples_for_pascalraw_remosaic_forwards_cfa_options(self) -> None:
         manifest = Path("reports/unit_pascalraw_manifest.json")
-        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_detection_samples", return_value=()) as loader:
+        with mock.patch("perception_isp.datasets.pascalraw_loader.load_pascalraw_detection_samples", return_value=()) as loader:
             samples = _load_samples(
                 source="pascalraw-dataset",
                 dataset="data/raw_datasets/pascalraw",
@@ -198,7 +198,7 @@ class CfaLensPsfDetectorSweepTest(unittest.TestCase):
 
     def test_load_samples_for_pascalraw_native_uses_native_loader(self) -> None:
         manifest = Path("reports/unit_pascalraw_manifest.json")
-        with mock.patch("perception_isp.pascalraw_loader.load_pascalraw_native_detection_samples", return_value=()) as loader:
+        with mock.patch("perception_isp.datasets.pascalraw_loader.load_pascalraw_native_detection_samples", return_value=()) as loader:
             samples = _load_samples(
                 source="pascalraw-dataset",
                 dataset="data/raw_datasets/pascalraw",

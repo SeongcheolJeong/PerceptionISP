@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.raw_dataset_readiness import (
+from perception_isp.datasets.raw_dataset_readiness import (
     build_raw_dataset_readiness,
     main as raw_dataset_readiness_main,
     write_raw_dataset_readiness,

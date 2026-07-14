@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.condition_gate import build_condition_gate, main as condition_gate_main, write_condition_gate
+from perception_isp.evaluation.condition_gate import build_condition_gate, main as condition_gate_main, write_condition_gate
 
 
 class ConditionGateTest(unittest.TestCase):

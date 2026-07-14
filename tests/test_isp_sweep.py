@@ -4,8 +4,8 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
-from perception_isp.isp_sweep import build_sweep_summary, config_id, iter_sweep_configs, parse_csv, parse_float_csv, summarize_run
-from perception_isp.types import PerceptionISPConfig
+from perception_isp.evaluation.isp_sweep import build_sweep_summary, config_id, iter_sweep_configs, parse_csv, parse_float_csv, summarize_run
+from perception_isp.core.types import PerceptionISPConfig
 
 
 class ISPSweepTest(unittest.TestCase):

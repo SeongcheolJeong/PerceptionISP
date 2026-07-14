@@ -7,9 +7,9 @@ from pathlib import Path
 
 import numpy as np
 
-from perception_isp.aux_export import EDGE6_CHANNELS, export_aux_dataset
-from perception_isp.synthetic_eval import make_synthetic_evaluation_samples
-from perception_isp.yolo_aux_dataset import export_yolo_aux_dataset
+from perception_isp.datasets.aux_export import EDGE6_CHANNELS, export_aux_dataset
+from perception_isp.evaluation.synthetic_eval import make_synthetic_evaluation_samples
+from perception_isp.datasets.yolo_aux_dataset import export_yolo_aux_dataset
 
 
 class YoloAuxDatasetTest(unittest.TestCase):

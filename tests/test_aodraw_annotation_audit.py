@@ -8,7 +8,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from perception_isp.aodraw_annotation_audit import (
+from perception_isp.evaluation.aodraw_annotation_audit import (
     build_aodraw_annotation_audit,
     main as aodraw_annotation_audit_main,
     write_aodraw_annotation_audit,

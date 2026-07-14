@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.edge_fidelity_suite import build_edge_fidelity_suite, main as edge_fidelity_main, write_edge_fidelity_suite
+from perception_isp.evaluation.edge_fidelity_suite import build_edge_fidelity_suite, main as edge_fidelity_main, write_edge_fidelity_suite
 
 
 class EdgeFidelitySuiteTest(unittest.TestCase):

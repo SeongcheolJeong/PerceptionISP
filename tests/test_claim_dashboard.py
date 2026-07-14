@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.claim_dashboard import build_claim_dashboard, main as dashboard_main, write_claim_dashboard
+from perception_isp.reporting.claim_dashboard import build_claim_dashboard, main as dashboard_main, write_claim_dashboard
 
 
 class ClaimDashboardTest(unittest.TestCase):

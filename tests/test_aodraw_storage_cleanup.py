@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perception_isp.aodraw_storage_cleanup import (
+from perception_isp.datasets.aodraw_storage_cleanup import (
     CONFIRM_TOKEN,
     build_aodraw_storage_cleanup,
     main as aodraw_storage_cleanup_main,
@@ -115,7 +115,7 @@ def _patch_cleanup(candidate: Path):
         "manual_action": "unit",
     }
     return mock.patch.multiple(
-        "perception_isp.aodraw_storage_cleanup",
+        "perception_isp.datasets.aodraw_storage_cleanup",
         _cleanup_candidates=mock.Mock(return_value=[row]),
         _cleanup_summary=mock.Mock(
             return_value={

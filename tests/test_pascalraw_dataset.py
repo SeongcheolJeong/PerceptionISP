@@ -8,7 +8,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from perception_isp.pascalraw_dataset import (
+from perception_isp.datasets.pascalraw_dataset import (
     build_pascalraw_image_availability,
     build_pascalraw_native_union_plan,
     build_pascalraw_subset_plan,

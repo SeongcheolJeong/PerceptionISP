@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from perception_isp.resolution_sweep import parse_resolutions, summarize_run
+from perception_isp.evaluation.resolution_sweep import parse_resolutions, summarize_run
 
 
 class ResolutionSweepTest(unittest.TestCase):

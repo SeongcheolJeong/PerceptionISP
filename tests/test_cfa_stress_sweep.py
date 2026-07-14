@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.cfa_stress_sweep import build_cfa_stress_sweep, main as cfa_sweep_main, write_cfa_stress_sweep
+from perception_isp.evaluation.cfa_stress_sweep import build_cfa_stress_sweep, main as cfa_sweep_main, write_cfa_stress_sweep
 
 
 class CFAStressSweepTest(unittest.TestCase):

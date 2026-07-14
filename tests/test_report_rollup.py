@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perception_isp.report_rollup import build_rollup, write_rollup_report
+from perception_isp.reporting.report_rollup import build_rollup, write_rollup_report
 
 
 class ReportRollupTest(unittest.TestCase):

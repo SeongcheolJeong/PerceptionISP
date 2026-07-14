@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.eval_cli import (
+from perception_isp.evaluation.eval_cli import (
     apply_psf_sigma_to_samples,
     filter_sample_labels,
     main as eval_cli_main,
@@ -19,8 +19,8 @@ from perception_isp.eval_cli import (
     raw_height_width,
     remap_sample_labels,
 )
-from perception_isp.eval_types import BoundingBox, EvaluationSample
-from perception_isp.types import RawFrame, SensorMetadata
+from perception_isp.core.task_types import BoundingBox, EvaluationSample
+from perception_isp.core.types import RawFrame, SensorMetadata
 
 
 class EvalCliHelpersTest(unittest.TestCase):

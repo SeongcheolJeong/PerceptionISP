@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perception_isp.aodraw_download_plan import (
+from perception_isp.datasets.aodraw_download_plan import (
     _cleanup_candidates as _build_cleanup_candidates,
     build_aodraw_download_plan,
     main as aodraw_download_plan_main,
@@ -33,8 +33,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
     def test_build_plan_prioritizes_downsampled_srgb_and_subset_raw(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
-                with mock.patch("perception_isp.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
+            with mock.patch("perception_isp.datasets.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
+                with mock.patch("perception_isp.datasets.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
                     summary = build_aodraw_download_plan(
                         manifest=_manifest(),
                         availability_summary=_availability(),
@@ -78,8 +78,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
     def test_build_plan_blocks_when_raw_zip_has_no_headroom(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=False)):
-                with mock.patch("perception_isp.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
+            with mock.patch("perception_isp.datasets.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=False)):
+                with mock.patch("perception_isp.datasets.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
                     summary = build_aodraw_download_plan(
                         manifest=_manifest(),
                         availability_summary=_availability(),
@@ -104,8 +104,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
     def test_slice_native_cfa_plan_does_not_recommend_downsample_zip_as_ready(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
-                with mock.patch("perception_isp.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
+            with mock.patch("perception_isp.datasets.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
+                with mock.patch("perception_isp.datasets.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
                     summary = build_aodraw_download_plan(
                         manifest=_slice_manifest(),
                         availability_summary=_availability_for(_slice_manifest()),
@@ -131,8 +131,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             manifest_path.write_text(json.dumps(_manifest()))
             availability_path.write_text(json.dumps(_availability()))
 
-            with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
-                with mock.patch("perception_isp.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
+            with mock.patch("perception_isp.datasets.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
+                with mock.patch("perception_isp.datasets.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
                     summary = build_aodraw_download_plan(
                         manifest=manifest_path,
                         availability_summary=availability_path,
@@ -152,8 +152,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertIn("RAW format warning", checklist)
 
             stdout = io.StringIO()
-            with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
-                with mock.patch("perception_isp.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
+            with mock.patch("perception_isp.datasets.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
+                with mock.patch("perception_isp.datasets.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
                     with contextlib.redirect_stdout(stdout):
                         exit_code = aodraw_download_plan_main(
                             [

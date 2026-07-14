@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from perception_isp.aodraw_pipeline import (
+from perception_isp.datasets.aodraw_pipeline import (
     main as aodraw_pipeline_main,
     run_aodraw_pipeline,
     write_aodraw_pipeline,

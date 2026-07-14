@@ -8,7 +8,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from perception_isp.aodraw_download_importer import (
+from perception_isp.datasets.aodraw_download_importer import (
     import_aodraw_downloads,
     main as aodraw_download_importer_main,
     write_aodraw_download_import,
