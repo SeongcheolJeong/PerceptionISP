@@ -26,6 +26,16 @@ from .eval_types import EvaluationSample
 from .types import PerceptionISPConfig, json_ready
 
 
+EDGE6_CHANNELS = (
+    "rgb_r",
+    "rgb_g",
+    "rgb_b",
+    "aux_edge_strength",
+    "aux_edge_evidence",
+    "aux_psf_edge_likelihood",
+)
+
+
 def main(argv: Any = None) -> int:
     parser = argparse.ArgumentParser(description="Export PerceptionISP RGB+aux tensors for DNN training.")
     parser.add_argument(
@@ -49,6 +59,14 @@ def main(argv: Any = None) -> int:
     parser.add_argument("--denoise-strength", type=float, default=0.18)
     parser.add_argument("--demosaic-method", default="edge_aware", choices=["edge_aware", "bilinear"])
     parser.add_argument("--demosaic-artifact-suppression", type=float, default=0.35)
+    parser.add_argument(
+        "--channels",
+        default=None,
+        help=(
+            "Comma-separated base tensor channels to store in rgb_aux_hwc/chw. "
+            "Aliases: stable6, edge6. Use edge6 to keep edge_evidence without exporting all 16 extended channels."
+        ),
+    )
     parser.add_argument("--minimal", action="store_true", help="Export only 6-channel RGB+aux tensors needed for fast gate training/eval.")
     parser.add_argument("--no-preview", action="store_true", help="Skip preview RGB/aux arrays while keeping trainable RGB+aux tensors.")
     parser.add_argument("--no-compress", action="store_true", help="Use faster uncompressed NPZ writes instead of np.savez_compressed.")
@@ -80,6 +98,7 @@ def main(argv: Any = None) -> int:
         samples,
         args.output_dir,
         config=config,
+        channels=_parse_channel_list(args.channels),
         include_extended=not bool(args.minimal),
         include_preview=not bool(args.minimal) and not bool(args.no_preview),
         compress=not bool(args.no_compress),
@@ -101,6 +120,7 @@ def main(argv: Any = None) -> int:
             "denoise_strength": float(args.denoise_strength),
             "demosaic_method": str(args.demosaic_method),
             "demosaic_artifact_suppression": float(args.demosaic_artifact_suppression),
+            "channels": list(_parse_channel_list(args.channels) or RGB_AUX_CHANNELS),
             "minimal": bool(args.minimal),
             "no_preview": bool(args.no_preview),
             "include_preview": not bool(args.minimal) and not bool(args.no_preview),
@@ -116,6 +136,7 @@ def export_aux_dataset(
     output_dir: str | Path,
     *,
     config: PerceptionISPConfig | None = None,
+    channels: Sequence[str] | None = None,
     include_extended: bool = True,
     include_preview: bool = True,
     compress: bool = True,
@@ -127,12 +148,13 @@ def export_aux_dataset(
     label_dir = destination / "labels"
     tensor_dir.mkdir(parents=True, exist_ok=True)
     label_dir.mkdir(parents=True, exist_ok=True)
+    base_channels = tuple(str(value) for value in (channels or RGB_AUX_CHANNELS))
 
     manifest_rows: List[Dict[str, Any]] = []
     for index, sample in enumerate(samples):
         images = build_pipeline_images(sample, config=config)
-        rgb_aux_hwc = build_rgb_aux_tensor(images, layout="hwc")
-        rgb_aux_chw = build_rgb_aux_tensor(images, layout="chw")
+        rgb_aux_hwc = build_rgb_aux_tensor(images, layout="hwc", channels=base_channels)
+        rgb_aux_chw = build_rgb_aux_tensor(images, layout="chw", channels=base_channels)
         height, width = rgb_aux_hwc.shape[:2]
         safe_id = _safe_id(sample.sample_id, index)
         tensor_name = f"{index:05d}_{safe_id}.npz"
@@ -147,7 +169,7 @@ def export_aux_dataset(
             "rgb_aux_chw": rgb_aux_chw,
             "boxes_xyxy": boxes_xyxy,
             "boxes_xyxy_normalized": boxes_xyxy_norm,
-            "channel_names": np.asarray(RGB_AUX_CHANNELS),
+            "channel_names": np.asarray(base_channels),
         }
         if include_extended:
             tensor_payload["rgb_aux_extended_hwc"] = build_rgb_aux_extended_tensor(images, layout="hwc")
@@ -172,10 +194,10 @@ def export_aux_dataset(
             "label_path": str(Path("labels") / label_name),
             "width": int(width),
             "height": int(height),
-            "channels": list(RGB_AUX_CHANNELS),
+            "channels": list(base_channels),
             "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS) if include_extended else [],
             "box_count": int(len(sample.ground_truth)),
-            "tensor_stats": tensor_stats(rgb_aux_chw),
+            "tensor_stats": tensor_stats(rgb_aux_chw, channels=base_channels),
             "raw_provenance": raw_provenance,
             "metadata": dict(sample.metadata),
             "isp_processing": dict(images.metadata.get("processing", {})) if isinstance(images.metadata, Mapping) else {},
@@ -191,6 +213,7 @@ def export_aux_dataset(
         manifest_rows,
         run_config=run_config,
         elapsed_seconds=elapsed_seconds,
+        channels=base_channels,
         include_extended=include_extended,
         include_preview=include_preview,
         compress=compress,
@@ -305,6 +328,7 @@ def _summary(
     *,
     run_config: Mapping[str, Any] | None,
     elapsed_seconds: float,
+    channels: Sequence[str] | None = None,
     include_extended: bool = True,
     include_preview: bool = True,
     compress: bool = True,
@@ -317,9 +341,10 @@ def _summary(
         tensor_layouts.extend(["rgb_aux_extended_hwc", "rgb_aux_extended_chw"])
     if include_preview:
         tensor_layouts.extend(["perception_rgb_hwc", "perception_aux_hwc"])
+    base_channels = tuple(str(value) for value in (channels or RGB_AUX_CHANNELS))
     return {
         "sample_count": sample_count,
-        "channels": list(RGB_AUX_CHANNELS),
+        "channels": list(base_channels),
         "extended_channels": list(RGB_AUX_EXTENDED_CHANNELS) if include_extended else [],
         "tensor_layouts": tensor_layouts,
         "export_options": {
@@ -376,7 +401,7 @@ def _render_html(summary: Mapping[str, Any], rows: Sequence[Mapping[str, Any]]) 
 </head>
 <body>
   <h1>PerceptionISP RGB+Aux DNN Export</h1>
-  <div class=\"note\">This export is the DNN-facing path. The stable six-channel tensor is stored as HWC/CHW for existing checkpoints: <code>{html_lib.escape(channels)}</code>. A sensor-native extended tensor is also stored for new aux-aware experiments: <code>{html_lib.escape(extended_channels)}</code>.</div>
+  <div class=\"note\">This export is the DNN-facing path. The base tensor is stored as HWC/CHW for training: <code>{html_lib.escape(channels)}</code>. When enabled, a sensor-native extended tensor is also stored for broader aux-aware experiments: <code>{html_lib.escape(extended_channels)}</code>.</div>
   <p>Samples: {int(summary.get('sample_count', 0))}, boxes: {int(summary.get('total_boxes', 0))}, export: {float(summary.get('elapsed_seconds', 0.0)):.2f}s ({float(summary.get('samples_per_second', 0.0)):.2f} samples/s). Manifest: <code>manifest.jsonl</code>.</p>
   <table>
     <thead><tr><th>Sample</th><th>Shape</th><th>Boxes</th><th>Source CFA</th><th>Target CFA</th><th>Remapped</th><th>Tensor</th></tr></thead>
@@ -401,6 +426,20 @@ def _safe_id(value: str, index: int) -> str:
     import re
 
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value)).strip("._") or f"sample_{index}"
+
+
+def _parse_channel_list(value: str | None) -> Sequence[str] | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+    alias = normalized.lower().replace("-", "_")
+    if alias in {"stable", "stable6", "default", "rgb_aux"}:
+        return RGB_AUX_CHANNELS
+    if alias in {"edge", "edge6", "edge_evidence6"}:
+        return EDGE6_CHANNELS
+    return tuple(part.strip() for part in normalized.split(",") if part.strip())
 
 
 if __name__ == "__main__":

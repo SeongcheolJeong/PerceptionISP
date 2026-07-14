@@ -46,6 +46,10 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertEqual(summary["sample_count"], 2)
             self.assertEqual(summary["subset_raw_file_count"], 2)
             self.assertEqual(summary["subset_srgb_file_count"], 2)
+            self.assertEqual(summary["raw_storage_layouts"], ["demosaiced_rgb_3ch_npy_not_native_cfa"])
+            self.assertEqual(summary["native_cfa_target_count"], 0)
+            self.assertEqual(summary["non_native_cfa_target_count"], 2)
+            self.assertIn("native Bayer CFA", summary["aodraw_raw_format_warning"])
             self.assertEqual(summary["missing_file_count"], 4)
             steps = {row["name"]: row for row in summary["download_steps"]}
             self.assertEqual(steps["Download AODRaw test downsampled RAW zip"]["expected_size_gb"], 58.94)
@@ -62,6 +66,8 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertIn("aodraw_pipeline", summary["post_download_commands"][0])
             self.assertIn("raw_only", summary["post_download_commands"][0])
             self.assertNotIn("eval_cli", summary["post_download_commands"][0])
+            checks = {row["id"]: row["status"] for row in summary["checks"]}
+            self.assertEqual(checks["raw_targets_native_cfa"], "warning")
             acquisition_commands = {row["step"]: row["command"] for row in summary["acquisition_commands"]}
             self.assertNotIn("free_space", acquisition_commands)
             self.assertIn("open -a Safari", acquisition_commands["open_raw_download"])
@@ -95,6 +101,28 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             self.assertIn("--open-download", acquisition_commands["approved_acquisition_runner"])
             self.assertIn("--watch", acquisition_commands["approved_acquisition_runner"])
 
+    def test_slice_native_cfa_plan_does_not_recommend_downsample_zip_as_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
+                with mock.patch("perception_isp.aodraw_download_plan._cleanup_candidates", return_value=_cleanup_candidates()):
+                    summary = build_aodraw_download_plan(
+                        manifest=_slice_manifest(),
+                        availability_summary=_availability_for(_slice_manifest()),
+                        dataset_root=root / "aodraw",
+                    )
+
+            self.assertEqual(summary["status"], "blocked")
+            self.assertEqual(summary["raw_storage_layouts"], ["packed_bayer_4ch_npy_native_cfa"])
+            self.assertEqual(summary["native_cfa_target_count"], 2)
+            self.assertIn("images_slice_raw", summary["recommended_first"])
+            steps = {row["name"]: row for row in summary["download_steps"]}
+            self.assertIn("Acquire selected AODRaw sliced RAW files or generate them from original .ARW images", steps)
+            self.assertNotIn("Download AODRaw test downsampled RAW zip", steps)
+            checks = {row["id"]: row["status"] for row in summary["checks"]}
+            self.assertEqual(checks["raw_targets_native_cfa"], "pass")
+            self.assertEqual(checks["raw_acquisition_path_available"], "fail")
+
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -118,8 +146,10 @@ class AODRawDownloadPlanTest(unittest.TestCase):
             checklist = (html_path.parent / "aodraw_manual_download_checklist.md").read_text()
             self.assertIn("AODRaw Partial Download Plan", html)
             self.assertIn("Storage Cleanup Candidates", html)
+            self.assertIn("RAW format warning", html)
             self.assertIn("0.0 GiB", html)
             self.assertIn("0.0 GiB", checklist)
+            self.assertIn("RAW format warning", checklist)
 
             stdout = io.StringIO()
             with mock.patch("perception_isp.aodraw_download_plan._disk_summary", return_value=_disk(fits_raw_headroom=True)):
@@ -161,16 +191,41 @@ def _manifest() -> list[dict]:
 
 
 def _availability() -> dict:
+    return _availability_for(_manifest())
+
+
+def _availability_for(manifest: list[dict]) -> dict:
     return {
         "evaluation_ready": False,
         "missing_file_count": 4,
         "missing_files": [
-            {"relative_path": "images_downsampled_raw/00000001.npy"},
-            {"relative_path": "images_downsampled_srgb/00000001.JPG"},
-            {"relative_path": "images_downsampled_raw/00000002.npy"},
-            {"relative_path": "images_downsampled_srgb/00000002.JPG"},
+            {"relative_path": row["expected_raw_relative_path"]}
+            for row in manifest
+        ]
+        + [
+            {"relative_path": row["expected_srgb_relative_path"]}
+            for row in manifest
         ],
     }
+
+
+def _slice_manifest() -> list[dict]:
+    return [
+        {
+            "image_id": 1,
+            "file_name": "00000001.JPG",
+            "expected_raw_relative_path": "images_slice_raw/00000001__1280__0___0.npy",
+            "expected_srgb_relative_path": "images_slice_srgb/00000001__1280__0___0.JPG",
+            "raw_storage_layout": "packed_bayer_4ch_npy_native_cfa",
+        },
+        {
+            "image_id": 2,
+            "file_name": "00000002.JPG",
+            "expected_raw_relative_path": "images_slice_raw/00000002__1280__0___0.npy",
+            "expected_srgb_relative_path": "images_slice_srgb/00000002__1280__0___0.JPG",
+            "raw_storage_layout": "packed_bayer_4ch_npy_native_cfa",
+        },
+    ]
 
 
 def _disk(*, fits_raw_headroom: bool) -> dict:

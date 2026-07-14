@@ -140,7 +140,14 @@ def _export_one(
     label_path = _resolve_manifest_path(manifest_file, row.get("label_path"))
     tensor_npz = np.load(tensor_path)
     tensor = _tensor_hwc(tensor_npz, tensor_key=tensor_key)
-    tensor, channel_names = _select_channels(tensor, mode=channel_mode, tensor_key=tensor_key, selected_channels=selected_channels)
+    available_channels = _channel_names_from_npz(tensor_npz, tensor_key=tensor_key, channel_count=int(tensor.shape[2]))
+    tensor, channel_names = _select_channels(
+        tensor,
+        mode=channel_mode,
+        tensor_key=tensor_key,
+        available_channels=available_channels,
+        selected_channels=selected_channels,
+    )
     yolo_tensor = _to_uint8_hwc(tensor, channel_mode=channel_mode)
 
     stem = _safe_stem(str(row.get("sample_id", f"sample_{row_index:05d}")), row_index)
@@ -197,14 +204,20 @@ def _select_channels(
     *,
     mode: str,
     tensor_key: str,
+    available_channels: Sequence[str] | None = None,
     selected_channels: Sequence[str] | None = None,
 ) -> Tuple[np.ndarray, Tuple[str, ...]]:
-    available_channels = channels_for_tensor_key(tensor_key)
-    if len(available_channels) != int(tensor.shape[2]):
-        available_channels = tuple(f"channel_{index}" for index in range(int(tensor.shape[2])))
+    channel_names = tuple(str(value) for value in (available_channels or ()))
+    if len(channel_names) != int(tensor.shape[2]):
+        try:
+            channel_names = channels_for_tensor_key(tensor_key)
+        except ValueError:
+            channel_names = ()
+    if len(channel_names) != int(tensor.shape[2]):
+        channel_names = tuple(f"channel_{index}" for index in range(int(tensor.shape[2])))
     requested_channels = tuple(str(value).strip() for value in (selected_channels or ()) if str(value).strip())
     if requested_channels:
-        channel_to_index = {name: index for index, name in enumerate(available_channels)}
+        channel_to_index = {name: index for index, name in enumerate(channel_names)}
         missing = tuple(name for name in requested_channels if name not in channel_to_index)
         if missing:
             raise ValueError(f"selected channels not present in {tensor_key!r}: {missing}")
@@ -215,12 +228,22 @@ def _select_channels(
     if normalized == "rgb_only":
         if tensor.shape[2] < 3:
             raise ValueError("rgb_only export requires at least 3 tensor channels")
-        return tensor[:, :, :3], tuple(available_channels[:3])
+        return tensor[:, :, :3], tuple(channel_names[:3])
     if normalized == "aux_only":
         if tensor.shape[2] <= 3:
             raise ValueError("aux_only export requires aux channels after RGB")
-        return tensor[:, :, 3:], tuple(available_channels[3:])
-    return tensor, available_channels
+        return tensor[:, :, 3:], tuple(channel_names[3:])
+    return tensor, channel_names
+
+
+def _channel_names_from_npz(npz: Any, *, tensor_key: str, channel_count: int) -> Tuple[str, ...] | None:
+    key = "extended_channel_names" if "extended" in str(tensor_key).lower() else "channel_names"
+    if key not in npz:
+        return None
+    names = tuple(str(value) for value in np.asarray(npz[key]).tolist())
+    if len(names) != int(channel_count):
+        return None
+    return names
 
 
 def _to_uint8_hwc(tensor: np.ndarray, *, channel_mode: str) -> np.ndarray:

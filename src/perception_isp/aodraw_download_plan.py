@@ -25,6 +25,8 @@ AODRAW_OFFICIAL_URLS = {
     "downsampled_srgb_baidu": "https://pan.baidu.com/s/1_56k-Tr1JGDI99xFugPGtQ?pwd=aerr",
     "downsampled_srgb_terabox": "https://terabox.com/s/1QerBpH6FaGCE05cXks2XxQ",
     "downsampled_raw_baidu": "https://pan.baidu.com/s/1QvqKuBPIgWXzdoABo-L-MQ?pwd=5v4a",
+    "slice_srgb_baidu": "https://pan.baidu.com/s/1BwKE9idUTLiw8Hi_PYnL1Q?pwd=n4cu",
+    "slice_srgb_terabox": "https://terabox.com/s/1FOtFtFbRbmghYsCCodqwUg",
     "original_images_baidu": "https://pan.baidu.com/s/1WqPZz_E9godci3FHlx07EQ?pwd=i2dv",
     "original_images_terabox": "https://terabox.com/s/1QMnQ7z0V9Wy79pBylG5ZBw",
 }
@@ -116,15 +118,18 @@ def build_aodraw_download_plan(
 ) -> Dict[str, Any]:
     root = Path(dataset_root).expanduser()
     project_path = Path.cwd() if project_root is None else Path(project_root).expanduser().resolve()
+    manifest_ref = _source_ref(manifest)
+    availability_ref = _source_ref(availability_summary)
     manifest_rows = _load_manifest(manifest)
     availability = _load_availability_summary(availability_summary)
     raw_files = sorted({str(row.get("expected_raw_relative_path", "")) for row in manifest_rows if row.get("expected_raw_relative_path")})
     srgb_files = sorted({str(row.get("expected_srgb_relative_path", "")) for row in manifest_rows if row.get("expected_srgb_relative_path")})
+    raw_layouts = _raw_layouts(manifest_rows, raw_files)
     missing_files = [str(row.get("relative_path", "")) for row in availability.get("missing_files", ()) if isinstance(row, Mapping)]
     disk = _disk_summary(root)
     cleanup_candidates = _cleanup_candidates(project_path)
     cleanup = _cleanup_summary(disk, cleanup_candidates)
-    steps = _download_steps(root=root, raw_files=raw_files, srgb_files=srgb_files, disk=disk)
+    steps = _download_steps(root=root, raw_files=raw_files, srgb_files=srgb_files, disk=disk, raw_layouts=raw_layouts)
     checks = _checks(manifest_rows, raw_files, srgb_files, availability, disk)
     return {
         "name": "AODRaw partial-download plan",
@@ -135,18 +140,31 @@ def build_aodraw_download_plan(
         "sample_count": len(manifest_rows),
         "subset_raw_file_count": len(raw_files),
         "subset_srgb_file_count": len(srgb_files),
+        "raw_storage_layouts": raw_layouts,
+        "native_cfa_target_count": _native_cfa_count(manifest_rows, raw_files),
+        "non_native_cfa_target_count": _non_native_cfa_count(manifest_rows, raw_files),
+        "aodraw_raw_format_warning": _raw_format_warning(raw_layouts),
         "missing_file_count": len(missing_files),
         "official_urls": dict(AODRAW_OFFICIAL_URLS),
         "disk": disk,
         "cleanup": cleanup,
         "cleanup_candidates": cleanup_candidates,
         "download_steps": steps,
-        "acquisition_commands": _acquisition_commands(cleanup),
+        "acquisition_commands": _acquisition_commands(
+            cleanup,
+            manifest_ref=manifest_ref,
+            availability_ref=availability_ref,
+            dataset_root=str(root),
+        ),
         "required_subset_files": sorted(set(raw_files + srgb_files)),
         "missing_files": missing_files,
         "downsampled_raw_archives": dict(AODRAW_DOWNSAMPLED_RAW_ARCHIVES),
-        "recommended_first": _recommended_first(disk),
-        "post_download_commands": _post_download_commands(),
+        "recommended_first": _recommended_first(disk, raw_layouts=raw_layouts),
+        "post_download_commands": _post_download_commands(
+            manifest_ref=manifest_ref,
+            dataset_root=str(root),
+            sample_count=len(manifest_rows),
+        ),
         "checks": checks,
         "claim_boundary": (
             "This is a download/action plan only. It does not prove image availability or PerceptionISP performance until the files are present and the availability/evaluation gates pass."
@@ -175,6 +193,14 @@ def _load_manifest(manifest: str | Path | Sequence[Mapping[str, Any]]) -> list[D
     if not isinstance(payload, Sequence) or isinstance(payload, (str, bytes)):
         raise ValueError("AODRaw manifest must be a JSON list or a summary with a manifest key")
     return [dict(row) for row in payload if isinstance(row, Mapping)]
+
+
+def _source_ref(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (str, bytes, Path)):
+        return str(Path(value).expanduser())
+    return ""
 
 
 def _load_availability_summary(value: str | Path | Mapping[str, Any] | None) -> Dict[str, Any]:
@@ -310,7 +336,45 @@ def _download_steps(
     raw_files: Sequence[str],
     srgb_files: Sequence[str],
     disk: Mapping[str, Any],
+    raw_layouts: Sequence[str],
 ) -> list[Dict[str, Any]]:
+    if any("packed_bayer_4ch" in str(layout) for layout in raw_layouts):
+        return [
+            {
+                "priority": "P0",
+                "name": "Acquire selected AODRaw sliced RAW files or generate them from original .ARW images",
+                "target_directory": str(root / "images_slice_raw"),
+                "expected_size_gb": None,
+                "source_urls": [AODRAW_OFFICIAL_URLS["original_images_baidu"], AODRAW_OFFICIAL_URLS["original_images_terabox"]],
+                "required_for_subset_files": [path for path in raw_files],
+                "status": "manual_blocked_no_public_slice_raw_archive",
+                "why": (
+                    "This is the correct native-CFA path for PerceptionISP demosaic evidence, but the official AODRaw README does not list a direct images_slice_raw download link. "
+                    "Acquire pre-generated slice RAW files manually if the provider exposes them, or download selected original .ARW/.JPG pairs and run the official slicing preprocessing."
+                ),
+            },
+            {
+                "priority": "P1",
+                "name": "Download AODRaw original images for native CFA slicing",
+                "target_directory": "~/Downloads or " + str(root / "downloads"),
+                "expected_size_gb": 435.0,
+                "source_urls": [AODRAW_OFFICIAL_URLS["original_images_baidu"], AODRAW_OFFICIAL_URLS["original_images_terabox"]],
+                "archive_filename": "",
+                "required_for_subset_files": [],
+                "status": "high_disk_manual_access",
+                "why": "Original .ARW files are native CFA, but the full directory is roughly 435 GB. Prefer selected-file download if the browser UI allows it.",
+            },
+            {
+                "priority": "P1",
+                "name": "Download sliced sRGB zip or directory",
+                "target_directory": str(root / "images_slice_srgb"),
+                "expected_size_gb": 23.0,
+                "source_urls": [AODRAW_OFFICIAL_URLS["slice_srgb_baidu"], AODRAW_OFFICIAL_URLS["slice_srgb_terabox"]],
+                "required_for_subset_files": [path for path in srgb_files],
+                "status": "recommended_after_raw_path_confirmed",
+                "why": "Sliced sRGB can support reference checks, but it does not unblock native RAW evidence without images_slice_raw.",
+            },
+        ]
     return [
         {
             "priority": "P0",
@@ -322,7 +386,8 @@ def _download_steps(
             "required_for_subset_files": [path for path in raw_files],
             "status": "recommended_now" if disk.get("fits_downsampled_raw_test_zip_with_headroom") else "disk_blocked",
             "why": (
-                "This is the first real RAW archive to acquire; the importer can extract only the selected subset .npy files from this zip. "
+                "This is the first official AODRaw image archive to acquire for a quick detector smoke test; the importer can extract only the selected subset .npy files from this zip. "
+                "Important: official downsampled RAW .npy files are demosaiced 3-channel RAW-RGB, not native Bayer CFA. "
                 f"Keep at least {RAW_DOWNLOAD_HEADROOM_GIB:.0f} GiB free beyond the zip size to avoid incomplete browser downloads."
             ),
         },
@@ -344,7 +409,10 @@ def _download_steps(
             "source_urls": [AODRAW_OFFICIAL_URLS["downsampled_raw_baidu"]],
             "required_for_subset_files": [path for path in raw_files],
             "status": "recommended_if_partial_selection_available",
-            "why": "This would be faster than the test zip, but the current Baidu link appears to expose zip archives rather than individual files.",
+            "why": (
+                "This would be faster than the test zip, but the current Baidu link appears to expose zip archives rather than individual files. "
+                "These downsampled files still do not prove native CFA/demosaic behavior because they are demosaiced 3-channel RAW-RGB."
+            ),
         },
         {
             "priority": "P2",
@@ -360,12 +428,72 @@ def _download_steps(
     ]
 
 
-def _recommended_first(disk: Mapping[str, Any]) -> str:
+def _recommended_first(disk: Mapping[str, Any], *, raw_layouts: Sequence[str] = ()) -> str:
+    if any("packed_bayer_4ch" in str(layout) for layout in raw_layouts):
+        return "Resolve AODRaw images_slice_raw acquisition; no official direct slice RAW download link is listed"
     if disk.get("fits_downsampled_raw_test_zip_with_headroom"):
         return "AODRaw_test_downsampled_raw.zip 58.94GB via Baidu"
     if disk.get("fits_downsampled_srgb_4p3gb"):
         return f"Free at least {RAW_DOWNLOAD_HEADROOM_GIB:.0f} GiB more headroom, then download AODRaw_test_downsampled_raw.zip"
     return "Free disk space before downloading AODRaw images"
+
+
+def _raw_layouts(rows: Sequence[Mapping[str, Any]], raw_files: Sequence[str]) -> list[str]:
+    layouts = {
+        _raw_layout_for_row(row)
+        for row in rows
+        if str(row.get("expected_raw_relative_path", "")).strip()
+    }
+    if not layouts:
+        layouts = {_raw_layout_from_path(path) for path in raw_files}
+    return sorted(str(layout) for layout in layouts if str(layout))
+
+
+def _raw_layout_for_row(row: Mapping[str, Any]) -> str:
+    explicit = str(row.get("raw_storage_layout", "")).strip()
+    if explicit:
+        return explicit
+    return _raw_layout_from_path(str(row.get("expected_raw_relative_path", "")))
+
+
+def _raw_layout_from_path(path: str) -> str:
+    normalized = str(path).lower()
+    if "images_slice_raw" in normalized:
+        return "packed_bayer_4ch_npy_native_cfa"
+    if "images_downsampled_raw" in normalized or "images_downsample_raw" in normalized:
+        return "demosaiced_rgb_3ch_npy_not_native_cfa"
+    if normalized.endswith(".arw"):
+        return "original_arw_native_cfa"
+    return "unknown_raw_layout"
+
+
+def _layout_is_native_cfa(layout: str) -> bool:
+    value = str(layout)
+    return "native_cfa" in value and "not_native_cfa" not in value
+
+
+def _native_cfa_count(rows: Sequence[Mapping[str, Any]], raw_files: Sequence[str]) -> int:
+    if rows:
+        return sum(1 for row in rows if _layout_is_native_cfa(_raw_layout_for_row(row)))
+    return sum(1 for path in raw_files if _layout_is_native_cfa(_raw_layout_from_path(path)))
+
+
+def _non_native_cfa_count(rows: Sequence[Mapping[str, Any]], raw_files: Sequence[str]) -> int:
+    if rows:
+        return sum(1 for row in rows if not _layout_is_native_cfa(_raw_layout_for_row(row)))
+    return sum(1 for path in raw_files if not _layout_is_native_cfa(_raw_layout_from_path(path)))
+
+
+def _raw_format_warning(layouts: Sequence[str]) -> str:
+    if any("not_native_cfa" in str(layout) for layout in layouts):
+        return (
+            "The planned AODRaw downsampled RAW files are official RAW-domain detector inputs, "
+            "but they are demosaiced 3-channel RAW-RGB .npy files rather than native Bayer CFA. "
+            "Use this path for quick adverse-condition detector smoke tests; use AODRaw sliced RAW packed Bayer or original .ARW files for strict CFA/demosaic PerceptionISP evidence."
+        )
+    if any("packed_bayer" in str(layout) or "original_arw" in str(layout) for layout in layouts):
+        return "The planned AODRaw files are native-CFA compatible after unpacking/decoding, so they can support CFA/demosaic PerceptionISP evidence if metadata is verified."
+    return "The planned AODRaw raw layout is unknown; inspect a sample .npy/.ARW before making PerceptionISP CFA claims."
 
 
 def _checks(
@@ -379,6 +507,20 @@ def _checks(
         {"id": "manifest_loaded", "status": "pass" if rows else "fail", "evidence": f"samples={len(rows)}"},
         {"id": "subset_raw_targets_listed", "status": "pass" if raw_files else "fail", "evidence": f"raw_files={len(raw_files)}"},
         {"id": "subset_srgb_targets_listed", "status": "pass" if srgb_files else "fail", "evidence": f"srgb_files={len(srgb_files)}"},
+        {
+            "id": "raw_targets_native_cfa",
+            "status": "pass" if _non_native_cfa_count(rows, raw_files) == 0 else "warning",
+            "evidence": f"layouts={_raw_layouts(rows, raw_files)} non_native_cfa={_non_native_cfa_count(rows, raw_files)}",
+        },
+        {
+            "id": "raw_acquisition_path_available",
+            "status": "fail" if any("packed_bayer_4ch" in str(layout) for layout in _raw_layouts(rows, raw_files)) else "pass",
+            "evidence": (
+                "images_slice_raw has no direct official download link in the AODRaw README"
+                if any("packed_bayer_4ch" in str(layout) for layout in _raw_layouts(rows, raw_files))
+                else "planned raw files use a listed official archive/link"
+            ),
+        },
         {
             "id": "sufficient_disk_for_srgb",
             "status": "pass" if disk.get("fits_downsampled_srgb_4p3gb") else "fail",
@@ -410,23 +552,36 @@ def _checks(
     ]
 
 
-def _post_download_commands() -> list[str]:
+def _post_download_commands(*, manifest_ref: str, dataset_root: str, sample_count: int) -> list[str]:
+    manifest_arg = f"--manifest {_shell_quote(manifest_ref)} " if manifest_ref else ""
+    slug = _command_slug(manifest_ref=manifest_ref, fallback=f"aodraw_subset_{sample_count}")
     return [
         (
             "PYTHONPATH=src python3 -m perception_isp.aodraw_pipeline "
+            f"{manifest_arg}"
             "--kind raw "
             "--download-root ~/Downloads "
-            "--dataset-root data/raw_datasets/aodraw "
-            "--output-dir reports/perception_aodraw_pipeline_test_downsample_adverse_24_raw_only_v1 "
-            "--count 24 --width 768 --height 512 "
+            f"--dataset-root {_shell_quote(dataset_root)} "
+            f"--output-dir reports/perception_aodraw_pipeline_{slug}_raw_only_v1 "
+            f"--count {int(sample_count)} --width 768 --height 512 "
             "--rgb-detector yolo --rgb-detector-model yolo11n.pt --label-aware "
             "--no-visuals"
         ),
     ]
 
 
-def _acquisition_commands(cleanup: Mapping[str, Any]) -> list[Dict[str, str]]:
+def _acquisition_commands(
+    cleanup: Mapping[str, Any],
+    *,
+    manifest_ref: str,
+    availability_ref: str,
+    dataset_root: str,
+) -> list[Dict[str, str]]:
     candidate = str(cleanup.get("first_sufficient_candidate", "")).strip()
+    manifest_arg = f"--manifest {_shell_quote(manifest_ref)} " if manifest_ref else ""
+    availability_arg = f"--availability-summary {_shell_quote(availability_ref)} " if availability_ref else ""
+    dataset_arg = f"--dataset-root {_shell_quote(dataset_root)} "
+    slug = _command_slug(manifest_ref=manifest_ref, fallback="aodraw_subset")
     commands = []
     if candidate:
         commands.append(
@@ -448,9 +603,12 @@ def _acquisition_commands(cleanup: Mapping[str, Any]) -> list[Dict[str, str]]:
                 "status": "requires_explicit_approval",
                 "command": (
                     "PYTHONPATH=src python3 -m perception_isp.aodraw_acquisition "
+                    f"{manifest_arg}"
+                    f"{availability_arg}"
+                    f"{dataset_arg}"
                     f"--execute-cleanup --confirm-token {CLEANUP_CONFIRM_TOKEN} "
                     "--open-download --watch --watch-iterations 1 "
-                    "--output-dir reports/perception_aodraw_acquisition_raw_first_v1"
+                    f"--output-dir reports/perception_aodraw_acquisition_{slug}_raw_first_v1"
                 ),
                 "why": "After cleanup approval, this runs cleanup, opens Safari/Baidu, and writes the first RAW-only watch report.",
             }
@@ -468,9 +626,11 @@ def _acquisition_commands(cleanup: Mapping[str, Any]) -> list[Dict[str, str]]:
                 "status": "run_after_download_lands",
                 "command": (
                     "PYTHONPATH=src python3 -m perception_isp.aodraw_download_watch "
+                    f"{manifest_arg}"
                     "--kind raw --download-root ~/Downloads "
-                    "--dataset-root data/raw_datasets/aodraw "
-                    "--output-dir reports/perception_aodraw_download_watch_raw_latest"
+                    f"{dataset_arg}"
+                    f"--availability-output-dir reports/perception_aodraw_image_availability_{slug}_raw_latest "
+                    f"--output-dir reports/perception_aodraw_download_watch_{slug}_raw_latest"
                 ),
                 "why": "Imports completed RAW files, checks availability, and prints the RAW-only pipeline command when ready.",
             },
@@ -479,11 +639,26 @@ def _acquisition_commands(cleanup: Mapping[str, Any]) -> list[Dict[str, str]]:
     return commands
 
 
+def _shell_quote(value: str) -> str:
+    return json.dumps(str(value))
+
+
+def _command_slug(*, manifest_ref: str, fallback: str) -> str:
+    if manifest_ref:
+        parent = Path(manifest_ref).parent.name or Path(manifest_ref).stem
+        slug = parent.replace("perception_aodraw_subset_plan_", "")
+    else:
+        slug = fallback
+    normalized = "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in slug).strip("_")
+    return normalized or fallback
+
+
 def _ready_for_raw_download(checks: Sequence[Mapping[str, Any]]) -> bool:
     statuses = {str(row.get("id", "")): str(row.get("status", "")) for row in checks}
     required = (
         "manifest_loaded",
         "subset_raw_targets_listed",
+        "raw_acquisition_path_available",
         "sufficient_disk_for_test_raw_zip",
         "sufficient_disk_for_test_raw_zip_with_headroom",
     )
@@ -496,6 +671,7 @@ def _render_checklist(summary: Mapping[str, Any]) -> str:
         "",
         f"Dataset root: `{summary.get('dataset_root')}`",
         f"Recommended first: {summary.get('recommended_first')}",
+        f"RAW format warning: {summary.get('aodraw_raw_format_warning', '')}",
         "",
         "## Official Links",
     ]
@@ -569,8 +745,9 @@ def _render_html(summary: Mapping[str, Any]) -> str:
 <body>
   <h1>AODRaw Partial Download Plan</h1>
   <div class="note">{html_lib.escape(str(summary.get('claim_boundary', '')))}</div>
+  <div class="note"><strong>RAW format warning:</strong> {html_lib.escape(str(summary.get('aodraw_raw_format_warning', '')))}</div>
   <p>Status: <code>{html_lib.escape(str(summary.get('status', '')))}</code>. Recommended first: <b>{html_lib.escape(str(summary.get('recommended_first', '')))}</b>.</p>
-  <p>Disk available: <code>{html_lib.escape(str(summary.get('disk', {}).get('available_gib', '')))} GiB</code>; subset samples: {int(summary.get('sample_count', 0))}; missing files: {int(summary.get('missing_file_count', 0))}.</p>
+  <p>Disk available: <code>{html_lib.escape(str(summary.get('disk', {}).get('available_gib', '')))} GiB</code>; subset samples: {int(summary.get('sample_count', 0))}; missing files: {int(summary.get('missing_file_count', 0))}; raw layouts: <code>{html_lib.escape(', '.join(str(value) for value in summary.get('raw_storage_layouts', ())))}</code>.</p>
   <p>Additional free space needed for RAW zip plus headroom: <code>{html_lib.escape(str(summary.get('cleanup', {}).get('additional_free_gib_needed', '')))} GiB</code>. First sufficient cleanup candidate: <code>{html_lib.escape(str(summary.get('cleanup', {}).get('first_sufficient_candidate', '')))}</code>.</p>
   <h2>Official Links</h2>
   <ul>{urls}</ul>

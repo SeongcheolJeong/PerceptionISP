@@ -49,8 +49,57 @@ class AODRawDatasetTest(unittest.TestCase):
             manifest = summary["manifest"]
             self.assertTrue(all(row["raw_file_name"].endswith(".npy") for row in manifest))
             self.assertEqual(manifest[0]["expected_raw_relative_path"], "images_downsampled_raw/00000001.npy")
+            self.assertEqual(manifest[0]["raw_storage_layout"], "demosaiced_rgb_3ch_npy_not_native_cfa")
+            self.assertFalse(manifest[0]["true_sensor_cfa_mosaic_expected"])
+            self.assertFalse(summary["image_requirements"]["true_sensor_cfa_mosaic_expected"])
+            self.assertIn("not a native Bayer mosaic", summary["image_requirements"]["claim_note"])
             checks = {row["id"]: row["status"] for row in summary["checks"]}
             self.assertEqual(checks["selected_rows_have_boxes"], "pass")
+
+    def test_build_subset_plan_maps_slice_raw_to_native_packed_bayer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = _write_zip(Path(tmp) / "ann.zip")
+
+            summary = build_aodraw_subset_plan(
+                archive,
+                split="test_annotations_slice_1280_300.json",
+                conditions=("low_light",),
+                per_condition=1,
+                max_total=1,
+            )
+
+            row = summary["manifest"][0]
+            self.assertEqual(row["expected_raw_relative_path"], "images_slice_raw/00000001.npy")
+            self.assertEqual(row["expected_srgb_relative_path"], "images_slice_srgb/00000001.JPG")
+            self.assertEqual(row["raw_storage_layout"], "packed_bayer_4ch_npy_native_cfa")
+            self.assertTrue(row["true_sensor_cfa_mosaic_expected"])
+            self.assertTrue(summary["image_requirements"]["true_sensor_cfa_mosaic_expected"])
+
+    def test_build_subset_plan_can_select_hard_thin_records(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = _write_zip(Path(tmp) / "ann.zip")
+
+            summary = build_aodraw_subset_plan(
+                archive,
+                split="test_annotations_downsample_scale3_bbox_min_size32.json",
+                conditions=("fog",),
+                per_condition=1,
+                max_total=1,
+                hard_case="thin",
+                small_area_frac=0.0001,
+                thin_aspect=3.0,
+            )
+
+            self.assertEqual(summary["status"], "pass")
+            self.assertEqual(summary["selected_count"], 1)
+            self.assertEqual(summary["hard_case"], "thin")
+            self.assertEqual(summary["hard_counts"]["thin"], 1)
+            row = summary["manifest"][0]
+            self.assertEqual(row["file_name"], "00000003.JPG")
+            self.assertEqual(row["thin_box_count"], 1)
+            self.assertEqual(row["small_box_count"], 0)
+            checks = {item["id"]: item["status"] for item in summary["checks"]}
+            self.assertEqual(checks["selected_rows_match_hard_case"], "pass")
 
     def test_write_and_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -84,6 +133,7 @@ class AODRawDatasetTest(unittest.TestCase):
 def _write_zip(path: Path) -> Path:
     with zipfile.ZipFile(path, "w") as z:
         z.writestr("AODRaw/annotations/test_annotations_downsample_scale3_bbox_min_size32.json", json.dumps(_payload()))
+        z.writestr("AODRaw/annotations/test_annotations_slice_1280_300.json", json.dumps(_payload()))
     return path
 
 
@@ -99,7 +149,7 @@ def _payload() -> dict:
         {"id": 11, "image_id": 1, "category_id": 1, "bbox": [1, 1, 0, 5], "area": 0, "iscrowd": 1, "ignore": 0},
         {"id": 12, "image_id": 1, "category_id": 2, "bbox": [1, 1, 5, 5], "area": 25, "iscrowd": 0, "ignore": 0},
         {"id": 20, "image_id": 2, "category_id": 1, "bbox": [15, 25, 35, 45], "area": 1575, "iscrowd": 0, "ignore": 0},
-        {"id": 30, "image_id": 3, "category_id": 1, "bbox": [20, 30, 40, 50], "area": 2000, "iscrowd": 0, "ignore": 0},
+        {"id": 30, "image_id": 3, "category_id": 1, "bbox": [20, 30, 200, 20], "area": 4000, "iscrowd": 0, "ignore": 0},
         {"id": 40, "image_id": 4, "category_id": 0, "bbox": [25, 35, 45, 55], "area": 2475, "iscrowd": 0, "ignore": 0},
     ]
     categories = [

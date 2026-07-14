@@ -93,14 +93,15 @@ def load_aodraw_manifest_row(
     if not raw_path.is_file():
         raise FileNotFoundError(f"AODRaw RAW file not found: {raw_path}")
     raw_array = np.load(raw_path)
+    pattern = _normalize_cfa_pattern(cfa_pattern)
     raw_mosaic, raw_meta = _prepare_raw_mosaic(
         raw_array,
         target_width=target_width,
         target_height=target_height,
+        cfa_pattern=pattern,
     )
     height, width = int(raw_mosaic.shape[0]), int(raw_mosaic.shape[1])
-    levels = _infer_levels(raw_array, black_level=black_level, white_level=white_level)
-    pattern = _normalize_cfa_pattern(cfa_pattern)
+    levels = _infer_levels(raw_mosaic, black_level=black_level, white_level=white_level)
     calibration = CalibrationProfile(
         cfa_pattern=pattern,
         black_level=float(levels["black_level"]),
@@ -138,7 +139,10 @@ def load_aodraw_manifest_row(
         "requested_cfa_pattern": str(cfa_pattern),
         "target_cfa_pattern": pattern,
         "pattern_remapped": False,
-        "true_sensor_cfa_mosaic": True,
+        "raw_storage_layout": str(row.get("raw_storage_layout", raw_meta["raw_storage_layout"])),
+        "raw_loader_layout": str(raw_meta["raw_storage_layout"]),
+        "true_sensor_cfa_mosaic": bool(raw_meta["true_sensor_cfa_mosaic"]),
+        "synthetic_cfa_from_rgb": bool(raw_meta["synthetic_cfa_from_rgb"]),
         "native_resolution_matches_target": bool(raw_meta["native_resolution_matches_target"]),
         "native_resolution_at_least_target": bool(raw_meta["native_resolution_at_least_target"]),
         "raw_resize_mode": str(raw_meta["raw_resize_mode"]),
@@ -169,6 +173,8 @@ def load_aodraw_manifest_row(
             "cfa_pattern": pattern,
             "raw_resize_mode": str(raw_meta["raw_resize_mode"]),
             "native_resolution_matches_target": bool(raw_meta["native_resolution_matches_target"]),
+            "raw_storage_layout": str(raw_meta["raw_storage_layout"]),
+            "true_sensor_cfa_mosaic": bool(raw_meta["true_sensor_cfa_mosaic"]),
             "raw_provenance": provenance,
         },
         reference_rgb=srgb,
@@ -192,8 +198,9 @@ def _prepare_raw_mosaic(
     *,
     target_width: Optional[int],
     target_height: Optional[int],
+    cfa_pattern: str,
 ) -> tuple[np.ndarray, Dict[str, Any]]:
-    mosaic = _extract_single_mosaic(raw_array)
+    mosaic, layout_meta = _extract_single_mosaic(raw_array, cfa_pattern=cfa_pattern)
     native_h, native_w = int(mosaic.shape[0]), int(mosaic.shape[1])
     requested_h = native_h if target_height is None or int(target_height) <= 0 else int(target_height)
     requested_w = native_w if target_width is None or int(target_width) <= 0 else int(target_width)
@@ -201,27 +208,100 @@ def _prepare_raw_mosaic(
         raise ValueError("AODRaw target dimensions must be at least 2x2")
     if (requested_h, requested_w) == (native_h, native_w):
         return mosaic.astype(np.float64, copy=False), {
+            **layout_meta,
             "raw_resize_mode": "native",
             "native_resolution_matches_target": True,
             "native_resolution_at_least_target": True,
         }
     resized = _resize_cfa_nearest(mosaic, height=requested_h, width=requested_w)
     return resized, {
+        **layout_meta,
         "raw_resize_mode": "nearest_cfa_preserve_parity",
         "native_resolution_matches_target": False,
         "native_resolution_at_least_target": bool(native_h >= requested_h and native_w >= requested_w),
     }
 
 
-def _extract_single_mosaic(raw_array: Any) -> np.ndarray:
+def _extract_single_mosaic(raw_array: Any, *, cfa_pattern: str) -> tuple[np.ndarray, Dict[str, Any]]:
     arr = np.asarray(raw_array)
     if arr.ndim == 2:
-        return np.asarray(arr, dtype=np.float64)
+        return np.asarray(arr, dtype=np.float64), {
+            "raw_storage_layout": "single_channel_bayer_mosaic",
+            "true_sensor_cfa_mosaic": True,
+            "synthetic_cfa_from_rgb": False,
+        }
     if arr.ndim == 3 and arr.shape[2] == 1:
-        return np.asarray(arr[:, :, 0], dtype=np.float64)
+        return np.asarray(arr[:, :, 0], dtype=np.float64), {
+            "raw_storage_layout": "single_channel_bayer_mosaic_hwc1",
+            "true_sensor_cfa_mosaic": True,
+            "synthetic_cfa_from_rgb": False,
+        }
     if arr.ndim == 3 and arr.shape[0] == 1:
-        return np.asarray(arr[0], dtype=np.float64)
-    raise ValueError(f"AODRaw loader expects a single-channel Bayer mosaic, got shape {arr.shape}")
+        return np.asarray(arr[0], dtype=np.float64), {
+            "raw_storage_layout": "single_channel_bayer_mosaic_chw1",
+            "true_sensor_cfa_mosaic": True,
+            "synthetic_cfa_from_rgb": False,
+        }
+    if arr.ndim == 3 and arr.shape[0] == 4:
+        return _unpack_aodraw_packed_bayer_chw(arr), {
+            "raw_storage_layout": "packed_bayer_chw4",
+            "true_sensor_cfa_mosaic": True,
+            "synthetic_cfa_from_rgb": False,
+        }
+    if arr.ndim == 3 and arr.shape[0] == 3:
+        return _rgb_to_cfa_mosaic(np.moveaxis(arr, 0, -1), pattern=cfa_pattern), {
+            "raw_storage_layout": "demosaiced_rgb_chw3_to_synthetic_bayer",
+            "true_sensor_cfa_mosaic": False,
+            "synthetic_cfa_from_rgb": True,
+        }
+    if arr.ndim == 3 and arr.shape[2] == 4:
+        return _unpack_aodraw_packed_bayer_chw(np.moveaxis(arr, -1, 0)), {
+            "raw_storage_layout": "packed_bayer_hwc4",
+            "true_sensor_cfa_mosaic": True,
+            "synthetic_cfa_from_rgb": False,
+        }
+    if arr.ndim == 3 and arr.shape[2] == 3:
+        return _rgb_to_cfa_mosaic(arr, pattern=cfa_pattern), {
+            "raw_storage_layout": "demosaiced_rgb_hwc3_to_synthetic_bayer",
+            "true_sensor_cfa_mosaic": False,
+            "synthetic_cfa_from_rgb": True,
+        }
+    raise ValueError(
+        "AODRaw loader expects a 2-D Bayer mosaic, official 4-channel packed Bayer, "
+        f"or official 3-channel demosaiced RAW-RGB .npy, got shape {arr.shape}"
+    )
+
+
+def _unpack_aodraw_packed_bayer_chw(values: Any) -> np.ndarray:
+    arr = np.asarray(values, dtype=np.float64)
+    if arr.ndim != 3 or arr.shape[0] != 4:
+        raise ValueError(f"AODRaw packed Bayer must be 4xHxW, got {arr.shape}")
+    _, h, w = arr.shape
+    out = np.zeros((int(h) * 2, int(w) * 2), dtype=np.float64)
+    out[0::2, 0::2] = arr[0]
+    out[0::2, 1::2] = arr[1]
+    out[1::2, 1::2] = arr[2]
+    out[1::2, 0::2] = arr[3]
+    return out
+
+
+def _rgb_to_cfa_mosaic(values: Any, *, pattern: str) -> np.ndarray:
+    rgb = np.asarray(values, dtype=np.float64)
+    if rgb.ndim != 3 or rgb.shape[2] != 3:
+        raise ValueError(f"AODRaw RGB-to-CFA conversion expects HxWx3, got {rgb.shape}")
+    h, w = int(rgb.shape[0]), int(rgb.shape[1])
+    mosaic = np.zeros((h, w), dtype=np.float64)
+    tiles = {
+        "RGGB": ((0, 1), (1, 2)),
+        "GRBG": ((1, 0), (2, 1)),
+        "GBRG": ((1, 2), (0, 1)),
+        "BGGR": ((2, 1), (1, 0)),
+    }
+    tile = tiles.get(_normalize_cfa_pattern(pattern), tiles["RGGB"])
+    for row_offset in range(2):
+        for col_offset in range(2):
+            mosaic[row_offset::2, col_offset::2] = rgb[row_offset::2, col_offset::2, tile[row_offset][col_offset]]
+    return mosaic
 
 
 def _resize_cfa_nearest(mosaic: np.ndarray, *, height: int, width: int) -> np.ndarray:
@@ -261,6 +341,9 @@ def _infer_levels(raw_array: Any, *, black_level: Optional[float], white_level: 
         if observed_max <= 1.5:
             inferred_white = 1.0
             white_source = "observed_unit_range"
+        elif observed_max <= 255.0:
+            inferred_white = 255.0
+            white_source = "observed_8bit_range"
         elif observed_max <= 4095.0:
             inferred_white = 4095.0
             white_source = "observed_12bit_range"

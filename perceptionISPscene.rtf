@@ -1,0 +1,2977 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2868
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset129 AppleMyungjo;\f1\froman\fcharset0 Times-Roman;\f2\fmodern\fcharset0 Courier;
+\f3\fnil\fcharset129 AppleSDGothicNeo-Regular;\f4\froman\fcharset0 Times-Bold;\f5\fnil\fcharset0 Menlo-Regular;
+}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;\red109\green109\blue109;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;\cssrgb\c50196\c50196\c50196;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 \'b3\'d7
+\f1 . **Perception ISP 
+\f0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f1  
+\f0 \'b0\'a1\'c0\'e5
+\f1  
+\f0 \'c5\'a9\'b0\'d4
+\f1  
+\f0 \'b3\'aa\'bf\'c0\'b4\'c2
+\f1  object scene
+\f0 \'c0\'ba
+\f1  \'93
+\f0 \'c0\'cf\'b9\'dd
+\f1  RGB ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'c1\'a4\'ba\'b8\'b8\'a6
+\f1  
+\f0 \'bf\'b9\'bb\'da\'b0\'d4
+\f1  
+\f0 \'b8\'b8\'b5\'e9\'b8\'e9\'bc\'ad
+\f1  
+\f0 \'bf\'c0\'c8\'f7\'b7\'c1
+\f1  task-relevant signal
+\f0 \'c0\'bb
+\f1  
+\f0 \'c0\'d2\'b4\'c2
+\f1  
+\f0 \'c0\'e5\'b8\'e9
+\f1 \'94**
+\f0 \'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'b9\'dd\'b4\'eb\'b7\'ce
+\f1  
+\f0 \'b8\'bb\'c7\'cf\'b8\'e9
+\f1 , 
+\f0 \'b8\'bc\'c0\'ba
+\f1  
+\f0 \'b3\'b7\'bf\'a1
+\f1  
+\f0 \'c5\'ab
+\f1  
+\f0 \'c2\'f7\'b7\'ae\'c0\'cc
+\f1  
+\f0 \'c8\'ad\'b8\'e9
+\f1  
+\f0 \'c1\'df\'be\'d3\'bf\'a1
+\f1  
+\f0 \'c0\'d6\'b0\'ed
+\f1 , 
+\f0 \'b3\'eb\'c3\'e2\'b5\'b5
+\f1  
+\f0 \'c0\'fb\'c0\'fd\'c7\'cf\'b0\'ed
+\f1 , edge
+\f0 \'b5\'b5
+\f1  
+\f0 \'bc\'b1\'b8\'ed\'c7\'cf\'b0\'ed
+\f1 , 
+\f0 \'bb\'f6\'b5\'b5
+\f1  
+\f0 \'be\'c8\'c1\'a4\'c0\'fb\'c0\'cc\'b8\'e9
+\f1  Perception ISP
+\f0 \'c0\'c7
+\f1  
+\f0 \'c0\'cc\'b5\'e6\'c0\'ba
+\f1  
+\f0 \'c1\'a6\'c7\'d1\'c0\'fb\'c0\'d4\'b4\'cf\'b4\'d9
+\f1 . 
+\f0 \'b1\'d7\'b7\'b1
+\f1  
+\f0 \'c0\'e5\'b8\'e9\'c0\'ba
+\f1  
+\f0 \'c0\'cf\'b9\'dd
+\f1  RGB ISP + DNN
+\f0 \'c0\'b8\'b7\'ce\'b5\'b5
+\f1  
+\f0 \'c0\'df
+\f1  
+\f0 \'b5\'cb\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f1  
+\f0 \'b1\'d8\'b4\'eb\'c8\'ad\'b5\'c7\'b4\'c2
+\f1  
+\f0 \'c0\'e5\'b8\'e9\'c0\'ba
+\f1  
+\f0 \'ba\'b8\'c5\'eb
+\f1  
+\f0 \'be\'c6\'b7\'a1
+\f1  
+\f0 \'c1\'b6\'b0\'c7\'c0\'bb
+\f1  
+\f0 \'b0\'a1\'c1\'fd\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 1. 
+\f3 \'b0\'b4\'c3\'bc\'b0\'a1
+\f2  
+\f3 \'c0\'db\'b0\'c5\'b3\'aa
+\f2  
+\f3 \'b8\'d6\'b4\'d9
+\f2 \
+2. SNR
+\f3 \'c0\'cc
+\f2  
+\f3 \'b3\'b7\'b4\'d9
+\f2 \
+3. HDR / glare / saturation
+\f3 \'c0\'cc
+\f2  
+\f3 \'bd\'c9\'c7\'cf\'b4\'d9
+\f2 \
+4. 
+\f3 \'bb\'f6
+\f2  
+\f3 \'c1\'a4\'ba\'b8\'b0\'a1
+\f2  safety decision
+\f3 \'bf\'a1
+\f2  
+\f3 \'c1\'df\'bf\'e4\'c7\'cf\'b4\'d9
+\f2 \
+5. LED flicker
+\f3 \'b3\'aa
+\f2  temporal artifact
+\f3 \'b0\'a1
+\f2  
+\f3 \'c0\'d6\'b4\'d9
+\f2 \
+6. 
+\f3 \'b7\'bb\'c1\'ee
+\f2  
+\f3 \'c1\'d6\'ba\'af\'ba\'ce
+\f2  / 
+\f3 \'b1\'a4\'b0\'a2
+\f2  / blur / MTF 
+\f3 \'c0\'fa\'c7\'cf\'b0\'a1
+\f2  
+\f3 \'c0\'d6\'b4\'d9
+\f2 \
+7. full-frame wait 
+\f3 \'be\'f8\'c0\'cc
+\f2  
+\f3 \'bb\'a1\'b8\'ae
+\f2  
+\f3 \'ba\'c1\'be\'df
+\f2  
+\f3 \'c7\'d1\'b4\'d9
+\f2 \
+8. RGB 
+\f3 \'ba\'af\'c8\'af
+\f2  
+\f3 \'b0\'fa\'c1\'a4\'bf\'a1\'bc\'ad
+\f2  sensor-native 
+\f3 \'c1\'a4\'ba\'b8\'b0\'a1
+\f2  
+\f3 \'bb\'e7\'b6\'f3\'c1\'f8\'b4\'d9
+\f2 \
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 1. 
+\f0\b0 \'c3\'d6\'bb\'f3\'c0\'a7
+\f4\b  
+\f0\b0 \'bf\'ec\'bc\'b1\'bc\'f8\'c0\'a7
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'c1\'a6\'b0\'a1
+\f1  
+\f0 \'ba\'b8\'b1\'e2\'bf\'a3
+\f1  Perception ISP 
+\f0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f1  
+\f0 \'b0\'a1\'c0\'e5
+\f1  
+\f0 \'c5\'ab
+\f1  scene top 10
+\f0 \'c0\'ba
+\f1  
+\f0 \'c0\'cc\'b7\'b8\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 .\
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrt\brdrnil \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+
+\f0 \cf0 \'bf\'ec\'bc\'b1\'bc\'f8\'c0\'a7
+\f4\b \cell 
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+\cf0 Scene\cell 
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+
+\f0\b0 \cf0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f4\b  
+\f0\b0 \'c5\'ab
+\f4\b  
+\f0\b0 \'c0\'cc\'c0\'af
+\f4\b \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+
+\f1\b0 \cf0 1\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'be\'df\'b0\'a3
+\f4\b  
+\f0\b0 \'ba\'b8\'c7\'e0\'c0\'da
+\f4\b  / 
+\f0\b0 \'c0\'da\'c0\'fc\'b0\'c5
+\f4\b  / PM
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c0\'fa\'c1\'b6\'b5\'b5
+\f1 , 
+\f0 \'c0\'db\'c0\'ba
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1 , 
+\f0 \'b3\'eb\'c0\'cc\'c1\'ee\'bf\'cd
+\f1  edge 
+\f0 \'b1\'b8\'ba\'d0\'c0\'cc
+\f1  
+\f0 \'be\'ee\'b7\'c1\'bf\'f2
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 2\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c5\'cd\'b3\'ce
+\f4\b  
+\f0\b0 \'c3\'e2\'b1\'b8
+\f4\b  / 
+\f0\b0 \'bf\'aa\'b1\'a4
+\f4\b  
+\f0\b0 \'bc\'d3
+\f4\b  
+\f0\b0 \'c2\'f7\'b7\'ae
+\f4\b \'b7
+\f0\b0 \'ba\'b8\'c7\'e0\'c0\'da
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 HDR, saturation, glare, tone mapping 
+\f0 \'bc\'d5\'bd\'c7
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 3\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c7\'ec\'b5\'e5\'b6\'f3\'c0\'cc\'c6\'ae
+\f4\b  
+\f0\b0 \'c1\'d6\'ba\'af
+\f4\b  
+\f0\b0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 long exposure 
+\f0 \'c6\'f7\'c8\'ad
+\f1 , short exposure 
+\f0 \'c1\'a4\'ba\'b8
+\f1  
+\f0 \'c7\'ca\'bf\'e4
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 4\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bd\'c5\'c8\'a3\'b5\'ee
+\f4\b  / 
+\f0\b0 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f4\b  / 
+\f0\b0 \'b9\'e6\'c7\'e2\'c1\'f6\'bd\'c3\'b5\'ee
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bb\'f6
+\f1  
+\f0 \'b1\'b8\'ba\'d0
+\f1 , LED flicker, exposure source
+\f0 \'b0\'a1
+\f1  
+\f0 \'c1\'df\'bf\'e4
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 5\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b8\'d6\'b8\'ae
+\f4\b  
+\f0\b0 \'c0\'d6\'b4\'c2
+\f4\b  
+\f0\b0 \'c0\'db\'c0\'ba
+\f4\b  
+\f0\b0 \'c2\'f7\'b7\'ae
+\f4\b  / 
+\f0\b0 \'bf\'c0\'c5\'e4\'b9\'d9\'c0\'cc
+\f4\b  / 
+\f0\b0 \'c0\'da\'c0\'fc\'b0\'c5
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 demosaic, denoise, resize
+\f0 \'b0\'a1
+\f1  
+\f0 \'c0\'db\'c0\'ba
+\f1  edge
+\f0 \'b8\'a6
+\f1  
+\f0 \'c1\'f6\'bf\'f2
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 6\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b0\'cb\'c0\'ba
+\f4\b  
+\f0\b0 \'c2\'f7\'b7\'ae
+\f4\b  / 
+\f0\b0 \'b0\'cb\'c0\'ba
+\f4\b  
+\f0\b0 \'ba\'b8\'c7\'e0\'c0\'da
+\f4\b  / 
+\f0\b0 \'be\'ee\'b5\'ce\'bf\'ee
+\f4\b  
+\f0\b0 \'c0\'e5\'be\'d6\'b9\'b0
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b3\'b7\'c0\'ba
+\f1  contrast, low SNR, clear/IR/HDR 
+\f0 \'c1\'a4\'ba\'b8
+\f1  
+\f0 \'c7\'ca\'bf\'e4
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 7\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b1\'a4\'b0\'a2
+\f4\b  
+\f0\b0 \'c4\'ab\'b8\'de\'b6\'f3
+\f4\b  
+\f0\b0 \'c1\'d6\'ba\'af\'ba\'ce
+\f4\b  
+\f0\b0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 vignetting, MTF 
+\f0 \'c0\'fa\'c7\'cf
+\f1 , color shading, corner SNR 
+\f0 \'c0\'fa\'c7\'cf
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 8\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c2\'f7\'bc\'b1
+\f4\b  / 
+\f0\b0 \'b3\'eb\'b8\'e9
+\f4\b  
+\f0\b0 \'c7\'a5\'bd\'c3
+\f4\b  / 
+\f0\b0 \'b0\'f8\'bb\'e7
+\f4\b  cone
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 edge + color + low contrast
+\f0 \'b0\'a1
+\f1  
+\f0 \'b8\'f0\'b5\'ce
+\f1  
+\f0 \'c1\'df\'bf\'e4
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 9\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'ba\'f1
+\f4\b \'b7
+\f0\b0 \'be\'c8\'b0\'b3
+\f4\b \'b7
+\f0\b0 \'b4\'ab
+\f4\b \'b7
+\f0\b0 \'b7\'bb\'c1\'ee
+\f4\b  
+\f0\b0 \'bf\'c0\'bf\'b0
+\f4\b  
+\f0\b0 \'bb\'f3\'c8\'b2\'c0\'c7
+\f4\b  
+\f0\b0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 visibility confidence
+\f0 \'bf\'cd
+\f1  degradation detection 
+\f0 \'c7\'ca\'bf\'e4
+\f1 \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrt\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth4250\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5345\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qr\partightenfactor0
+\cf0 10\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f4\b \cf0 AEB/VRU 
+\f0\b0 \'b1\'de\'b9\'da
+\f4\b  
+\f0\b0 \'bb\'f3\'c8\'b2\'c0\'c7
+\f4\b  
+\f0\b0 \'c7\'cf\'b4\'dc
+\f4\b  ROI
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 full-frame wait
+\f0 \'b8\'a6
+\f1  
+\f0 \'b1\'fa\'b4\'c2
+\f1  partial/stripe fast path 
+\f0 \'b0\'a1\'c4\'a1
+\f1  
+\f0 \'c5\'ad
+\f1 \cell \lastrow\row
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 2. Scene 
+\f0\b0 \'c0\'af\'c7\'fc\'ba\'b0\'b7\'ce
+\f4\b  
+\f0\b0 \'ba\'b8\'b8\'e9
+\f4\b \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\fs36 \cf0 A. 
+\f0\b0 \'c0\'fa\'c1\'b6\'b5\'b5
+\f4\b  VRU: 
+\f0\b0 \'ba\'b8\'c7\'e0\'c0\'da
+\f4\b , 
+\f0\b0 \'c0\'da\'c0\'fc\'b0\'c5
+\f4\b , 
+\f0\b0 \'c5\'b1\'ba\'b8\'b5\'e5
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'b0\'a1\'c0\'e5
+\f1  
+\f0 \'b0\'ad\'b7\'c2\'c7\'d1
+\f1  
+\f0 \'b4\'eb\'bb\'f3\'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'be\'df\'b0\'a3
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'b0\'cb\'c0\'ba
+\f2  
+\f3 \'bf\'ca
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'c0\'da\'c0\'fc\'b0\'c5
+\f2  
+\f3 \'c3\'f8\'b8\'e9
+\f2 \
+
+\f3 \'c0\'fc\'b5\'bf\'c5\'b1\'ba\'b8\'b5\'e5
+\f2 \
+
+\f3 \'b5\'b5\'b7\'ce
+\f2  
+\f3 \'b0\'a1\'c0\'e5\'c0\'da\'b8\'ae
+\f2  
+\f3 \'bb\'e7\'b6\'f7
+\f2 \
+
+\f3 \'b0\'a1\'b7\'ce\'b5\'ee
+\f2  
+\f3 \'bb\'e7\'c0\'cc
+\f2  
+\f3 \'be\'ee\'b5\'ce\'bf\'ee
+\f2  
+\f3 \'b1\'b8\'b0\'a3
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cf\'b9\'dd
+\f1  ISP
+\f0 \'bf\'a1\'bc\'ad
+\f1  
+\f0 \'b9\'ae\'c1\'a6\'b0\'a1
+\f1  
+\f0 \'b5\'c7\'b4\'c2
+\f1  
+\f0 \'ba\'ce\'ba\'d0\'c0\'ba
+\f1  
+\f0 \'b4\'d9\'c0\'bd\'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'b0\'ad\'c7\'d1
+\f2  denoise 
+\f5 \uc0\u8594 
+\f2  
+\f3 \'c0\'db\'c0\'ba
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2  texture
+\f3 \'bf\'cd
+\f2  edge
+\f3 \'b0\'a1
+\f2  
+\f3 \'bb\'e7\'b6\'f3\'c1\'fc
+\f2 \
+tone mapping 
+\f5 \uc0\u8594 
+\f2  
+\f3 \'be\'ee\'b5\'ce\'bf\'ee
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2  contrast
+\f3 \'b0\'a1
+\f2  
+\f3 \'be\'e0\'c7\'d8\'c1\'fc
+\f2 \
+gamma 
+\f5 \uc0\u8594 
+\f2  shadow detail
+\f3 \'c0\'cc
+\f2  
+\f3 \'be\'d0\'c3\'e0\'b5\'ca
+\f2 \
+RGB 
+\f3 \'ba\'af\'c8\'af
+\f2  
+\f5 \uc0\u8594 
+\f2  
+\f3 \'b3\'eb\'c0\'cc\'c1\'ee\'c0\'ce\'c1\'f6
+\f2  edge
+\f3 \'c0\'ce\'c1\'f6
+\f2  
+\f3 \'b1\'b8\'ba\'d0
+\f2  
+\f3 \'be\'ee\'b7\'c1\'bf\'f2
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'bb\'ec\'b8\'b1
+\f1  
+\f0 \'bc\'f6
+\f1  
+\f0 \'c0\'d6\'b4\'c2
+\f1  
+\f0 \'c1\'a4\'ba\'b8\'b4\'c2
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 noise variance map\
+SNR map\
+CFA-aware edge map\
+IR channel, RGB-IR 
+\f3 \'bc\'be\'bc\'ad\'c0\'ce
+\f2  
+\f3 \'b0\'e6\'bf\'ec
+\f2 \
+Clear luminance, RCCB/RCCC 
+\f3 \'bc\'be\'bc\'ad\'c0\'ce
+\f2  
+\f3 \'b0\'e6\'bf\'ec
+\f2 \
+low-light confidence\
+weak denoise + edge confidence\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc
+\f1  scene
+\f0 \'bf\'a1\'bc\'ad\'b4\'c2
+\f1  **\'93
+\f0 \'b3\'eb\'c0\'cc\'c1\'ee\'b8\'a6
+\f1  
+\f0 \'c1\'f6\'bf\'ec\'b4\'c2
+\f1  
+\f0 \'b0\'cd
+\f1 \'94
+\f0 \'ba\'b8\'b4\'d9
+\f1  \'93
+\f0 \'b3\'eb\'c0\'cc\'c1\'ee\'bf\'cd
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1  edge
+\f0 \'b8\'a6
+\f1  
+\f0 \'b1\'b8\'ba\'d0\'c7\'d8\'bc\'ad
+\f1  DNN
+\f0 \'bf\'a1
+\f1  
+\f0 \'be\'cb\'b7\'c1\'c1\'d6\'b4\'c2
+\f1  
+\f0 \'b0\'cd
+\f1 \'94**
+\f0 \'c0\'cc
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'c3\'df\'c3\'b5
+\f1  
+\f0 \'c3\'e2\'b7\'c2
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 linear/log HDR image\
++ noise map\
++ edge confidence\
++ low-light confidence\
++ IR/Clear channel\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 B. 
+\f0\b0 \'bf\'aa\'b1\'a4
+\f4\b  / 
+\f0\b0 \'c5\'c2\'be\'e7
+\f4\b  glare / 
+\f0\b0 \'c5\'cd\'b3\'ce
+\f4\b  
+\f0\b0 \'c3\'e2\'b1\'b8
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'c0\'cc\'b7\'b1
+\f1  
+\f0 \'c0\'e5\'b8\'e9\'c0\'ba
+\f1  Perception ISP 
+\f0 \'b0\'a1\'c4\'a1\'b0\'a1
+\f1  
+\f0 \'b8\'c5\'bf\'ec
+\f1  
+\f0 \'c5\'ae\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'c5\'c2\'be\'e7\'c0\'bb
+\f2  
+\f3 \'c1\'a4\'b8\'e9\'c0\'b8\'b7\'ce
+\f2  
+\f3 \'ba\'b8\'b4\'c2
+\f2  
+\f3 \'b5\'b5\'b7\'ce
+\f2 \
+
+\f3 \'b3\'aa\'b9\'ab
+\f2  
+\f3 \'bb\'e7\'c0\'cc
+\f2  
+\f3 \'b0\'ad\'c7\'d1
+\f2  
+\f3 \'ba\'fb
+\f2 \
+
+\f3 \'c5\'cd\'b3\'ce
+\f2  
+\f3 \'c3\'e2\'b1\'b8
+\f2 \
+
+\f3 \'c1\'a5\'c0\'ba
+\f2  
+\f3 \'b3\'eb\'b8\'e9
+\f2  
+\f3 \'b9\'dd\'bb\'e7
+\f2 \
+
+\f3 \'c7\'ec\'b5\'e5\'b6\'f3\'c0\'cc\'c6\'ae
+\f2  flare\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cf\'b9\'dd
+\f1  RGB ISP
+\f0 \'c0\'c7
+\f1  
+\f0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 tone mapping
+\f3 \'c0\'cc
+\f2  
+\f3 \'c0\'e5\'b8\'e9\'c0\'bb
+\f2  
+\f3 \'ba\'b8\'b1\'e2
+\f2  
+\f3 \'c1\'c1\'b0\'d4
+\f2  
+\f3 \'b8\'b8\'b5\'e9\'c1\'f6\'b8\'b8
+\f2  task feature
+\f3 \'b8\'a6
+\f2  
+\f3 \'bf\'d6\'b0\'ee
+\f2 \
+saturation 
+\f3 \'bf\'b5\'bf\'aa\'c0\'bb
+\f2  
+\f3 \'ba\'b8\'b1\'e2
+\f2  
+\f3 \'c1\'c1\'b0\'d4
+\f2  
+\f3 \'b9\'b6\'b0\'b3\'b9\'f6\'b8\'b2
+\f2 \
+glare 
+\f3 \'bf\'b5\'bf\'aa\'c0\'cc
+\f2  
+\f3 \'b4\'dc\'bc\'f8
+\f2  
+\f3 \'b9\'e0\'c0\'ba
+\f2  blob
+\f3 \'c0\'b8\'b7\'ce
+\f2  
+\f3 \'ba\'af\'c7\'d4
+\f2 \
+
+\f3 \'be\'ee\'b6\'b2
+\f2  
+\f3 \'c7\'c8\'bc\'bf\'c0\'cc
+\f2  
+\f3 \'bd\'c7\'c1\'a6
+\f2  
+\f3 \'c1\'a4\'ba\'b8\'c0\'ce\'c1\'f6
+\f2  
+\f3 \'c6\'f7\'c8\'ad\'c0\'ce\'c1\'f6
+\f2  
+\f3 \'be\'cb
+\f2  
+\f3 \'bc\'f6
+\f2  
+\f3 \'be\'f8\'c0\'bd
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'b3\'b2\'b0\'dc\'be\'df
+\f1  
+\f0 \'c7\'d2
+\f1  
+\f0 \'c1\'a4\'ba\'b8
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 saturation map\
+HDR exposure source map\
+glare / flare confidence\
+HDR confidence\
+short exposure edge\
+ghost / motion artifact map\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c7\'d9\'bd\'c9\'c0\'ba
+\f1  
+\f0 \'c0\'cc\'b0\'cc\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'c3\'d6\'c1\'be
+\f2  HDR 
+\f3 \'c0\'cc\'b9\'cc\'c1\'f6
+\f2  
+\f3 \'c7\'cf\'b3\'aa\'ba\'b8\'b4\'d9
+\f2 ,\
+\'93
+\f3 \'c0\'cc
+\f2  
+\f3 \'c7\'c8\'bc\'bf\'c0\'cc
+\f2  
+\f3 \'be\'ee\'b6\'b2
+\f2  exposure
+\f3 \'bf\'a1\'bc\'ad
+\f2  
+\f3 \'bf\'d4\'b0\'ed
+\f2  
+\f3 \'be\'f3\'b8\'b6\'b3\'aa
+\f2  
+\f3 \'b9\'cf\'c0\'bb
+\f2  
+\f3 \'bc\'f6
+\f2  
+\f3 \'c0\'d6\'b4\'c2\'b0\'a1
+\f2 \'94
+\f3 \'b0\'a1
+\f2  
+\f3 \'b4\'f5
+\f2  
+\f3 \'c1\'df\'bf\'e4\'c7\'cf\'b4\'d9
+\f2 .\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'bf\'b9\'b8\'a6
+\f1  
+\f0 \'b5\'e9\'be\'ee
+\f1  
+\f0 \'c7\'ec\'b5\'e5\'b6\'f3\'c0\'cc\'c6\'ae
+\f1  
+\f0 \'c1\'d6\'ba\'af
+\f1  
+\f0 \'c2\'f7\'b7\'ae
+\f1  
+\f0 \'c0\'b1\'b0\'fb\'c0\'ba
+\f1  long exposure
+\f0 \'bf\'a1\'bc\'ad\'b4\'c2
+\f1  
+\f0 \'c6\'f7\'c8\'ad\'b5\'c7\'b0\'ed
+\f1 , short exposure
+\f0 \'bf\'a1\'bc\'ad\'b8\'b8
+\f1  
+\f0 \'bb\'ec\'be\'c6\'c0\'d6\'c0\'bb
+\f1  
+\f0 \'bc\'f6
+\f1  
+\f0 \'c0\'d6\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 . 
+\f0 \'c0\'cc\'b6\'a7
+\f1  DNN
+\f0 \'c0\'cc
+\f1  exposure source
+\f0 \'b8\'a6
+\f1  
+\f0 \'be\'cb\'b8\'e9
+\f1  
+\f0 \'c8\'ce\'be\'c0
+\f1  
+\f0 \'be\'c8\'c1\'a4\'c0\'fb\'c0\'b8\'b7\'ce
+\f1  
+\f0 \'c6\'c7\'b4\'dc\'c7\'d2
+\f1  
+\f0 \'bc\'f6
+\f1  
+\f0 \'c0\'d6\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 C. LED 
+\f0\b0 \'bd\'c5\'c8\'a3\'b5\'ee
+\f4\b , 
+\f0\b0 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f4\b , 
+\f0\b0 \'b9\'e6\'c7\'e2\'c1\'f6\'bd\'c3\'b5\'ee
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'c0\'cc
+\f1  scene
+\f0 \'c0\'ba
+\f1  color
+\f0 \'bf\'cd
+\f1  temporal 
+\f0 \'c1\'a4\'ba\'b8\'b0\'a1
+\f1  
+\f0 \'b8\'f0\'b5\'ce
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'bd\'c5\'c8\'a3\'b5\'ee
+\f2  red / amber / green\
+
+\f3 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f2 \
+
+\f3 \'b9\'e6\'c7\'e2\'c1\'f6\'bd\'c3\'b5\'ee
+\f2 \
+
+\f3 \'ba\'f1\'bb\'f3\'b5\'ee
+\f2 \
+
+\f3 \'c0\'fc\'b1\'a4\'c6\'c7
+\f2 \
+LED 
+\f3 \'c7\'a5\'c1\'f6\'c6\'c7
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cf\'b9\'dd
+\f1  RGB ISP
+\f0 \'c0\'c7
+\f1  
+\f0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 short exposure
+\f3 \'bf\'a1\'bc\'ad
+\f2  LED
+\f3 \'b0\'a1
+\f2  
+\f3 \'b2\'a8\'c1\'f8
+\f2  
+\f3 \'b0\'cd\'c3\'b3\'b7\'b3
+\f2  
+\f3 \'ba\'b8\'c0\'d3
+\f2 \
+AWB/CCM
+\f3 \'c0\'cc
+\f2  
+\f3 \'bb\'f6\'c0\'bb
+\f2  
+\f3 \'c0\'da\'bf\'ac\'bd\'ba\'b7\'b4\'b0\'d4
+\f2  
+\f3 \'b8\'b8\'b5\'e9\'b8\'e7
+\f2  class separability
+\f3 \'b8\'a6
+\f2  
+\f3 \'c1\'d9\'c0\'d3
+\f2 \
+saturation
+\f3 \'c0\'b8\'b7\'ce
+\f2  
+\f3 \'bb\'f6\'c0\'cc
+\f2  white blob
+\f3 \'c3\'b3\'b7\'b3
+\f2  
+\f3 \'ba\'af\'c7\'d4
+\f2 \
+temporal flicker
+\f3 \'b8\'a6
+\f2  noise
+\f3 \'c3\'b3\'b7\'b3
+\f2  
+\f3 \'c3\'b3\'b8\'ae\'c7\'d2
+\f2  
+\f3 \'bc\'f6
+\f2  
+\f3 \'c0\'d6\'c0\'bd
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'c7\'d8\'be\'df
+\f1  
+\f0 \'c7\'d2
+\f1  
+\f0 \'c0\'cf
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 multi-exposure LED detection\
+LED flicker confidence\
+temporal intensity consistency\
+color confidence\
+saturation map\
+log(R/G), log(B/G)\
+opponent color channels\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc
+\f1  scene
+\f0 \'bf\'a1\'bc\'ad
+\f1  
+\f0 \'c7\'d9\'bd\'c9\'c0\'ba
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'bf\'b9\'bb\'db
+\f2  
+\f3 \'bb\'f6\'b0\'a8\'c0\'cc
+\f2  
+\f3 \'be\'c6\'b4\'cf\'b6\'f3
+\f2  red / amber / green class separability\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'bd\'c5\'c8\'a3\'b5\'ee\'c0\'ba
+\f1  
+\f0 \'c0\'db\'c0\'ba
+\f1  object
+\f0 \'c0\'ce
+\f1  
+\f0 \'b5\'bf\'bd\'c3\'bf\'a1
+\f1  
+\f0 \'bb\'f6
+\f1  decision
+\f0 \'c0\'cc
+\f1  safety-critical
+\f0 \'c7\'d5\'b4\'cf\'b4\'d9
+\f1 . 
+\f0 \'b5\'fb\'b6\'f3\'bc\'ad
+\f1  perception color ISP 
+\f0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f1  
+\f0 \'b8\'c5\'bf\'ec
+\f1  
+\f0 \'c5\'ae\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 D. 
+\f0\b0 \'bf\'f8\'b0\'c5\'b8\'ae
+\f4\b  
+\f0\b0 \'c0\'db\'c0\'ba
+\f4\b  
+\f0\b0 \'b0\'b4\'c3\'bc
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'b4\'eb\'bb\'f3
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'bf\'f8\'b0\'c5\'b8\'ae
+\f2  
+\f3 \'c2\'f7\'b7\'ae
+\f2 \
+
+\f3 \'bf\'c0\'c5\'e4\'b9\'d9\'c0\'cc
+\f2 \
+
+\f3 \'c0\'da\'c0\'fc\'b0\'c5
+\f2 \
+
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'b5\'b5\'b7\'ce
+\f2  
+\f3 \'c0\'a7
+\f2  
+\f3 \'b3\'ab\'c7\'cf\'b9\'b0
+\f2 \
+
+\f3 \'b5\'bf\'b9\'b0
+\f2 \
+
+\f3 \'b0\'f8\'bb\'e7
+\f2  cone\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cf\'b9\'dd
+\f1  ISP
+\f0 \'c0\'c7
+\f1  
+\f0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 demosaic interpolation
+\f3 \'c0\'cc
+\f2  edge
+\f3 \'b8\'a6
+\f2  
+\f3 \'c8\'e5\'b8\'b2
+\f2 \
+strong denoise
+\f3 \'b0\'a1
+\f2  
+\f3 \'c0\'db\'c0\'ba
+\f2  texture
+\f3 \'b8\'a6
+\f2  
+\f3 \'c1\'a6\'b0\'c5
+\f2 \
+resize/downsample
+\f3 \'c0\'cc
+\f2  
+\f3 \'c0\'db\'c0\'ba
+\f2  
+\f3 \'b0\'b4\'c3\'bc\'b8\'a6
+\f2  
+\f3 \'bb\'e7\'b6\'f3\'c1\'f6\'b0\'d4
+\f2  
+\f3 \'c7\'d4
+\f2 \
+sharpening
+\f3 \'c0\'cc
+\f2  false edge
+\f3 \'b8\'a6
+\f2  
+\f3 \'b8\'b8\'b5\'e9
+\f2  
+\f3 \'bc\'f6
+\f2  
+\f3 \'c0\'d6\'c0\'bd
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'c7\'d8\'be\'df
+\f1  
+\f0 \'c7\'d2
+\f1  
+\f0 \'c0\'cf
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 CFA-aware structure tensor\
+G luma edge\
+R-G / B-G chroma edge\
+edge orientation / confidence\
+demosaic confidence\
+small-object preserving denoise\
+ROI / tile output\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'bf\'a9\'b1\'e2\'bc\'ad\'b4\'c2
+\f1  
+\f4\b RGB
+\f0\b0 \'b8\'a6
+\f4\b  
+\f0\b0 \'b8\'b8\'b5\'e7
+\f4\b  
+\f0\b0 \'b5\'da
+\f4\b  edge
+\f0\b0 \'b8\'a6
+\f4\b  
+\f0\b0 \'c3\'a3\'b4\'c2
+\f4\b  
+\f0\b0 \'b0\'cd\'ba\'b8\'b4\'d9
+\f4\b  Bayer RAW
+\f0\b0 \'bf\'a1\'bc\'ad
+\f4\b  edge primitive
+\f0\b0 \'b8\'a6
+\f4\b  
+\f0\b0 \'b8\'d5\'c0\'fa
+\f4\b  
+\f0\b0 \'c3\'df\'c3\'e2\'c7\'cf\'b4\'c2
+\f4\b  
+\f0\b0 \'b1\'b8\'c1\'b6\'b0\'a1
+\f1  
+\f0 \'c0\'af\'b8\'ae\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'c3\'df\'c3\'b5
+\f1  fast path:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 Bayer RAW\
+
+\f5 \uc0\u8594 
+\f2  CFA-aware edge map\
+
+\f5 \uc0\u8594 
+\f2  low-res / ROI tiny model\
+
+\f5 \uc0\u8594 
+\f2  early candidate\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 E. 
+\f0\b0 \'b1\'a4\'b0\'a2
+\f4\b  
+\f0\b0 \'c4\'ab\'b8\'de\'b6\'f3
+\f4\b  
+\f0\b0 \'c1\'d6\'ba\'af\'ba\'ce
+\f4\b  
+\f0\b0 \'b0\'b4\'c3\'bc
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'c2\'f7\'b7\'ae
+\f1  
+\f0 \'c4\'ab\'b8\'de\'b6\'f3\'b4\'c2
+\f1  
+\f0 \'b1\'a4\'b0\'a2\'c0\'cc
+\f1  
+\f0 \'b8\'b9\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 surround view\
+front wide\
+side camera\
+corner camera\
+eMirror\
+parking camera\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c8\'ad\'b8\'e9
+\f1  
+\f0 \'c1\'d6\'ba\'af\'ba\'ce\'bf\'a1\'bc\'ad\'b4\'c2
+\f1  
+\f0 \'b4\'d9\'c0\'bd
+\f1  
+\f0 \'b9\'ae\'c1\'a6\'b0\'a1
+\f1  
+\f0 \'bb\'fd\'b1\'e9\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 chief ray angle 
+\f3 \'c1\'f5\'b0\'a1
+\f2 \
+vignetting\
+color shading\
+MTF 
+\f3 \'c0\'fa\'c7\'cf
+\f2 \
+PSF 
+\f3 \'c8\'ae\'c0\'e5
+\f2 \
+corner SNR 
+\f3 \'c0\'fa\'c7\'cf
+\f2 \
+pixel crosstalk 
+\f3 \'c1\'f5\'b0\'a1
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cf\'b9\'dd
+\f1  ISP
+\f0 \'b4\'c2
+\f1  lens shading correction
+\f0 \'c0\'b8\'b7\'ce
+\f1  
+\f0 \'b9\'e0\'b1\'e2\'b8\'b8
+\f1  
+\f0 \'b8\'c2\'c3\'e4\'b4\'cf\'b4\'d9
+\f1 .\uc0\u8232 
+\f0 \'c7\'cf\'c1\'f6\'b8\'b8
+\f1  
+\f0 \'c1\'d6\'ba\'af\'ba\'ce
+\f1  gain
+\f0 \'c0\'bb
+\f1  
+\f0 \'bf\'c3\'b8\'ae\'b8\'e9
+\f1  noise
+\f0 \'b5\'b5
+\f1  
+\f0 \'b0\'b0\'c0\'cc
+\f1  
+\f0 \'c1\'f5\'b0\'a1\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 corrected_signal = gain \'d7 raw_signal\
+corrected_noise_variance = gain\'b2 \'d7 raw_noise_variance\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'b3\'b2\'b0\'dc\'be\'df
+\f1  
+\f0 \'c7\'d2
+\f1  
+\f0 \'c1\'a4\'ba\'b8
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 lens gain map\
+corner SNR map\
+MTF confidence\
+blur / focus confidence\
+position-dependent noise map\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc
+\f1  scene
+\f0 \'bf\'a1\'bc\'ad\'b4\'c2
+\f1  DNN
+\f0 \'c0\'cc
+\f1  \'93
+\f0 \'c8\'ad\'b8\'e9
+\f1  
+\f0 \'c1\'d6\'ba\'af\'ba\'ce\'c0\'c7
+\f1  
+\f0 \'b0\'b4\'c3\'bc\'b8\'a6
+\f1  
+\f0 \'be\'f3\'b8\'b6\'b3\'aa
+\f1  
+\f0 \'b9\'cf\'c0\'bb
+\f1  
+\f0 \'bc\'f6
+\f1  
+\f0 \'c0\'d6\'b4\'c2\'c1\'f6
+\f1 \'94 
+\f0 \'be\'cb\'be\'c6\'be\'df
+\f1  
+\f0 \'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'c6\'af\'c8\'f7
+\f1  
+\f0 \'c3\'f8\'b8\'e9\'bf\'a1\'bc\'ad
+\f1  
+\f0 \'b5\'e9\'be\'ee\'bf\'c0\'b4\'c2
+\f1  
+\f0 \'ba\'b8\'c7\'e0\'c0\'da\'b3\'aa
+\f1  
+\f0 \'c0\'da\'c0\'fc\'b0\'c5\'b4\'c2
+\f1  
+\f0 \'c1\'d6\'ba\'af\'ba\'ce\'bf\'a1\'bc\'ad
+\f1  
+\f0 \'b8\'d5\'c0\'fa
+\f1  
+\f0 \'b3\'aa\'c5\'b8\'b3\'aa\'b9\'c7\'b7\'ce
+\f1  active safety
+\f0 \'bf\'a1
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 F. 
+\f0\b0 \'b0\'cb\'c0\'ba
+\f4\b  
+\f0\b0 \'b9\'b0\'c3\'bc
+\f4\b  / 
+\f0\b0 \'b3\'b7\'c0\'ba
+\f4\b  contrast object\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'b4\'eb\'bb\'f3
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'b0\'cb\'c0\'ba
+\f2  
+\f3 \'c2\'f7\'b7\'ae
+\f2 \
+
+\f3 \'b0\'cb\'c0\'ba
+\f2  
+\f3 \'bf\'ca
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'be\'ee\'b5\'ce\'bf\'ee
+\f2  
+\f3 \'b5\'bf\'b9\'b0
+\f2 \
+
+\f3 \'b5\'b5\'b7\'ce
+\f2  
+\f3 \'c0\'a7
+\f2  
+\f3 \'c5\'b8\'c0\'cc\'be\'ee
+\f2  
+\f3 \'c1\'b6\'b0\'a2
+\f2 \
+
+\f3 \'b0\'cb\'c0\'ba
+\f2  
+\f3 \'c0\'e5\'be\'d6\'b9\'b0
+\f2 \
+
+\f3 \'c1\'a5\'c0\'ba
+\f2  
+\f3 \'be\'c6\'bd\'ba\'c6\'c8\'c6\'ae
+\f2  
+\f3 \'c0\'a7
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'b0\'b4\'c3\'bc\'bf\'cd
+\f2  
+\f3 \'b9\'e8\'b0\'e6
+\f2  contrast
+\f3 \'b0\'a1
+\f2  
+\f3 \'b3\'b7\'c0\'bd
+\f2 \
+RGB tone mapping 
+\f3 \'c8\'c4
+\f2  
+\f3 \'b4\'f5
+\f2  
+\f3 \'b9\'af\'c8\'fa
+\f2  
+\f3 \'bc\'f6
+\f2  
+\f3 \'c0\'d6\'c0\'bd
+\f2 \
+noise
+\f3 \'bf\'cd
+\f2  object edge
+\f3 \'b0\'a1
+\f2  
+\f3 \'ba\'f1\'bd\'c1\'c7\'d8\'c1\'fc
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'bf\'a1\'bc\'ad
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d1
+\f1  
+\f0 \'b0\'cd
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 local contrast preservation\
+noise-normalized gradient\
+weak denoise\
+log-HDR representation\
+clear luminance / IR signal\
+edge confidence\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc
+\f1  scene
+\f0 \'c0\'ba
+\f1  
+\f4\b SNR map + edge confidence
+\f0\b0 \'b0\'a1
+\f1  
+\f0 \'c6\'af\'c8\'f7
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 G. 
+\f0\b0 \'c2\'f7\'bc\'b1
+\f4\b , 
+\f0\b0 \'b3\'eb\'b8\'e9
+\f4\b  
+\f0\b0 \'c7\'a5\'bd\'c3
+\f4\b , 
+\f0\b0 \'b0\'f8\'bb\'e7
+\f4\b  
+\f0\b0 \'b1\'b8\'b0\'a3
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'b4\'eb\'bb\'f3
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'c8\'f2
+\f2  
+\f3 \'c2\'f7\'bc\'b1
+\f2 \
+
+\f3 \'b3\'eb\'b6\'f5
+\f2  
+\f3 \'c2\'f7\'bc\'b1
+\f2 \
+
+\f3 \'c6\'c4\'b6\'f5
+\f2  
+\f3 \'c2\'f7\'bc\'b1
+\f2 \
+
+\f3 \'c8\'be\'b4\'dc\'ba\'b8\'b5\'b5
+\f2 \
+
+\f3 \'b0\'f8\'bb\'e7
+\f2  cone\
+
+\f3 \'c0\'d3\'bd\'c3
+\f2  
+\f3 \'c2\'f7\'bc\'b1
+\f2 \
+
+\f3 \'c1\'a5\'c0\'ba
+\f2  
+\f3 \'b3\'eb\'b8\'e9
+\f2  
+\f3 \'c0\'a7
+\f2  
+\f3 \'c7\'a5\'bd\'c3
+\f2 \
+
+\f3 \'b8\'b6\'b8\'f0\'b5\'c8
+\f2  
+\f3 \'c2\'f7\'bc\'b1
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'c2\'f7\'bc\'b1\'c0\'ba
+\f2  
+\f3 \'be\'e3\'b0\'ed
+\f2  
+\f3 \'b0\'ed\'c1\'d6\'c6\'c4
+\f2  edge\
+
+\f3 \'bb\'f6
+\f2  
+\f3 \'b1\'b8\'ba\'d0\'c0\'cc
+\f2  
+\f3 \'c1\'df\'bf\'e4
+\f2 \
+
+\f3 \'b3\'eb\'b8\'e9
+\f2  
+\f3 \'b9\'dd\'bb\'e7\'bf\'cd
+\f2  glare
+\f3 \'b0\'a1
+\f2  
+\f3 \'b8\'b9\'c0\'bd
+\f2 \
+
+\f3 \'b8\'b6\'b8\'f0\'b5\'c8
+\f2  
+\f3 \'c2\'f7\'bc\'b1\'c0\'ba
+\f2  contrast 
+\f3 \'b3\'b7\'c0\'bd
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'bb\'ec\'b8\'b1
+\f1  
+\f0 \'c1\'a4\'ba\'b8
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 CFA-aware edge\
+color opponent channel\
+log(R/G), log(B/G)\
+polarization 
+\f3 \'c1\'a4\'ba\'b8\'b0\'a1
+\f2  
+\f3 \'c0\'d6\'b4\'d9\'b8\'e9
+\f2  
+\f3 \'b9\'dd\'bb\'e7
+\f2  
+\f3 \'c1\'a6\'b0\'c5
+\f2 \
+saturation map\
+MTF confidence\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c2\'f7\'bc\'b1\'c0\'ba
+\f1  
+\f0 \'b4\'dc\'bc\'f8
+\f1  edge
+\f0 \'c0\'cc\'b8\'e9\'bc\'ad
+\f1  
+\f0 \'bb\'f6
+\f1  class
+\f0 \'b5\'b5
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\uc0\u8232 
+\f0 \'b5\'fb\'b6\'f3\'bc\'ad
+\f1  edge ISP
+\f0 \'bf\'cd
+\f1  color ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'b8\'f0\'b5\'ce
+\f1  
+\f0 \'c7\'ca\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 H. 
+\f0\b0 \'ba\'f1
+\f4\b , 
+\f0\b0 \'be\'c8\'b0\'b3
+\f4\b , 
+\f0\b0 \'b4\'ab
+\f4\b , 
+\f0\b0 \'b7\'bb\'c1\'ee
+\f4\b  
+\f0\b0 \'bf\'c0\'bf\'b0
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'c0\'cc\'b7\'b1
+\f1  scene
+\f0 \'bf\'a1\'bc\'ad\'b4\'c2
+\f1  \'93
+\f0 \'c0\'df
+\f1  
+\f0 \'ba\'b8\'c0\'cc\'b0\'d4
+\f1  
+\f0 \'ba\'b9\'bf\'f8
+\f1 \'94
+\f0 \'b5\'b5
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'cf\'c1\'f6\'b8\'b8
+\f1 , 
+\f0 \'b4\'f5
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d1
+\f1  
+\f0 \'b0\'cd\'c0\'ba
+\f1  
+\f0 \'be\'f3\'b8\'b6\'b3\'aa
+\f4\b  
+\f0\b0 \'b8\'f8
+\f4\b  
+\f0\b0 \'ba\'b8\'b4\'c2\'c1\'f6
+\f4\b  
+\f0\b0 \'be\'c6\'b4\'c2
+\f4\b  
+\f0\b0 \'b0\'cd\'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 contrast 
+\f3 \'b0\'a8\'bc\'d2
+\f2 \
+blur 
+\f3 \'c1\'f5\'b0\'a1
+\f2 \
+
+\f3 \'ba\'fb
+\f2  
+\f3 \'b9\'f8\'c1\'fc
+\f2 \
+
+\f3 \'b7\'bb\'c1\'ee
+\f2  
+\f3 \'c0\'a7
+\f2  
+\f3 \'b9\'b0\'b9\'e6\'bf\'ef
+\f2 \
+
+\f3 \'ba\'ce\'ba\'d0
+\f2  
+\f3 \'b0\'a1\'b8\'b2
+\f2 \
+
+\f3 \'bb\'f6
+\f2  
+\f3 \'bf\'d6\'b0\'ee
+\f2 \
+
+\f3 \'b3\'eb\'c0\'cc\'c1\'ee
+\f2  
+\f3 \'c1\'f5\'b0\'a1
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'c7\'d8\'be\'df
+\f1  
+\f0 \'c7\'d2
+\f1  
+\f0 \'c0\'cf
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 visibility confidence\
+lens contamination map\
+blur / focus confidence\
+rain/fog degradation score\
+temporal consistency\
+local contrast confidence\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc
+\f1  scene
+\f0 \'bf\'a1\'bc\'ad\'b4\'c2
+\f1  Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'b4\'dc\'bc\'f8
+\f1  image enhancement
+\f0 \'b8\'a6
+\f1  
+\f0 \'c7\'cf\'b4\'c2
+\f1  
+\f0 \'b0\'cd\'ba\'b8\'b4\'d9
+\f1 , 
+\f0 \'c8\'c4\'b4\'dc
+\f1  DNN
+\f0 \'b0\'fa
+\f1  planner
+\f0 \'bf\'a1
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'c7\'f6\'c0\'e7
+\f2  
+\f3 \'c0\'cc
+\f2  
+\f3 \'c4\'ab\'b8\'de\'b6\'f3
+\f2 /
+\f3 \'bf\'b5\'bf\'aa\'c0\'c7
+\f2  
+\f3 \'bd\'c5\'b7\'da\'b5\'b5\'b0\'a1
+\f2  
+\f3 \'b3\'b7\'b4\'d9
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'b8\'a6
+\f1  
+\f0 \'be\'cb\'b7\'c1\'c1\'d6\'b4\'c2
+\f1  
+\f0 \'b0\'cd\'c0\'cc
+\f1  
+\f0 \'b8\'c5\'bf\'ec
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 I. Rolling shutter / 
+\f0\b0 \'b0\'ed\'bc\'d3
+\f4\b  motion object\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'b4\'eb\'bb\'f3
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'ba\'fc\'b8\'a3\'b0\'d4
+\f2  
+\f3 \'c1\'f6\'b3\'aa\'b0\'a1\'b4\'c2
+\f2  
+\f3 \'c0\'da\'c0\'fc\'b0\'c5
+\f2 \
+cut-in 
+\f3 \'c2\'f7\'b7\'ae
+\f2 \
+
+\f3 \'b1\'b3\'c2\'f7\'b7\'ce
+\f2  
+\f3 \'c8\'be\'b4\'dc
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'b0\'ed\'bc\'d3
+\f2  
+\f3 \'c1\'d6\'c7\'e0
+\f2  
+\f3 \'c1\'df
+\f2  
+\f3 \'c3\'f8\'b8\'e9
+\f2  
+\f3 \'b9\'b0\'c3\'bc
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'b9\'ae\'c1\'a6
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 row
+\f3 \'b8\'b6\'b4\'d9
+\f2  
+\f3 \'c3\'d4\'bf\'b5
+\f2  
+\f3 \'bd\'c3\'b0\'a3\'c0\'cc
+\f2  
+\f3 \'b4\'d9\'b8\'a7
+\f2 \
+motion blur\
+object shape distortion\
+multi-camera fusion timestamp 
+\f3 \'c2\'f7\'c0\'cc
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Perception ISP
+\f0 \'b0\'a1
+\f1  
+\f0 \'b3\'b2\'b0\'dc\'be\'df
+\f1  
+\f0 \'c7\'d2
+\f1  
+\f0 \'b0\'cd
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 row timestamp\
+readout direction\
+rolling shutter timing\
+motion confidence\
+temporal consistency\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc\'b0\'c7
+\f1  
+\f0 \'c0\'cc\'b9\'cc\'c1\'f6
+\f1  
+\f0 \'c7\'b0\'c1\'fa\'ba\'b8\'b4\'d9\'b4\'c2
+\f1  geometry/temporal metadata
+\f0 \'b0\'a1
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 3. \'93Object \'d7 Scene\'94 
+\f0\b0 \'c1\'b6\'c7\'d5\'c0\'b8\'b7\'ce
+\f4\b  
+\f0\b0 \'ba\'b8\'b8\'e9
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Perception ISP 
+\f0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f1  
+\f0 \'c5\'ab
+\f1  
+\f0 \'c1\'b6\'c7\'d5\'c0\'ba
+\f1  
+\f0 \'b4\'d9\'c0\'bd\'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrt\brdrnil \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+
+\f4\b \cf0 Object\cell 
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+\cf0 Scene condition\cell 
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+
+\f0\b0 \cf0 \'c7\'ca\'bf\'e4\'c7\'d1
+\f4\b  Perception ISP 
+\f0\b0 \'b1\'e2\'b4\'c9
+\f4\b \cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b0 \cf0 \'ba\'b8\'c7\'e0\'c0\'da
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'be\'df\'b0\'a3
+\f1 , 
+\f0 \'b0\'cb\'c0\'ba
+\f1  
+\f0 \'bf\'ca
+\f1 , low contrast\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 noise map, IR/Clear, edge confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c0\'da\'c0\'fc\'b0\'c5
+\f1 /
+\f0 \'c5\'b1\'ba\'b8\'b5\'e5
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c0\'db\'b0\'ed
+\f1  
+\f0 \'be\'e3\'c0\'ba
+\f1  
+\f0 \'b1\'b8\'c1\'b6
+\f1 , 
+\f0 \'c3\'f8\'b8\'e9
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 CFA edge, small-object preservation\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bd\'c5\'c8\'a3\'b5\'ee
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 LED flicker, 
+\f0 \'bf\'f8\'b0\'c5\'b8\'ae
+\f1 , saturation\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 color confidence, flicker confidence, HDR source\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'be\'df\'b0\'a3
+\f1 , PWM, 
+\f0 \'c6\'f7\'c8\'ad
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 LED tracking, saturation map\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bf\'c0\'c5\'e4\'b9\'d9\'c0\'cc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bf\'f8\'b0\'c5\'b8\'ae
+\f1 , 
+\f0 \'c0\'db\'c0\'bd
+\f1 , 
+\f0 \'ba\'fc\'b8\'a7
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 ROI/stripe fast path, edge packet\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b0\'cb\'c0\'ba
+\f1  
+\f0 \'c2\'f7\'b7\'ae
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'be\'ee\'b5\'ce\'bf\'ee
+\f1  
+\f0 \'b9\'e8\'b0\'e6
+\f1 , 
+\f0 \'c0\'fa\'c1\'b6\'b5\'b5
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 log-HDR, low-light SNR map\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c2\'f7\'bc\'b1
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b8\'b6\'b8\'f0
+\f1 , 
+\f0 \'c1\'a5\'c0\'ba
+\f1  
+\f0 \'b3\'eb\'b8\'e9
+\f1 , glare\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 luma/chroma edge, color separability\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b0\'f8\'bb\'e7
+\f1  cone\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bb\'f6
+\f1  class 
+\f0 \'c1\'df\'bf\'e4
+\f1 , 
+\f0 \'c0\'db\'c0\'ba
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 opponent color, saturation confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c7\'a5\'c1\'f6\'c6\'c7
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bb\'f6\'b0\'fa
+\f1  shape 
+\f0 \'b8\'f0\'b5\'ce
+\f1  
+\f0 \'c1\'df\'bf\'e4
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 color ratio, edge confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b5\'b5\'b7\'ce
+\f1  
+\f0 \'b3\'ab\'c7\'cf\'b9\'b0
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c0\'db\'b0\'ed
+\f1  
+\f0 \'b3\'b7\'c0\'ba
+\f1  contrast\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 low-level edge, shadow-aware detection\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b5\'bf\'b9\'b0
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'be\'df\'b0\'a3
+\f1 , 
+\f0 \'b3\'b7\'c0\'ba
+\f1  contrast\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 IR/Clear, temporal edge, noise confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrt\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1505\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth3035\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth4738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c1\'d6\'ba\'af\'ba\'ce
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 wide FOV corner\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 MTF map, lens gain, corner SNR\cell \lastrow\row
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 4. Perception ISP 
+\f0\b0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f4\b  
+\f0\b0 \'c0\'db\'c0\'ba
+\f4\b  scene\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'b9\'dd\'b4\'eb\'b7\'ce
+\f1  
+\f0 \'c0\'cc\'b7\'b1
+\f1  scene
+\f0 \'c0\'ba
+\f1  
+\f0 \'c0\'cc\'b5\'e6\'c0\'cc
+\f1  
+\f0 \'c0\'db\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'b8\'bc\'c0\'ba
+\f2  
+\f3 \'b3\'b7
+\f2 \
+
+\f3 \'c5\'ab
+\f2  
+\f3 \'c2\'f7\'b7\'ae
+\f2 \
+
+\f3 \'c8\'ad\'b8\'e9
+\f2  
+\f3 \'c1\'df\'be\'d3
+\f2 \
+
+\f3 \'c0\'fb\'c0\'fd\'c7\'d1
+\f2  
+\f3 \'b3\'eb\'c3\'e2
+\f2 \
+high contrast\
+slow motion\
+
+\f3 \'bb\'f6\'c0\'cc
+\f2  
+\f3 \'c1\'df\'bf\'e4\'c7\'cf\'c1\'f6
+\f2  
+\f3 \'be\'ca\'c0\'bd
+\f2 \
+
+\f3 \'b1\'e2\'c1\'b8
+\f2  RGB DNN
+\f3 \'c0\'cc
+\f2  
+\f3 \'c0\'cc\'b9\'cc
+\f2  
+\f3 \'c0\'df\'c7\'cf\'b4\'c2
+\f2  
+\f3 \'b0\'e6\'bf\'ec
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'bf\'b9
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'b3\'b7\'bf\'a1
+\f2  
+\f3 \'be\'d5\'c2\'f7\'b0\'a1
+\f2  
+\f3 \'c5\'a9\'b0\'d4
+\f2  
+\f3 \'ba\'b8\'c0\'cc\'b4\'c2
+\f2  
+\f3 \'c0\'e5\'b8\'e9
+\f2 \
+
+\f3 \'c1\'df\'be\'d3
+\f2  
+\f3 \'c2\'f7\'bc\'b1\'c0\'cc
+\f2  
+\f3 \'bc\'b1\'b8\'ed\'c7\'d1
+\f2  
+\f3 \'b0\'ed\'bc\'d3\'b5\'b5\'b7\'ce
+\f2 \
+
+\f3 \'c1\'d6\'b0\'a3
+\f2  
+\f3 \'c1\'d6\'c2\'f7\'c0\'e5\'bf\'a1\'bc\'ad
+\f2  
+\f3 \'c5\'ab
+\f2  
+\f3 \'c2\'f7\'b7\'ae
+\f2  
+\f3 \'b0\'cb\'c3\'e2
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c0\'cc\'b7\'b1
+\f1  
+\f0 \'b0\'e6\'bf\'ec\'b4\'c2
+\f1  
+\f0 \'c0\'cf\'b9\'dd
+\f1  ISP
+\f0 \'b5\'b5
+\f1  
+\f0 \'c3\'e6\'ba\'d0\'c8\'f7
+\f1  
+\f0 \'c0\'df\'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'b5\'fb\'b6\'f3\'bc\'ad
+\f1  Perception ISP
+\f0 \'c0\'c7
+\f1  
+\f0 \'c2\'f7\'ba\'b0\'bc\'ba\'c0\'bb
+\f1  
+\f0 \'c1\'f5\'b8\'ed\'c7\'cf\'b7\'c1\'b8\'e9
+\f1  
+\f0 \'bd\'ac\'bf\'ee
+\f1  
+\f0 \'c0\'e5\'b8\'e9\'c0\'cc
+\f1  
+\f0 \'be\'c6\'b4\'cf\'b6\'f3
+\f1  
+\f4\b failure-prone corner case
+\f0\b0 \'b8\'a6
+\f1  
+\f0 \'c5\'d7\'bd\'ba\'c6\'ae\'c7\'d8\'be\'df
+\f1  
+\f0 \'c7\'d5\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 5. Perception ISP 
+\f0\b0 \'b0\'cb\'c1\'f5\'bf\'eb
+\f4\b  scene suite 
+\f0\b0 \'c1\'a6\'be\'c8
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 \'c1\'a6\'b0\'a1
+\f1  
+\f0 \'c5\'d7\'bd\'ba\'c6\'ae\'bc\'c2\'c0\'bb
+\f1  
+\f0 \'b8\'b8\'b5\'e7\'b4\'d9\'b8\'e9
+\f1  
+\f0 \'be\'c6\'b7\'a1\'c3\'b3\'b7\'b3
+\f1  
+\f0 \'b1\'b8\'bc\'ba\'c7\'cf\'b0\'da\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 Set 1. Low-light VRU\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'b0\'cb\'c0\'ba
+\f2  
+\f3 \'bf\'ca
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'c0\'da\'c0\'fc\'b0\'c5
+\f2  
+\f3 \'c3\'f8\'b8\'e9
+\f2 \
+
+\f3 \'c5\'b1\'ba\'b8\'b5\'e5
+\f2 \
+
+\f3 \'b0\'a1\'b7\'ce\'b5\'ee
+\f2  
+\f3 \'bb\'e7\'c0\'cc
+\f2 \
+
+\f3 \'be\'df\'b0\'a3
+\f2  
+\f3 \'b1\'b3\'c2\'f7\'b7\'ce
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Metric:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 VRU recall\
+false positive\
+edge confidence calibration\
+AEB pre-trigger lead time\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 Set 2. HDR / glare\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'c5\'cd\'b3\'ce
+\f2  
+\f3 \'c3\'e2\'b1\'b8
+\f2 \
+
+\f3 \'c5\'c2\'be\'e7
+\f2  
+\f3 \'c1\'a4\'b8\'e9
+\f2 \
+
+\f3 \'c7\'ec\'b5\'e5\'b6\'f3\'c0\'cc\'c6\'ae
+\f2  glare\
+
+\f3 \'c1\'a5\'c0\'ba
+\f2  
+\f3 \'b3\'eb\'b8\'e9
+\f2  
+\f3 \'b9\'dd\'bb\'e7
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Metric:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 object recall in saturated region\
+saturation map accuracy\
+HDR source map usefulness\
+glare confidence calibration\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 Set 3. LED / traffic light\
+\pard\pardeftab720\partightenfactor0
+
+\f2\b0\fs26 \cf0 PWM 
+\f3 \'bd\'c5\'c8\'a3\'b5\'ee
+\f2 \
+
+\f3 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f2 \
+
+\f3 \'b9\'e6\'c7\'e2\'c1\'f6\'bd\'c3\'b5\'ee
+\f2 \
+
+\f3 \'c0\'fc\'b1\'a4\'c6\'c7
+\f2 \
+
+\f3 \'bf\'f8\'b0\'c5\'b8\'ae
+\f2  
+\f3 \'c0\'db\'c0\'ba
+\f2  
+\f3 \'bd\'c5\'c8\'a3\'b5\'ee
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Metric:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 traffic light state accuracy\
+LED detection recall\
+flicker confidence accuracy\
+color false classification\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 Set 4. Small object / long range\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'bf\'f8\'b0\'c5\'b8\'ae
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'bf\'c0\'c5\'e4\'b9\'d9\'c0\'cc
+\f2 \
+
+\f3 \'c0\'da\'c0\'fc\'b0\'c5
+\f2 \
+cone\
+
+\f3 \'b3\'ab\'c7\'cf\'b9\'b0
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Metric:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 small object AP\
+early candidate recall\
+demosaic confidence correlation\
+edge map utility\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 Set 5. Wide FOV corner\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'c8\'ad\'b8\'e9
+\f2  
+\f3 \'b0\'a1\'c0\'e5\'c0\'da\'b8\'ae
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+side camera VRU\
+fisheye corner object\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Metric:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 corner object recall\
+MTF confidence calibration\
+lens gain/SNR map utility\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 Set 6. Weather / degradation\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'ba\'f1
+\f2 \
+
+\f3 \'be\'c8\'b0\'b3
+\f2 \
+
+\f3 \'b4\'ab
+\f2 \
+
+\f3 \'b7\'bb\'c1\'ee
+\f2  
+\f3 \'bf\'c0\'bf\'b0
+\f2 \
+
+\f3 \'b8\'d5\'c1\'f6
+\f2 \
+water droplet\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\fs24 \cf0 Metric:\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 visibility confidence\
+degradation detection\
+perception confidence calibration\
+safe fallback trigger accuracy\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 6. Scene
+\f0\b0 \'ba\'b0\'b7\'ce
+\f4\b  
+\f0\b0 \'b0\'a1\'c0\'e5
+\f4\b  
+\f0\b0 \'c1\'df\'bf\'e4\'c7\'d1
+\f4\b  auxiliary map\
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrt\brdrnil \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+
+\fs24 \cf0 Scene\cell 
+\pard\intbl\itap1\pardeftab720\qc\partightenfactor0
+
+\f0\b0 \cf0 \'b0\'a1\'c0\'e5
+\f4\b  
+\f0\b0 \'c1\'df\'bf\'e4\'c7\'d1
+\f4\b  map\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b0 \cf0 \'be\'df\'b0\'a3
+\f1  
+\f0 \'ba\'b8\'c7\'e0\'c0\'da
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 noise variance, SNR, IR/Clear\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c7\'ec\'b5\'e5\'b6\'f3\'c0\'cc\'c6\'ae
+\f1  glare\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 saturation, HDR source, glare confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'bd\'c5\'c8\'a3\'b5\'ee
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 color confidence, LED flicker, exposure source\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c0\'db\'c0\'ba
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 edge confidence, demosaic confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c1\'d6\'ba\'af\'ba\'ce
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 MTF confidence, lens gain, corner SNR\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'c2\'f7\'bc\'b1
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 luma edge, chroma edge, color ratio\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'ba\'f1
+\f1 /
+\f0 \'be\'c8\'b0\'b3
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 visibility confidence, temporal confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'ba\'fc\'b8\'a5
+\f1  
+\f0 \'b0\'b4\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 row timestamp, motion confidence\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b0\'cb\'c0\'ba
+\f1  
+\f0 \'b9\'b0\'c3\'bc
+\f1 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 log-HDR, noise-normalized gradient\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrt\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth1738\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx4320
+\clvertalc \clshdrawnil \clwWidth4515\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0 \cf0 \'b0\'f8\'bb\'e7
+\f1  cone\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 opponent color, saturation confidence\cell \lastrow\row
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 7. 
+\f0\b0 \'b0\'a1\'c0\'e5
+\f4\b  
+\f0\b0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f4\b  
+\f0\b0 \'c5\'ab
+\f4\b  
+\f0\b0 \'c1\'a6\'c7\'b0
+\f4\b  
+\f0\b0 \'b9\'e6\'c7\'e2
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Perception ISP
+\f0 \'b8\'a6
+\f1  
+\f0 \'c1\'a6\'c7\'b0\'c8\'ad\'c7\'d1\'b4\'d9\'b8\'e9
+\f1  
+\f0 \'c3\'b3\'c0\'bd\'bf\'a1\'b4\'c2
+\f1  
+\f0 \'be\'c6\'b7\'a1
+\f1  3
+\f0 \'b0\'b3
+\f1  use case
+\f0 \'b0\'a1
+\f1  
+\f0 \'b0\'a1\'c0\'e5
+\f1  
+\f0 \'bc\'b3\'b5\'e6\'b7\'c2
+\f1  
+\f0 \'c0\'d6\'bd\'c0\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 1
+\f0\b0 \'bc\'f8\'c0\'a7
+\f4\b : AEB / VRU fast path\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'be\'df\'b0\'a3
+\f2  
+\f3 \'ba\'b8\'c7\'e0\'c0\'da
+\f2 \
+
+\f3 \'c0\'da\'c0\'fc\'b0\'c5
+\f2 \
+
+\f3 \'c5\'b1\'ba\'b8\'b5\'e5
+\f2 \
+
+\f3 \'ba\'ce\'ba\'d0
+\f2  
+\f3 \'c7\'c1\'b7\'b9\'c0\'d3
+\f2  / 
+\f3 \'c7\'cf\'b4\'dc
+\f2  ROI / edge packet\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'bf\'d6
+\f1  
+\f0 \'c1\'c1\'c0\'ba\'b0\'a1
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'bc\'f6
+\f2  ms latency 
+\f3 \'c0\'cc\'b5\'e6\'c0\'cc
+\f2  safety metric
+\f3 \'bf\'a1
+\f2  
+\f3 \'c1\'f7\'c1\'a2
+\f2  
+\f3 \'bf\'ac\'b0\'e1
+\f2 \
+
+\f3 \'b1\'e2\'c1\'b8
+\f2  full-frame perception
+\f3 \'b0\'fa
+\f2  
+\f3 \'c2\'f7\'ba\'b0\'bc\'ba
+\f2  
+\f3 \'c5\'ad
+\f2 \
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 2
+\f0\b0 \'bc\'f8\'c0\'a7
+\f4\b : Traffic light / LED robust perception\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'bd\'c5\'c8\'a3\'b5\'ee
+\f2 \
+
+\f3 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f2 \
+
+\f3 \'b9\'e6\'c7\'e2\'c1\'f6\'bd\'c3\'b5\'ee
+\f2 \
+LED flicker\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'bf\'d6
+\f1  
+\f0 \'c1\'c1\'c0\'ba\'b0\'a1
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f3\fs26 \cf0 \'bb\'f6
+\f2  + flicker + HDR source 
+\f3 \'c1\'a4\'ba\'b8\'b0\'a1
+\f2  
+\f3 \'c0\'cf\'b9\'dd
+\f2  RGB
+\f3 \'bf\'a1\'bc\'ad
+\f2  
+\f3 \'bb\'e7\'b6\'f3\'c1\'f6\'b1\'e2
+\f2  
+\f3 \'bd\'ac\'bf\'f2
+\f2 \
+Perception ISP
+\f3 \'c0\'c7
+\f2  auxiliary map 
+\f3 \'b0\'a1\'c4\'a1\'b0\'a1
+\f2  
+\f3 \'b8\'ed\'c8\'ae\'c7\'d4
+\f2 \
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f4\b\fs36 \cf0 \strokec2 3
+\f0\b0 \'bc\'f8\'c0\'a7
+\f4\b : HDR glare / tunnel / headlight scene\
+\pard\pardeftab720\partightenfactor0
+
+\f3\b0\fs26 \cf0 \'c5\'cd\'b3\'ce
+\f2  
+\f3 \'c3\'e2\'b1\'b8
+\f2 \
+
+\f3 \'c5\'c2\'be\'e7
+\f2  glare\
+
+\f3 \'c7\'ec\'b5\'e5\'b6\'f3\'c0\'cc\'c6\'ae
+\f2  
+\f3 \'c1\'d6\'ba\'af
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'bf\'d6
+\f1  
+\f0 \'c1\'c1\'c0\'ba\'b0\'a1
+\f1 :\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 HDR source map, saturation map, confidence map
+\f3 \'c0\'c7
+\f2  
+\f3 \'c7\'ca\'bf\'e4\'bc\'ba\'c0\'cc
+\f2  
+\f3 \'b8\'c5\'bf\'ec
+\f2  
+\f3 \'b8\'ed\'c8\'ae\'c7\'d4
+\f2 \
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f4\b\fs48 \cf0 \strokec2 8. 
+\f0\b0 \'c3\'d6\'c1\'be
+\f4\b  
+\f0\b0 \'b0\'e1\'b7\'d0
+\f4\b \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Perception ISP
+\f0 \'c0\'c7
+\f1  
+\f0 \'c8\'bf\'b0\'fa\'b0\'a1
+\f1  
+\f0 \'b1\'d8\'b4\'eb\'c8\'ad\'b5\'c7\'b4\'c2
+\f1  object scene
+\f0 \'c0\'ba
+\f1  
+\f0 \'c0\'cf\'b9\'dd
+\f4\b  RGB ISP
+\f0\b0 \'b0\'a1
+\f4\b  sensor-native 
+\f0\b0 \'c1\'a4\'ba\'b8\'b8\'a6
+\f4\b  
+\f0\b0 \'c1\'f6\'bf\'ec\'b0\'c5\'b3\'aa
+\f4\b  
+\f0\b0 \'bf\'d6\'b0\'ee\'c7\'cf\'b4\'c2
+\f4\b  corner case
+\f0\b0 \'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+
+\f0 \'b0\'a1\'c0\'e5
+\f1  
+\f0 \'c1\'df\'bf\'e4\'c7\'d1
+\f1  
+\f0 \'b9\'fc\'c1\'d6\'b4\'c2
+\f1  
+\f0 \'b4\'d9\'c0\'bd\'c0\'d4\'b4\'cf\'b4\'d9
+\f1 .\
+\pard\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 1. 
+\f3 \'be\'df\'b0\'a3
+\f2  / 
+\f3 \'c0\'fa\'c1\'b6\'b5\'b5
+\f2  VRU\
+2. HDR / glare / saturation 
+\f3 \'c0\'e5\'b8\'e9
+\f2 \
+3. LED 
+\f3 \'bd\'c5\'c8\'a3\'b5\'ee
+\f2  / 
+\f3 \'ba\'ea\'b7\'b9\'c0\'cc\'c5\'a9\'b5\'ee
+\f2  / flicker\
+4. 
+\f3 \'bf\'f8\'b0\'c5\'b8\'ae
+\f2  
+\f3 \'c0\'db\'c0\'ba
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2 \
+5. 
+\f3 \'b1\'a4\'b0\'a2
+\f2  
+\f3 \'c1\'d6\'ba\'af\'ba\'ce
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2 \
+6. 
+\f3 \'b3\'b7\'c0\'ba
+\f2  contrast
+\f3 \'c0\'c7
+\f2  
+\f3 \'b0\'cb\'c0\'ba
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2 \
+7. 
+\f3 \'c2\'f7\'bc\'b1
+\f2  / 
+\f3 \'b0\'f8\'bb\'e7
+\f2  cone / 
+\f3 \'bb\'f6
+\f2  class
+\f3 \'b0\'a1
+\f2  
+\f3 \'c1\'df\'bf\'e4\'c7\'d1
+\f2  
+\f3 \'b0\'b4\'c3\'bc
+\f2 \
+8. 
+\f3 \'ba\'f1
+\f2 \'b7
+\f3 \'be\'c8\'b0\'b3
+\f2 \'b7
+\f3 \'b7\'bb\'c1\'ee
+\f2  
+\f3 \'bf\'c0\'bf\'b0
+\f2  
+\f3 \'b5\'ee
+\f2  visibility degradation\
+9. high-speed / rolling-shutter / temporal object\
+10. AEB/VRU
+\f3 \'bf\'eb
+\f2  partial-frame fast path 
+\f3 \'c0\'e5\'b8\'e9
+\f2 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \'c7\'d1
+\f1  
+\f0 \'c1\'d9\'b7\'ce
+\f1  
+\f0 \'c1\'a4\'b8\'ae\'c7\'cf\'b8\'e9
+\f1 :\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f4\b \cf0 Perception ISP
+\f0\b0 \'b4\'c2
+\f4\b  
+\f0\b0 \'bd\'ac\'bf\'ee
+\f4\b  
+\f0\b0 \'c1\'d6\'b0\'a3
+\f4\b  RGB 
+\f0\b0 \'c0\'e5\'b8\'e9\'c0\'cc
+\f4\b  
+\f0\b0 \'be\'c6\'b4\'cf\'b6\'f3
+\f4\b , 
+\f0\b0 \'c0\'fa\'c1\'b6\'b5\'b5
+\f4\b \'b7HDR\'b7glare\'b7LED\'b7
+\f0\b0 \'c0\'db\'c0\'ba
+\f4\b  
+\f0\b0 \'b0\'b4\'c3\'bc
+\f4\b \'b7
+\f0\b0 \'c1\'d6\'ba\'af\'ba\'ce
+\f4\b \'b7
+\f0\b0 \'bf\'c0\'bf\'b0
+\f4\b \'b7fast safety 
+\f0\b0 \'b0\'b0\'c0\'ba
+\f4\b  \'93RGB
+\f0\b0 \'b7\'ce
+\f4\b  
+\f0\b0 \'c6\'f2\'c1\'d8\'c8\'ad\'c7\'cf\'b8\'e9
+\f4\b  
+\f0\b0 \'c1\'a4\'ba\'b8\'b0\'a1
+\f4\b  
+\f0\b0 \'bb\'e7\'b6\'f3\'c1\'f6\'b4\'c2
+\f4\b  
+\f0\b0 \'c0\'e5\'b8\'e9
+\f4\b \'94
+\f0\b0 \'bf\'a1\'bc\'ad
+\f4\b  
+\f0\b0 \'b0\'a1\'c0\'e5
+\f4\b  
+\f0\b0 \'c5\'ab
+\f4\b  
+\f0\b0 \'c8\'bf\'b0\'fa\'b8\'a6
+\f4\b  
+\f0\b0 \'b3\'c0\'b4\'cf\'b4\'d9
+\f4\b .
+\f1\b0 \
+}

@@ -166,23 +166,65 @@ DATASET_RESOURCES: tuple[Dict[str, Any], ...] = (
     },
     {
         "dataset": "LOD",
+        "priority": "P0",
+        "resource": "raw_adapter_lod_google_drive",
+        "kind": "dataset_archive",
+        "url": "https://drive.google.com/file/d/1Jkm4mvynWxc7lXSH3H9sLI0wJ6p6ftvZ/view?usp=sharing",
+        "expected_access": "browser_or_gdrive",
+        "disk_estimate_gb": None,
+        "first_action": (
+            "Try this RAW-Adapter LOD_BMVC21 package first; it bundles RAW_dark, processed RAW variants, and RAW-dark annotations."
+        ),
+    },
+    {
+        "dataset": "LOD",
+        "priority": "P0",
+        "resource": "raw_adapter_lod_baidu",
+        "kind": "dataset_archive",
+        "url": "https://pan.baidu.com/s/1FA9lw1WXk2dJ0jtlLeho5w?pwd=kf43",
+        "expected_access": "baidu",
+        "disk_estimate_gb": None,
+        "first_action": "Alternate RAW-Adapter LOD_BMVC21 package path if Google Drive fails. Password: kf43.",
+    },
+    {
+        "dataset": "LOD",
         "priority": "P1",
         "resource": "raw_dark_annotations_baidu",
         "kind": "annotation",
-        "url": "https://pan.baidu.com/s/1pFAwtaX4ufuZaMy31Sv0AA",
+        "url": "https://pan.baidu.com/s/1pFAwtaX4ufuZaMy31Sv0AA?pwd=2021",
         "expected_access": "baidu",
         "disk_estimate_gb": 0.05,
-        "first_action": "Try annotation download first, then VOC XML conversion.",
+        "first_action": "Original-provider RAW-dark VOC XML annotations. Password: 2021.",
+    },
+    {
+        "dataset": "LOD",
+        "priority": "P1",
+        "resource": "raw_dark_annotations_raw_version_baidu",
+        "kind": "annotation",
+        "url": "https://pan.baidu.com/s/1HXwly01s9VPfiHNt49UwGA?pwd=2021",
+        "expected_access": "baidu",
+        "disk_estimate_gb": 0.05,
+        "first_action": "Original-provider RAW-version RAW-dark annotations. Prefer this for RAW-coordinate checks. Password: 2021.",
     },
     {
         "dataset": "LOD",
         "priority": "P1",
         "resource": "raw_dark_images_baidu",
         "kind": "raw_images",
-        "url": "https://pan.baidu.com/s/1cWu7Y6GtiRV9itZEbop4VQ",
+        "url": "https://pan.baidu.com/s/1cWu7Y6GtiRV9itZEbop4VQ?pwd=2021",
         "expected_access": "baidu",
         "disk_estimate_gb": None,
-        "first_action": "Download a small manual subset before full RAW-dark images.",
+        "first_action": "Original-provider RAW-dark images. Password: 2021.",
+    },
+    {
+        "dataset": "LOD",
+        "priority": "P2",
+        "resource": "all_raw_baidu",
+        "kind": "raw_images",
+        "url": "https://pan.baidu.com/s/1phBWWedKwcCJONNhny5_8g?pwd=2021",
+        "expected_access": "baidu",
+        "disk_estimate_gb": None,
+        "first_action": "Original Canon EOS 5D Mark IV camera RAW dump; defer until smaller RAW-dark package is validated. Password: 2021.",
     },
     {
         "dataset": "SID",
@@ -553,7 +595,9 @@ def _empty_local_state(*, dataset_root: str | Path, download_roots: Sequence[str
 def _build_local_state(*, dataset_root: str | Path, download_roots: Sequence[str | Path]) -> Dict[str, Any]:
     root = Path(dataset_root).expanduser()
     aodraw_root = root / "aodraw" if root.name != "aodraw" else root
+    lod_root = root / "lod" if root.name != "lod" else root
     search_roots = [Path(item).expanduser() for item in download_roots] + [aodraw_root, aodraw_root / "downloads"]
+    lod_search_roots = [Path(item).expanduser() for item in download_roots] + [lod_root, lod_root / "downloads"]
     annotations = aodraw_root / "annotations" / "AODRaw_annotations.zip"
     test_raw = _find_download_candidate(search_roots, "AODRaw_test_downsampled_raw.zip", expected_bytes=58936290415)
     train_raw = _find_download_candidate(search_roots, "AODRaw_train_downsampled_raw.zip", expected_bytes=137186166557)
@@ -566,6 +610,7 @@ def _build_local_state(*, dataset_root: str | Path, download_roots: Sequence[str
         "checked": True,
         "dataset_root": str(root),
         "aodraw_root": str(aodraw_root),
+        "lod_root": str(lod_root),
         "download_roots": [str(path) for path in search_roots],
         "disk_available_gib": round(float(usage.free) / float(1024**3), 2),
         "aodraw_annotations_present": bool(annotations.is_file()),
@@ -575,6 +620,21 @@ def _build_local_state(*, dataset_root: str | Path, download_roots: Sequence[str
         "aodraw_srgb_zip": srgb,
         "sid_sony_zip": _find_download_candidate(search_roots + [root / "sid" / "downloads"], "Sony2025.zip", expected_bytes=26926662016),
         "sid_fuji_zip": _find_download_candidate(search_roots + [root / "sid" / "downloads"], "Fuji2025.zip", expected_bytes=55409370853),
+        "lod_raw_adapter_archive": _find_optional_download_candidate(
+            lod_search_roots,
+            ("LOD_BMVC2021.zip", "LOD_BMVC2021.rar", "LOD_BMVC2021.7z", "LOD_BMVC21.zip", "LOD_BMVC21.rar", "LOD_BMVC21.7z", "LOD.zip"),
+            expected_bytes=22_000_000_000,
+        ),
+        "lod_raw_dark_annotations": _find_lod_directory_or_archive(
+            search_roots=lod_search_roots,
+            directory=lod_root / "RAW-dark-Annotations",
+            archive_names=("RAW-dark-Annotations.zip", "RAW-dark-Annotations.rar", "RAW_dark_Annotations.zip"),
+        ),
+        "lod_raw_dark_images": _find_lod_directory_or_archive(
+            search_roots=lod_search_roots,
+            directory=lod_root / "RAW-dark-images",
+            archive_names=("RAW-dark-images.zip", "RAW-dark-images.rar", "RAW_dark_images.zip"),
+        ),
         "qut_low_light_zip": _find_download_candidate(
             search_roots + [root / "qut_low_light" / "downloads"],
             "qut_low_light_raw_dataset.zip",
@@ -595,6 +655,54 @@ def _find_srgb_candidate(search_roots: Sequence[Path]) -> Dict[str, Any]:
         return _missing_candidate(names[0])
     severity = {"present": 0, "partial": 1, "invalid": 2, "missing": 3}
     return sorted(candidates, key=lambda item: severity.get(str(item.get("status")), 9))[0]
+
+
+def _find_optional_download_candidate(
+    search_roots: Sequence[Path],
+    filenames: Sequence[str],
+    *,
+    expected_bytes: int | None = None,
+) -> Dict[str, Any]:
+    for root in search_roots:
+        for filename in filenames:
+            candidates = [root / filename]
+            candidates.extend(sorted(root.glob(f"{filename}*.part")))
+            for path in candidates:
+                if not path.is_file():
+                    continue
+                size = int(path.stat().st_size)
+                if expected_bytes is not None and size < int(expected_bytes * 0.95):
+                    return {
+                        "filename": filename,
+                        "path": str(path),
+                        "status": "partial",
+                        "size_bytes": size,
+                        "expected_bytes": int(expected_bytes),
+                        "message": f"local file is only {round(size / 1024**3, 2)} GiB; expected about {round(expected_bytes / 1024**3, 2)} GiB",
+                    }
+                return {
+                    "filename": filename,
+                    "path": str(path),
+                    "status": "present",
+                    "size_bytes": size,
+                    "expected_bytes": int(expected_bytes) if expected_bytes is not None else None,
+                    "message": "local file is present",
+                }
+    return _missing_candidate(str(filenames[0] if filenames else "download"))
+
+
+def _find_lod_directory_or_archive(*, search_roots: Sequence[Path], directory: Path, archive_names: Sequence[str]) -> Dict[str, Any]:
+    if directory.is_dir():
+        files = [item for item in directory.rglob("*") if item.is_file()]
+        return {
+            "filename": directory.name,
+            "path": str(directory),
+            "status": "present" if files else "partial",
+            "size_bytes": int(sum(item.stat().st_size for item in files)),
+            "file_count": int(len(files)),
+            "message": "local directory is present" if files else "local directory exists but contains no files",
+        }
+    return _find_optional_download_candidate(search_roots, archive_names)
 
 
 def _find_download_candidate(
@@ -651,6 +759,19 @@ def _resource_local_status(resource: Mapping[str, Any], local_state: Mapping[str
     dataset = str(resource.get("dataset", ""))
     name = str(resource.get("resource", ""))
     if dataset != "AODRaw":
+        if dataset == "LOD":
+            key_by_resource = {
+                "raw_adapter_lod_google_drive": "lod_raw_adapter_archive",
+                "raw_adapter_lod_baidu": "lod_raw_adapter_archive",
+                "raw_dark_annotations_baidu": "lod_raw_dark_annotations",
+                "raw_dark_annotations_raw_version_baidu": "lod_raw_dark_annotations",
+                "raw_dark_images_baidu": "lod_raw_dark_images",
+            }
+            key = key_by_resource.get(name)
+            if key:
+                candidate = dict(local_state.get(key, {}) if isinstance(local_state.get(key), Mapping) else {})
+                candidate["checked"] = True
+                return candidate
         if dataset == "SID":
             key_by_resource = {
                 "sony_raw_google_storage": "sid_sony_zip",
@@ -789,6 +910,9 @@ def _local_state_html(local_state: Mapping[str, Any]) -> str:
         ("AODRaw test RAW zip", _candidate_status(local_state.get("aodraw_test_raw_zip")), _candidate_message(local_state.get("aodraw_test_raw_zip"))),
         ("AODRaw train RAW zip", _candidate_status(local_state.get("aodraw_train_raw_zip")), _candidate_message(local_state.get("aodraw_train_raw_zip"))),
         ("AODRaw sRGB zip", _candidate_status(local_state.get("aodraw_srgb_zip")), _candidate_message(local_state.get("aodraw_srgb_zip"))),
+        ("LOD RAW-Adapter archive", _candidate_status(local_state.get("lod_raw_adapter_archive")), _candidate_message(local_state.get("lod_raw_adapter_archive"))),
+        ("LOD RAW-dark annotations", _candidate_status(local_state.get("lod_raw_dark_annotations")), _candidate_message(local_state.get("lod_raw_dark_annotations"))),
+        ("LOD RAW-dark images", _candidate_status(local_state.get("lod_raw_dark_images")), _candidate_message(local_state.get("lod_raw_dark_images"))),
         ("SID Sony RAW zip", _candidate_status(local_state.get("sid_sony_zip")), _candidate_message(local_state.get("sid_sony_zip"))),
         ("SID Fuji RAW zip", _candidate_status(local_state.get("sid_fuji_zip")), _candidate_message(local_state.get("sid_fuji_zip"))),
         ("QUT low-light RAW zip", _candidate_status(local_state.get("qut_low_light_zip")), _candidate_message(local_state.get("qut_low_light_zip"))),

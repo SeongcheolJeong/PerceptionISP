@@ -24,7 +24,7 @@ from perception_isp.aux_dnn import (
     make_torch_dataset,
 )
 from perception_isp.aux_eval_dense import _apply_input_ablation, _shuffle_indices, evaluate_dense_manifest
-from perception_isp.aux_export import _load_samples, export_aux_dataset, main as aux_export_main
+from perception_isp.aux_export import EDGE6_CHANNELS, _load_samples, export_aux_dataset, main as aux_export_main
 from perception_isp.aux_train_dense import _dense_targets, _weighted_mean, train_dense
 from perception_isp.aux_train_smoke import train_smoke
 from perception_isp.comparison import build_pipeline_images, compare_dataset
@@ -153,6 +153,28 @@ class AuxDNNExportTest(unittest.TestCase):
             self.assertEqual(summary["tensor_layouts"], ["rgb_aux_hwc", "rgb_aux_chw"])
             self.assertEqual(rows[0]["extended_channels"], [])
             self.assertNotIn("extended_tensor_stats", rows[0])
+
+    def test_export_aux_dataset_can_store_edge_evidence_as_base_six_channels(self) -> None:
+        samples = make_synthetic_evaluation_samples(count=1, width=64, height=48)
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = export_aux_dataset(
+                samples,
+                tmp,
+                channels=EDGE6_CHANNELS,
+                include_extended=False,
+                include_preview=False,
+                compress=False,
+            )
+            root = Path(tmp)
+            rows = [json.loads(line) for line in (root / "manifest.jsonl").read_text().splitlines() if line.strip()]
+            tensor_path = root / rows[0]["tensor_path"]
+            with np.load(tensor_path) as payload:
+                self.assertEqual(tuple(str(value) for value in payload["channel_names"]), EDGE6_CHANNELS)
+                self.assertEqual(payload["rgb_aux_chw"].shape, (len(EDGE6_CHANNELS), 48, 64))
+                self.assertNotIn("rgb_aux_extended_chw", payload.files)
+            self.assertEqual(summary["channels"], list(EDGE6_CHANNELS))
+            self.assertEqual(rows[0]["channels"], list(EDGE6_CHANNELS))
+            self.assertEqual(rows[0]["tensor_stats"]["channels"], list(EDGE6_CHANNELS))
 
     def test_cli_no_preview_keeps_extended_tensors_without_preview_arrays(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

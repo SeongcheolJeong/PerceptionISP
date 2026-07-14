@@ -70,6 +70,53 @@ class AODRawLoaderTest(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 load_aodraw_manifest_row(root, row, require_srgb=True)
 
+    def test_official_downsampled_rgb_npy_is_marked_synthetic_cfa(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            row = _manifest_row("00000001")
+            raw_path = root / row["expected_raw_relative_path"]
+            raw_path.parent.mkdir(parents=True, exist_ok=True)
+            rgb = np.zeros((3, 4, 4), dtype=np.float32)
+            rgb[0, :, :] = 10.0
+            rgb[1, :, :] = 20.0
+            rgb[2, :, :] = 30.0
+            np.save(raw_path, rgb)
+
+            sample = load_aodraw_manifest_row(root, row, cfa_pattern="RGGB")
+
+            self.assertEqual(sample.raw.data.shape, (4, 4))
+            self.assertFalse(sample.raw.provenance["true_sensor_cfa_mosaic"])
+            self.assertTrue(sample.raw.provenance["synthetic_cfa_from_rgb"])
+            self.assertEqual(sample.raw.provenance["raw_loader_layout"], "demosaiced_rgb_chw3_to_synthetic_bayer")
+            self.assertEqual(sample.raw.calibration.white_level, 255.0)
+            self.assertEqual(float(sample.raw.data[0, 0]), 10.0)
+            self.assertEqual(float(sample.raw.data[0, 1]), 20.0)
+            self.assertEqual(float(sample.raw.data[1, 1]), 30.0)
+
+    def test_official_slice_packed_bayer_npy_unpacks_as_native_cfa(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            row = _manifest_row("00000001")
+            raw_path = root / row["expected_raw_relative_path"]
+            raw_path.parent.mkdir(parents=True, exist_ok=True)
+            packed = np.zeros((4, 2, 2), dtype=np.uint16)
+            packed[0, :, :] = 100
+            packed[1, :, :] = 200
+            packed[2, :, :] = 300
+            packed[3, :, :] = 400
+            np.save(raw_path, packed)
+
+            sample = load_aodraw_manifest_row(root, row, cfa_pattern="RGGB")
+
+            self.assertEqual(sample.raw.data.shape, (4, 4))
+            self.assertTrue(sample.raw.provenance["true_sensor_cfa_mosaic"])
+            self.assertFalse(sample.raw.provenance["synthetic_cfa_from_rgb"])
+            self.assertEqual(sample.raw.provenance["raw_loader_layout"], "packed_bayer_chw4")
+            self.assertEqual(float(sample.raw.data[0, 0]), 100.0)
+            self.assertEqual(float(sample.raw.data[0, 1]), 200.0)
+            self.assertEqual(float(sample.raw.data[1, 1]), 300.0)
+            self.assertEqual(float(sample.raw.data[1, 0]), 400.0)
+
 
 def _write_sample(root: Path, stem: str, *, write_srgb: bool = True) -> dict:
     raw_path = root / "images_downsampled_raw" / f"{stem}.npy"

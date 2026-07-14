@@ -127,7 +127,7 @@ def watch_aodraw_downloads(
         "iterations": iterations,
         "next_action": _next_action(ready=ready, dry_run=bool(dry_run)),
         "availability_output_dir": "" if availability_output_dir is None else str(availability_output_dir),
-        "evaluation_command": _pipeline_command(kind=kind),
+        "evaluation_command": _pipeline_command(kind=kind, manifest=manifest, dataset_root=dataset_root),
         "claim_boundary": (
             "This watcher only automates local file import and availability checks. It does not download Baidu/TeraBox files or prove PerceptionISP performance."
         ),
@@ -151,17 +151,57 @@ def _next_action(*, ready: bool, dry_run: bool) -> str:
     return "Keep the watcher running while Baidu/TeraBox downloads finish, or rerun after files land in the download directory."
 
 
-def _pipeline_command(*, kind: str) -> str:
+def _pipeline_command(*, kind: str, manifest: str | Path | Sequence[Mapping[str, Any]], dataset_root: str | Path) -> str:
     suffix = "_raw_only" if str(kind) == "raw" else ""
+    manifest_ref = _source_ref(manifest)
+    manifest_arg = f"--manifest {_shell_quote(manifest_ref)} " if manifest_ref else ""
+    count = _manifest_count(manifest)
+    slug = _command_slug(manifest_ref=manifest_ref, fallback=f"aodraw_subset_{count}")
     return (
         "PYTHONPATH=src python3 -m perception_isp.aodraw_pipeline "
+        f"{manifest_arg}"
         f"--kind {kind} "
         "--download-root ~/Downloads "
-        "--dataset-root data/raw_datasets/aodraw "
-        f"--output-dir reports/perception_aodraw_pipeline_test_downsample_adverse_24{suffix}_v1 "
-        "--count 24 --width 768 --height 512 "
+        f"--dataset-root {_shell_quote(str(Path(dataset_root).expanduser()))} "
+        f"--output-dir reports/perception_aodraw_pipeline_{slug}{suffix}_v1 "
+        f"--count {count} --width 768 --height 512 "
         "--rgb-detector yolo --rgb-detector-model yolo11n.pt --label-aware --no-visuals"
     )
+
+
+def _source_ref(value: Any) -> str:
+    if isinstance(value, (str, bytes, Path)):
+        return str(Path(value).expanduser())
+    return ""
+
+
+def _manifest_count(manifest: str | Path | Sequence[Mapping[str, Any]]) -> int:
+    if isinstance(manifest, Sequence) and not isinstance(manifest, (str, bytes, Path)):
+        return len([row for row in manifest if isinstance(row, Mapping)])
+    path = Path(manifest).expanduser()
+    try:
+        payload = json.loads(path.read_text())
+    except OSError:
+        return 24
+    if isinstance(payload, Mapping):
+        payload = payload.get("manifest", ())
+    if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes)):
+        return len([row for row in payload if isinstance(row, Mapping)])
+    return 24
+
+
+def _shell_quote(value: str) -> str:
+    return json.dumps(str(value))
+
+
+def _command_slug(*, manifest_ref: str, fallback: str) -> str:
+    if manifest_ref:
+        parent = Path(manifest_ref).parent.name or Path(manifest_ref).stem
+        slug = parent.replace("perception_aodraw_subset_plan_", "")
+    else:
+        slug = fallback
+    normalized = "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in slug).strip("_")
+    return normalized or fallback
 
 
 def _render_html(summary: Mapping[str, Any]) -> str:
