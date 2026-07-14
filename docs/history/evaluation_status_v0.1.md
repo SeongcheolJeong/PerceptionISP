@@ -1292,9 +1292,8 @@ it is only the first learned-adapter plumbing step.
 Use a KITTI object-detection subset:
 
 ```bash
-PYTHONPATH=src:/Users/seongcheoljeong/Documents/CameraE2E/src \
-/Users/seongcheoljeong/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 \
-  -m perception_isp.eval_cli \
+CAMERAE2E_ROOT=/path/to/CameraE2E \
+  perception-isp evaluate detection \
   --source kitti-dataset \
   --dataset /path/to/KITTI/object \
   --split training \
