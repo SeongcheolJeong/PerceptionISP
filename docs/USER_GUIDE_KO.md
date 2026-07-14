@@ -36,6 +36,9 @@ python -m pip install -e '.[all]'        # 위 runtime 기능 전체
 ```
 
 CameraE2E 자체는 별도 local checkout이며 pip extra에 포함되지 않습니다.
+`.[camerae2e]`는 HDF5 bridge 의존성만 추가하므로, 새 환경에서는
+CameraE2E checkout도 `python -m pip install -e "$CAMERAE2E_ROOT"`로
+설치해야 SciPy, scikit-image 등 simulator 전체 의존성이 준비됩니다.
 
 ## 3. 작업 경로
 
@@ -58,6 +61,7 @@ export CAMERAE2E_ROOT=/path/to/CameraE2E
 ```bash
 perception-isp --help
 perception-isp isp run --help
+perception-isp example suite --help
 perception-isp data yolo-aux --help
 perception-isp aux export --help
 perception-isp train yolo-aux --help
@@ -65,7 +69,7 @@ perception-isp evaluate detection --help
 perception-isp report rollup --help
 ```
 
-그룹은 `isp`, `data`, `aux`, `train`, `evaluate`, `report`입니다.
+그룹은 `isp`, `example`, `data`, `aux`, `train`, `evaluate`, `report`입니다.
 
 ## 5. ISP smoke test
 
@@ -95,10 +99,62 @@ for cfa in RGGB GRBG BGGR GBRG; do
 done
 ```
 
+## 5.1 실행형 HDR/Metadata 예제 Suite
+
+외부 dataset이나 PyTorch 없이 HDR, sensor metadata, calibration, CFA,
+temporal state, DNN 입력 계약을 한 번에 확인할 수 있습니다.
+
+```bash
+perception-isp example suite \
+  --output-dir "$PERCEPTION_ISP_OUTPUT/perception_isp_example_suite"
+```
+
+생성되는 `index.html`은 `Overview`, `HDR`, `Sensor Metadata`,
+`Calibration & Optics`, `Temporal`, `DNN Contract`, `CameraE2E` 탭으로
+구성됩니다. CFA와 geometry case는 `Calibration & Optics` 탭 안에서 함께
+표시됩니다. `summary.json`에는 동일한 PASS/FAIL gate와 metric이 저장되고,
+`assets/`에는 HumanISP/PerceptionISP 영상과 Aux map이 저장됩니다.
+
+일부만 빠르게 실행할 수도 있습니다.
+
+```bash
+perception-isp example suite --case hdr --case metadata
+perception-isp example suite --case dnn-contract
+perception-isp example suite --list-cases
+```
+
+Metadata 표의 의미는 다음과 같습니다.
+
+- `active processing`: 실제 pixel/map/timing 계산에 사용됩니다.
+- `propagated only`: provenance와 sidecar에는 남지만 pixel 계산에는 직접
+  사용되지 않습니다.
+- `declared but unused`: 계약에는 존재하지만 현재 pipeline block이
+  소비하지 않습니다.
+
+현재 6채널·16채널 RGB+Aux tensor에는 공간 Aux map만 포함됩니다. 노출시간,
+gain, 온도 같은 scalar metadata는 report와 manifest sidecar에는 기록되지만
+DNN input에는 들어가지 않습니다. 이 예제의 PASS는 front-end mechanism
+검증이며 detection/segmentation 성능 우월성 근거가 아닙니다.
+
+CameraE2E를 fallback 없이 필수 검증하려면 다음처럼 실행합니다.
+
+```bash
+export CAMERAE2E_ROOT=/path/to/CameraE2E
+python -m pip install -e "$CAMERAE2E_ROOT"
+python -m pip install -e '.[camerae2e]'
+perception-isp example suite --with-camerae2e --scene 'uniform ee'
+```
+
+`--with-camerae2e`를 지정했는데 직접 실행할 수 없으면 suite는 실패합니다.
+현재 CameraE2E bridge의 HDR stack은 하나의 simulated sensor mosaic을
+scale하여 만든 synthetic bracket이므로 true multi-capture HDR 근거로
+해석하면 안 됩니다.
+
 ## 6. CameraE2E 입력
 
 ```bash
 export CAMERAE2E_ROOT=/path/to/CameraE2E
+python -m pip install -e "$CAMERAE2E_ROOT"
 perception-isp isp run \
   --camerae2e \
   --scene 'uniform ee' \

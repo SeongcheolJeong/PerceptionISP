@@ -16,6 +16,7 @@ class Command:
 
 COMMANDS: dict[tuple[str, str], Command] = {
     ("isp", "run"): Command("perception_isp.core.run_cli", "Run the software ISP pipeline."),
+    ("example", "suite"): Command("perception_isp.evaluation.example_suite", "Run the visual HDR and metadata example suite."),
     ("data", "coco-subset"): Command("perception_isp.datasets.prepare_coco_subset", "Prepare a small COCO validation subset."),
     ("data", "yolo-aux"): Command("perception_isp.datasets.yolo_aux_dataset", "Export a YOLO RGB+Aux dataset."),
     ("data", "resplit"): Command("perception_isp.datasets.yolo_resplit_dataset", "Create leakage-safe train/validation/test splits."),

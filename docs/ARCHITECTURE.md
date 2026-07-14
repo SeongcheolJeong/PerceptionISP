@@ -26,6 +26,20 @@ The ISP must consume the source CFA recorded in metadata. A requested target
 CFA is allowed for a controlled remosaic experiment but must not be reported
 as native sensor evidence.
 
+Per-exposure time and gain arrays must contain either one broadcast value or
+one value per RAW exposure plane. Gain is removed during physical RAW
+normalization; HDR radiance scaling therefore uses exposure time only. A
+metadata/calibration CFA mismatch is rejected rather than silently remapped.
+
+Metadata has three implementation states:
+
+- **active processing:** exposure time, gains, temperature, CFA, frame timing,
+  line time, and readout direction;
+- **propagated only:** frame counter, camera synchronization ID, HDR
+  mode/ratios, rolling-shutter duration, module identifiers, and profile
+  identifiers;
+- **declared but unused:** currently `color_shading_gain`.
+
 ## Software ISP Flow
 
 ```mermaid
@@ -58,6 +72,11 @@ Available channels depend on the export profile and include combinations of:
 - HDR source/exposure selection;
 - motion or temporal confidence when previous-frame information is available;
 - raw-normalized, luma, and machine-view feature inputs.
+
+The public `saturation` map means that at least one source exposure crossed the
+saturation threshold. `clipping_distance` is also derived from source-exposure
+risk. Neither field by itself proves that the final fused HDR value is clipped
+or recovered; known-radiance error must be evaluated separately.
 
 Aux maps are not class labels. An RGB-trained detector cannot consume them
 without an adapter, a modified input stem, or a separate calibrated fusion

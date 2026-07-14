@@ -99,6 +99,68 @@ class PerceptionISPPipelineTest(unittest.TestCase):
         self.assertGreater(float(np.mean(zero_result.maps["edge_confidence"])), float(np.mean(blurred_result.maps["edge_confidence"])))
         self.assertGreater(float(np.mean(zero_result.maps["psf_edge_likelihood"])), float(np.mean(blurred_result.maps["psf_edge_likelihood"])))
 
+    def test_hdr_gain_normalization_is_not_applied_twice(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48, exposures=(0.08,), cfa_pattern="RGGB", seed=31)
+        black = float(raw.calibration.black_level)
+        white = float(raw.calibration.white_level)
+        base_plane = np.asarray(raw.data, dtype=np.float64)[0]
+        gain_two_plane = np.clip((base_plane - black) * 2.0 + black, black, white)
+        gain_stack = RawFrame(
+            data=np.stack([base_plane, gain_two_plane], axis=0),
+            metadata=replace(
+                raw.metadata,
+                exposure_times_us=(640.0, 640.0),
+                analog_gains=(1.0, 2.0),
+                digital_gains=(1.0, 1.0),
+                hdr_mode="multi_exposure",
+                hdr_ratios=(1.0, 1.0),
+            ),
+            calibration=raw.calibration,
+        )
+
+        pipeline = PerceptionISPPipeline()
+        reference = pipeline.run(raw)
+        fused = pipeline.run(gain_stack)
+
+        np.testing.assert_allclose(fused.raw_normalized, reference.raw_normalized, atol=1.0e-12, rtol=0.0)
+
+    def test_exposure_metadata_requires_broadcast_or_exact_length(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48)
+        raw.metadata = replace(raw.metadata, analog_gains=(1.0, 2.0))
+        with self.assertRaisesRegex(ValueError, "analog_gains must contain one value or one value per exposure"):
+            PerceptionISPPipeline().run(raw)
+
+    def test_exposure_metadata_requires_positive_finite_values(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48)
+        invalid_fields = (
+            ("exposure_times_us", (0.0,), "exposure_times_us"),
+            ("analog_gains", (float("nan"),), "analog_gains"),
+            ("digital_gains", (0.0,), "digital_gains"),
+        )
+        for field, value, message in invalid_fields:
+            with self.subTest(field=field):
+                invalid = replace(raw, metadata=replace(raw.metadata, **{field: value}))
+                with self.assertRaisesRegex(ValueError, f"{message} values must be finite and positive"):
+                    PerceptionISPPipeline().run(invalid)
+
+    def test_sensor_and_calibration_cfa_mismatch_is_rejected(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48, cfa_pattern="RGGB")
+        raw.calibration = replace(raw.calibration, cfa_pattern="GRBG")
+        with self.assertRaisesRegex(ValueError, "sensor metadata CFA does not match calibration CFA"):
+            PerceptionISPPipeline().run(raw)
+
+    def test_bottom_to_top_readout_reverses_row_timing(self) -> None:
+        raw = make_synthetic_raw(width=80, height=48, cfa_pattern="RGGB")
+        top = PerceptionISPPipeline().run(raw)
+        bottom_raw = replace(raw, metadata=replace(raw.metadata, readout_direction="bottom_to_top"))
+        bottom = PerceptionISPPipeline().run(bottom_raw)
+
+        self.assertLess(float(top.maps["rolling_row_fraction"][0]), float(top.maps["rolling_row_fraction"][-1]))
+        self.assertGreater(float(bottom.maps["rolling_row_fraction"][0]), float(bottom.maps["rolling_row_fraction"][-1]))
+        geometry = bottom.metadata["geometry"]
+        self.assertGreater(float(geometry["row0_timestamp_us"]), float(geometry["row_last_timestamp_us"]))
+        self.assertLess(float(geometry["row_timestamp_start_us"]), float(geometry["row_timestamp_end_us"]))
+
 
 if __name__ == "__main__":
     unittest.main()

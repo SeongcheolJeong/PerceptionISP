@@ -180,8 +180,19 @@ def edge_aware_denoise(image: object, edge_confidence: object, strength: float) 
     return values * (1.0 - blend) + smooth * blend
 
 
-def row_timestamp_map(rows: int, timestamp_us: float, line_time_us: float) -> ArrayF:
-    return float(timestamp_us) + np.arange(int(rows), dtype=np.float64) * float(line_time_us)
+def row_timestamp_map(
+    rows: int,
+    timestamp_us: float,
+    line_time_us: float,
+    readout_direction: str = "top_to_bottom",
+) -> ArrayF:
+    offsets = np.arange(int(rows), dtype=np.float64) * float(line_time_us)
+    direction = str(readout_direction).lower().replace("-", "_")
+    if direction == "bottom_to_top":
+        offsets = offsets[::-1]
+    elif direction != "top_to_bottom":
+        raise ValueError(f"unsupported readout direction: {readout_direction!r}")
+    return float(timestamp_us) + offsets
 
 
 def nearest_dewarp(image: object, distortion_coeffs: Sequence[float]) -> ArrayF:

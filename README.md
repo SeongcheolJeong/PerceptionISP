@@ -90,20 +90,46 @@ List all workflows with:
 
 ```bash
 perception-isp --help
+perception-isp example suite --help
 perception-isp train yolo-aux --help
 perception-isp evaluate detection --help
 ```
+
+## Executable Examples
+
+Run the self-contained HDR, metadata, calibration, CFA, temporal, and DNN
+input-contract suite without external datasets:
+
+```bash
+perception-isp example suite
+```
+
+The command writes a tabbed `index.html`, `summary.json`, and PNG evidence to
+`${PERCEPTION_ISP_OUTPUT:-reports}/perception_isp_example_suite`. Individual
+Python entry points and interpretation notes are in
+[examples/README.md](examples/README.md).
+
+The example suite validates controlled front-end behavior. A `PASS` is not a
+claim that PerceptionISP improves held-out detection or segmentation metrics.
+Scalar sensor metadata is audited as sidecar information and is not added to
+the current RGB+Aux DNN tensor.
 
 ## CameraE2E
 
 ```bash
 export CAMERAE2E_ROOT=/path/to/CameraE2E
+python -m pip install -e "$CAMERAE2E_ROOT"
 perception-isp isp run --camerae2e --scene 'uniform ee' --cfa auto
 ```
 
 `--cfa auto` preserves the source sensor CFA when CameraE2E exposes it. A
 requested explicit CFA is treated as the target pattern and recorded in frame
 provenance.
+
+The editable CameraE2E install supplies its full simulator dependency set;
+PerceptionISP's `camerae2e` extra only supplies the HDF5 bridge dependency.
+Use `perception-isp example suite --with-camerae2e` when CameraE2E must be
+validated without accepting the synthetic fallback.
 
 ## Repository Layout
 

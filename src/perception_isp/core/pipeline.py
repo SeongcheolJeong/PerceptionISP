@@ -7,7 +7,7 @@ product ISP, but it is a runnable algorithmic baseline for SW experiments.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import replace
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
@@ -177,11 +177,35 @@ class PerceptionISPPipeline:
         calibration = raw.calibration or self.default_calibration
         if calibration is None:
             calibration = self.default_calibration
-        if metadata.cfa_pattern == "RGGB" and calibration.cfa_pattern:
-            metadata = SensorMetadata(**{**metadata_to_dict(metadata), "cfa_pattern": calibration.cfa_pattern})
         exposures = ensure_exposure_first(raw.data)
         if exposures.shape[1] < 2 or exposures.shape[2] < 2:
             raise ValueError("raw frame must contain at least 2x2 pixels")
+        exposure_count = int(exposures.shape[0])
+        _metadata_tuple(metadata.exposure_times_us, exposure_count, "exposure_times_us")
+        _metadata_tuple(metadata.analog_gains, exposure_count, "analog_gains")
+        _metadata_tuple(metadata.digital_gains, exposure_count, "digital_gains")
+        _metadata_tuple(metadata.hdr_ratios, exposure_count, "hdr_ratios")
+
+        metadata_pattern = _normalize_cfa_pattern(metadata.cfa_pattern)
+        calibration_pattern = _normalize_cfa_pattern(calibration.cfa_pattern or metadata_pattern)
+        if metadata_pattern != calibration_pattern:
+            raise ValueError(
+                "sensor metadata CFA does not match calibration CFA: "
+                f"{metadata_pattern} != {calibration_pattern}"
+            )
+        direction = _normalize_readout_direction(metadata.readout_direction)
+        if not np.isfinite(float(metadata.timestamp_us)):
+            raise ValueError("timestamp_us must be finite")
+        if not np.isfinite(float(metadata.temperature_c)):
+            raise ValueError("temperature_c must be finite")
+        if not np.isfinite(float(metadata.line_time_us)) or float(metadata.line_time_us) <= 0.0:
+            raise ValueError("line_time_us must be finite and positive")
+        if not np.isfinite(float(metadata.rolling_shutter_time_us)) or float(metadata.rolling_shutter_time_us) <= 0.0:
+            raise ValueError("rolling_shutter_time_us must be finite and positive")
+        if float(calibration.white_level) <= float(calibration.black_level):
+            raise ValueError("calibration white_level must be greater than black_level")
+        metadata = replace(metadata, cfa_pattern=metadata_pattern, readout_direction=direction)
+        calibration = replace(calibration, cfa_pattern=calibration_pattern)
         return metadata, calibration, exposures, dict(raw.provenance)
 
     # Module 2.
@@ -207,8 +231,8 @@ class PerceptionISPPipeline:
         prnu = np.maximum(_optional_map(calibration.prnu_gain, shape, 1.0), EPS)
         lens_gain = _optional_map(calibration.lens_shading_gain, shape, 1.0)
 
-        analog_gains = _metadata_tuple(metadata.analog_gains, corrected.shape[0], 1.0)
-        digital_gains = _metadata_tuple(metadata.digital_gains, corrected.shape[0], 1.0)
+        analog_gains = _metadata_tuple(metadata.analog_gains, corrected.shape[0], "analog_gains")
+        digital_gains = _metadata_tuple(metadata.digital_gains, corrected.shape[0], "digital_gains")
         for index in range(corrected.shape[0]):
             gain = max(float(analog_gains[index]) * float(digital_gains[index]), EPS)
             corrected[index] = (corrected[index] - fpn - dsnu) / gain
@@ -257,10 +281,9 @@ class PerceptionISPPipeline:
     ) -> Dict[str, Any]:
         exposures = np.asarray(normalized_payload["normalized_exposures"], dtype=np.float64)
         count, rows, cols = exposures.shape
-        exposure_times = np.asarray(_metadata_tuple(metadata.exposure_times_us, count, 1.0), dtype=np.float64)
-        analog_gains = np.asarray(_metadata_tuple(metadata.analog_gains, count, 1.0), dtype=np.float64)
-        digital_gains = np.asarray(_metadata_tuple(metadata.digital_gains, count, 1.0), dtype=np.float64)
-        scale = np.maximum(exposure_times * analog_gains * digital_gains, EPS)
+        exposure_times = np.asarray(_metadata_tuple(metadata.exposure_times_us, count, "exposure_times_us"), dtype=np.float64)
+        # Analog and digital gains were already removed during RAW normalization.
+        scale = np.maximum(exposure_times, EPS)
         scale = scale / max(float(np.max(scale)), EPS)
         radiance = exposures / scale[:, None, None]
         saturation = exposures >= float(self.config.hdr_saturation_threshold)
@@ -349,7 +372,7 @@ class PerceptionISPPipeline:
         calibration: CalibrationProfile,
     ) -> Dict[str, Any]:
         signal = np.maximum(np.asarray(hdr_payload["fused"], dtype=np.float64), 0.0)
-        exposure = max(float(_metadata_tuple(metadata.exposure_times_us, 1, 1.0)[0]), EPS)
+        exposure = max(float(metadata.exposure_times_us[0]), EPS)
         temp_delta = max(float(metadata.temperature_c) - 25.0, 0.0)
         raw_var = (
             float(calibration.shot_noise_coeff) * signal
@@ -513,8 +536,15 @@ class PerceptionISPPipeline:
             accurate_rgb = rgb.copy()
             transform = "identity"
         rows, cols = rgb.shape[:2]
-        row_times = row_timestamp_map(rows, metadata.timestamp_us, metadata.line_time_us)
+        row_times = row_timestamp_map(
+            rows,
+            metadata.timestamp_us,
+            metadata.line_time_us,
+            metadata.readout_direction,
+        )
         rolling_row_fraction = np.linspace(0.0, 1.0, rows, dtype=np.float64)
+        if metadata.readout_direction == "bottom_to_top":
+            rolling_row_fraction = rolling_row_fraction[::-1]
         return {
             "accurate_rgb_geometry": accurate_rgb,
             "row_timestamps_us": row_times,
@@ -816,8 +846,10 @@ class PerceptionISPPipeline:
                 "intrinsic_matrix": np.asarray(geometry_payload["intrinsic_matrix"], dtype=np.float64).tolist(),
                 "distortion_coeffs": list(geometry_payload["distortion_coeffs"]),
                 "extrinsic_matrix": np.asarray(geometry_payload["extrinsic_matrix"], dtype=np.float64).tolist(),
-                "row_timestamp_start_us": float(row_times[0]) if row_times.size else float(metadata.timestamp_us),
-                "row_timestamp_end_us": float(row_times[-1]) if row_times.size else float(metadata.timestamp_us),
+                "row_timestamp_start_us": float(np.min(row_times)) if row_times.size else float(metadata.timestamp_us),
+                "row_timestamp_end_us": float(np.max(row_times)) if row_times.size else float(metadata.timestamp_us),
+                "row0_timestamp_us": float(row_times[0]) if row_times.size else float(metadata.timestamp_us),
+                "row_last_timestamp_us": float(row_times[-1]) if row_times.size else float(metadata.timestamp_us),
                 "readout_direction": metadata.readout_direction,
                 "roi_coordinate_transform": str(geometry_payload["roi_coordinate_transform"]),
                 "camera_sync_group": str(geometry_payload["camera_sync_group"]),
@@ -919,13 +951,29 @@ class RuntimeController:
         )
 
 
-def _metadata_tuple(values: Sequence[float], count: int, default: float) -> Tuple[float, ...]:
-    if not values:
-        return tuple(float(default) for _ in range(count))
-    result = list(float(v) for v in values)
-    while len(result) < count:
-        result.append(result[-1] if result else float(default))
-    return tuple(result[:count])
+def _metadata_tuple(values: Sequence[float], count: int, name: str) -> Tuple[float, ...]:
+    result = tuple(float(value) for value in values)
+    if len(result) not in {1, int(count)}:
+        raise ValueError(f"{name} must contain one value or one value per exposure ({count})")
+    if not all(np.isfinite(value) and value > 0.0 for value in result):
+        raise ValueError(f"{name} values must be finite and positive")
+    if len(result) == 1:
+        return tuple(result[0] for _ in range(int(count)))
+    return result
+
+
+def _normalize_cfa_pattern(value: str) -> str:
+    normalized = str(value or "").upper().replace("-", "").replace("_", "")
+    if not normalized:
+        raise ValueError("CFA pattern must not be empty")
+    return normalized
+
+
+def _normalize_readout_direction(value: str) -> str:
+    normalized = str(value or "").lower().replace("-", "_")
+    if normalized not in {"top_to_bottom", "bottom_to_top"}:
+        raise ValueError(f"unsupported readout direction: {value!r}")
+    return normalized
 
 
 def _optional_map(values: Optional[ArrayF], shape: Tuple[int, int], default: float) -> ArrayF:

@@ -20,6 +20,12 @@ Important observed results from the retained v0.1 experiment history are:
 The detailed historical tables remain in
 `docs/history/evaluation_status_v0.1.md`.
 
+The executable `perception-isp example suite` adds deterministic mechanism
+checks for HDR radiance recovery, metadata/gain consistency, calibration,
+CFA/PSF, temporal timing, and the 6/16-channel DNN input contract. These checks
+show that the software blocks respond in controlled directions. They do not
+replace a trained, held-out perception benchmark.
+
 ## Claims Supported Today
 
 - A software PerceptionISP can generate stable RGB and auxiliary evidence from

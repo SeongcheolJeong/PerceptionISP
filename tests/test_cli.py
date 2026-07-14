@@ -14,7 +14,7 @@ class UnifiedCliTest(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             self.assertEqual(main(["--help"]), 0)
         rendered = stdout.getvalue()
-        for group in ("isp:", "data:", "train:", "evaluate:", "report:"):
+        for group in ("isp:", "example:", "data:", "train:", "evaluate:", "report:"):
             self.assertIn(group, rendered)
 
     def test_dispatch_forwards_remaining_arguments(self) -> None:
