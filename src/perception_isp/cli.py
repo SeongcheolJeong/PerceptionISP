@@ -46,6 +46,10 @@ COMMANDS: dict[tuple[str, str], Command] = {
     ("report", "merge"): Command("perception_isp.reporting.merge_comparison_reports", "Merge sharded comparison reports."),
     ("report", "edge-casebook"): Command("perception_isp.reporting.scene_edge_casebook", "Build an edge evidence casebook."),
     ("report", "project"): Command("perception_isp.reporting.project_accomplishment_report", "Build the project accomplishment report."),
+    ("report", "status"): Command(
+        "perception_isp.reporting.project_status_report",
+        "Build the detailed PerceptionISP purpose, status, gaps, and roadmap report.",
+    ),
 }
 
 

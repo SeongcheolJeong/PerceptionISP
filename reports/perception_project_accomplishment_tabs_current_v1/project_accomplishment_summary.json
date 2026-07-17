@@ -1,0 +1,482 @@
+{
+  "name": "PerceptionISP accomplishment and validation report",
+  "generated_at": "2026-06-13T23:22:25.743343+00:00",
+  "root": "${PROJECT_ROOT}",
+  "summaries": {
+    "native_gate": "reports/perception_native_heldout_benchmark_audit_pascalraw_rawdet7_val750_fusion_v2/native_heldout_benchmark_audit_summary.json",
+    "dense_ablation": "reports/perception_dense_input_ablation_gate_pascalraw_native1581_union_seed101_202_303_broad_cached_v1/dense_input_ablation_summary.json",
+    "scene_edge": "reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/scene_edge_confidence_summary.json",
+    "scene_edge_aux": "reports/perception_scene_edge_aux_sweep_sid_lowlight_native16_edge_evidence_v1/scene_edge_aux_sweep_summary.json",
+    "yolo_audit": "reports/perception_yolo_edge6_evidence_audit_current_v1/yolo_evidence_audit_summary.json",
+    "raw_acquisition": "reports/perception_raw_dataset_acquisition_lod_priority_v1/raw_dataset_acquisition_summary.json",
+    "lod_readiness": "reports/perception_lod_local_readiness_current_v1/lod_local_readiness_summary.json",
+    "hard_seed2": "reports/perception_yolo_hard_object_eval_seed2_edge6_vs_rgb_pascalraw1581_v1/summary.json",
+    "hard_gated_seed2": "reports/perception_yolo_hard_object_eval_seed2_gated_edge6_vs_rgb_pascalraw1581_v1/summary.json",
+    "hard_hardx3_seed2": "reports/perception_yolo_hard_object_eval_seed2_hardx3_ft_rgb_vs_gated_pascalraw1581_v1/summary.json",
+    "hard_candidates": "reports/perception_yolo_hard_object_eval_gated_candidates_pascalraw1581_v1/summary.json"
+  },
+  "train_summaries": {
+    "rgb_seed2": "runs/detect/outputs/yolo_aux_pascalraw1581/rgb_only3_full_e20_mps_seed2_adamw_lr5e4_v1/perception_yolo_aux_train_summary.json",
+    "edge6_seed2": "runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_edge6_adapter025_full_e20_mps_seed2_adamw_lr5e4_v1/perception_yolo_aux_train_summary.json",
+    "gated_edge6_seed2_matched": "runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_edge6_gated_adapter025_full_e20_mps_seed2_matched_adamw_lr5e4_v1/perception_yolo_aux_train_summary.json",
+    "rgb_hardx3_seed2": "runs/detect/outputs/yolo_aux_pascalraw1581/rgb_only_full_hardx3_ft_e4_mps_seed2_adamw_lr2e4_b8_matched_v1/perception_yolo_aux_train_summary.json",
+    "gated_hardx3_seed2": "runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_gated_full_hardx3_ft_e4_mps_seed2_adamw_lr2e4_b8_matched_v1/perception_yolo_aux_train_summary.json"
+  },
+  "native": {
+    "status": "pass",
+    "claim_status": "large_native_fp_reducer_with_recall_tradeoff",
+    "sample_count": 750,
+    "precision50_delta": 0.03582781783823924,
+    "fp50_delta": -0.729333333333333,
+    "recall50_delta": -0.004266666666666641,
+    "native_raw_fraction": 1.0,
+    "true_cfa_fraction": 1.0,
+    "source_cfa_patterns": {
+      "RGGB": 750
+    },
+    "boundary": "This proves large held-out native RAW provenance only for the CFA pattern represented by the report. It does not prove all-CFA coverage, real adverse RAW coverage, broad detector superiority, or trained RGB+Aux DNN improvement."
+  },
+  "dense": {
+    "status": "pass",
+    "claim_status": "aux_input_used_by_dense_dnn",
+    "seed_count": 3,
+    "test_sample_count": 198,
+    "full_precision": 0.03844434429866288,
+    "full_recall": 0.5960998877665544,
+    "full_fp": 21.124579124579125,
+    "zero_aux_recall_delta": -0.4620744481855593,
+    "zero_aux_precision_delta": -0.013811638718389349,
+    "zero_rgb_recall_delta": -0.4512719790497568,
+    "shuffle_aux_recall_delta": 0.023569023569023573,
+    "boundary": "This proves input dependence for the compact dense detector under this held-out split. It is not yet a production-detector proof or a broad adverse-condition benchmark."
+  },
+  "scene": {
+    "status": "pass",
+    "sample_count": 12,
+    "perception_rgb_d_f1": 0.012167541634487697,
+    "perception_rgb_win_rate": 1.0,
+    "aux_strength_d_f1": 0.2048923127387081,
+    "aux_strength_win_rate": 1.0,
+    "aux_confidence_d_f1": -0.28250321135063,
+    "aux_best_name": "edge_evidence",
+    "aux_best_d_f1": 0.2684776162368251
+  },
+  "yolo_seed2": {
+    "status": "partial",
+    "comparison": "edge6_seed2 - rgb_seed2",
+    "base": {
+      "status": "complete",
+      "precision": 0.942797385475083,
+      "recall": 0.8698782276750738,
+      "map50": 0.9329053479912627,
+      "map5095": 0.667302131347576
+    },
+    "candidate": {
+      "status": "complete",
+      "precision": 0.9568291809214897,
+      "recall": 0.881103965386516,
+      "map50": 0.933040345806476,
+      "map5095": 0.6602782095911255
+    },
+    "precision_delta": 0.014031795446406758,
+    "recall_delta": 0.011225737711442196,
+    "map50_delta": 0.00013499781521331133,
+    "map5095_delta": -0.007023921756450502,
+    "delta_text": "dR=+0.0112, dAP50-95=-0.0070",
+    "interpretation": "Aux path improves recall but loses AP50-95; this is a signal path, not broad superiority."
+  },
+  "gated_seed2": {
+    "status": "partial",
+    "comparison": "gated_edge6_seed2 - rgb_seed2",
+    "base": {
+      "status": "complete",
+      "precision": 0.942797385475083,
+      "recall": 0.8698782276750738,
+      "map50": 0.9329053479912627,
+      "map5095": 0.667302131347576
+    },
+    "candidate": {
+      "status": "complete",
+      "precision": 0.9697600464656927,
+      "recall": 0.8604251643680557,
+      "map50": 0.9317918358037982,
+      "map5095": 0.666174824083063
+    },
+    "precision_delta": 0.026962660990609733,
+    "recall_delta": -0.009453063307018117,
+    "map50_delta": -0.0011135121874644716,
+    "map5095_delta": -0.0011273072645129334,
+    "delta_text": "dR=-0.0095, dAP50-95=-0.0011",
+    "interpretation": "No clear detector advantage over RGB-only under this recipe."
+  },
+  "hard_seed2": {
+    "status": "partial",
+    "label": "edge6_seed2 - rgb_seed2",
+    "base": "rgb_seed2",
+    "candidate": "edge6_seed2",
+    "filters": {
+      "all": {
+        "target_gt_count": 570,
+        "map50_delta": -0.006019961652099726,
+        "map5095_delta": -0.008301932681583635,
+        "precision025_delta": -0.020398380031407592,
+        "recall025_delta": -0.0035087719298245723
+      },
+      "small": {
+        "target_gt_count": 70,
+        "map50_delta": -0.005271114797967713,
+        "map5095_delta": 0.002399964439694313,
+        "precision025_delta": -0.10603715170278638,
+        "recall025_delta": -0.04285714285714293
+      },
+      "thin": {
+        "target_gt_count": 141,
+        "map50_delta": -0.006966319202905136,
+        "map5095_delta": -0.020702167220706835,
+        "precision025_delta": -0.03153259416529064,
+        "recall025_delta": -0.007092198581560294
+      },
+      "small_or_thin": {
+        "target_gt_count": 189,
+        "map50_delta": -0.006320374570034759,
+        "map5095_delta": -0.00978307548608126,
+        "precision025_delta": -0.04408602150537633,
+        "recall025_delta": -0.02645502645502651
+      }
+    }
+  },
+  "hard_gated_seed2": {
+    "status": "partial",
+    "label": "gated_edge6_seed2 - rgb_seed2",
+    "base": "rgb_seed2",
+    "candidate": "gated_edge6_seed2",
+    "filters": {
+      "all": {
+        "target_gt_count": 570,
+        "map50_delta": -0.0017270536869474773,
+        "map5095_delta": 0.0012006272236878557,
+        "precision025_delta": -0.0032779749547982018,
+        "recall025_delta": 0.0017543859649122862
+      },
+      "small": {
+        "target_gt_count": 70,
+        "map50_delta": -0.05917892504394395,
+        "map5095_delta": -0.014075545902268088,
+        "precision025_delta": -0.08305716652858319,
+        "recall025_delta": -0.05714285714285716
+      },
+      "thin": {
+        "target_gt_count": 141,
+        "map50_delta": 0.0037455739776210972,
+        "map5095_delta": 0.006766152689917426,
+        "precision025_delta": -0.031236889278767332,
+        "recall025_delta": 0.021276595744680882
+      },
+      "small_or_thin": {
+        "target_gt_count": 189,
+        "map50_delta": -0.013669317254232927,
+        "map5095_delta": 0.0017163517846888743,
+        "precision025_delta": -0.029271206690561602,
+        "recall025_delta": -0.015873015873015928
+      }
+    }
+  },
+  "hard_hardx3_seed2": {
+    "status": "partial",
+    "label": "gated_hardx3_seed2 - rgb_hardx3_seed2",
+    "base": "rgb_hardx3_seed2",
+    "candidate": "gated_hardx3_seed2",
+    "filters": {
+      "all": {
+        "target_gt_count": 570,
+        "map50_delta": -0.005939382638492474,
+        "map5095_delta": -0.006035209165431432,
+        "precision025_delta": -0.0029769994434305502,
+        "recall025_delta": -0.03508771929824561
+      },
+      "small": {
+        "target_gt_count": 70,
+        "map50_delta": -0.11952909987480376,
+        "map5095_delta": -0.035484122845920035,
+        "precision025_delta": -0.08459595959595956,
+        "recall025_delta": -0.21428571428571425
+      },
+      "thin": {
+        "target_gt_count": 141,
+        "map50_delta": 0.024022993993083164,
+        "map5095_delta": 0.014160129743566285,
+        "precision025_delta": -0.005023396641893774,
+        "recall025_delta": 0.021276595744680882
+      },
+      "small_or_thin": {
+        "target_gt_count": 189,
+        "map50_delta": -0.02627573309661324,
+        "map5095_delta": -0.0070212833520149065,
+        "precision025_delta": -0.017457008858780654,
+        "recall025_delta": -0.06878306878306883
+      }
+    }
+  },
+  "hardx3_train": {
+    "status": "partial",
+    "comparison": "gated_hardx3_seed2 - rgb_hardx3_seed2",
+    "base": {
+      "status": "complete",
+      "precision": 0.9599255539613579,
+      "recall": 0.8776007267696336,
+      "map50": 0.9425665090177997,
+      "map5095": 0.6637663544044068
+    },
+    "candidate": {
+      "status": "complete",
+      "precision": 0.9691771674360353,
+      "recall": 0.8508049119563944,
+      "map50": 0.9318501477264928,
+      "map5095": 0.6559951840162782
+    },
+    "precision_delta": 0.0092516134746774,
+    "recall_delta": -0.026795814813239227,
+    "map50_delta": -0.01071636129130693,
+    "map5095_delta": -0.007771170388128579,
+    "delta_text": "dR=-0.0268, dAP50-95=-0.0078",
+    "interpretation": "No clear detector advantage over RGB-only under this recipe."
+  },
+  "hard_candidates": [
+    {
+      "status": "pass",
+      "label": "edge6_adapter512_seed1 - rgb512_seed1",
+      "base": "rgb512_seed1",
+      "candidate": "edge6_adapter512_seed1",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": 0.0036822899359248984,
+          "map5095_delta": 0.0025602642912047058,
+          "precision025_delta": -0.02482070820259974,
+          "recall025_delta": 0.02280701754385972
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": 0.022169109929925046,
+          "map5095_delta": 0.0008590329993959367,
+          "precision025_delta": -0.01566703592340557,
+          "recall025_delta": 0.12857142857142856
+        },
+        "thin": {
+          "target_gt_count": 141,
+          "map50_delta": -0.020551550995627,
+          "map5095_delta": 0.003108313769791593,
+          "precision025_delta": -0.0670025728987994,
+          "recall025_delta": 0.014184397163120588
+        },
+        "small_or_thin": {
+          "target_gt_count": 189,
+          "map50_delta": 0.0009466107318060191,
+          "map5095_delta": 0.012115818066166573,
+          "precision025_delta": -0.042958459979736574,
+          "recall025_delta": 0.04761904761904767
+        }
+      },
+      "fairness": "partially matched",
+      "claim_use": "No; adapter only, use as supporting context."
+    },
+    {
+      "status": "pass",
+      "label": "edge6_gated512_seed1 - rgb512_seed1",
+      "base": "rgb512_seed1",
+      "candidate": "edge6_gated512_seed1",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": 0.030200442532636873,
+          "map5095_delta": 0.0711606044328903,
+          "precision025_delta": -0.01401473632931427,
+          "recall025_delta": 0.05438596491228076
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": 0.11430676994168265,
+          "map5095_delta": 0.076882386559393,
+          "precision025_delta": -0.02300934318783987,
+          "recall025_delta": 0.2142857142857143
+        },
+        "thin": {
+          "target_gt_count": 141,
+          "map50_delta": 0.02761797906184449,
+          "map5095_delta": 0.06695714460184843,
+          "precision025_delta": -0.05441467736891492,
+          "recall025_delta": 0.05673758865248224
+        },
+        "small_or_thin": {
+          "target_gt_count": 189,
+          "map50_delta": 0.04434941653695923,
+          "map5095_delta": 0.06974868326654271,
+          "precision025_delta": -0.037330754352030926,
+          "recall025_delta": 0.09523809523809523
+        }
+      },
+      "fairness": "mismatched recipe",
+      "claim_use": "No; promising candidate only."
+    },
+    {
+      "status": "partial",
+      "label": "edge6_gated640_seed1 - rgb640_seed1",
+      "base": "rgb640_seed1",
+      "candidate": "edge6_gated640_seed1",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": -0.0016430225193062586,
+          "map5095_delta": 0.011705076641093548,
+          "precision025_delta": 0.02030308572357531,
+          "recall025_delta": -0.0035087719298245723
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": -0.03819384454431718,
+          "map5095_delta": -0.01043057033055561,
+          "precision025_delta": 0.02921739130434786,
+          "recall025_delta": -0.02857142857142847
+        },
+        "thin": {
+          "target_gt_count": 140,
+          "map50_delta": -0.0012492217520791993,
+          "map5095_delta": 0.017379135184841354,
+          "precision025_delta": 0.06072570031960889,
+          "recall025_delta": 0.0
+        },
+        "small_or_thin": {
+          "target_gt_count": 188,
+          "map50_delta": -0.009516088121192423,
+          "map5095_delta": 0.01344535695247373,
+          "precision025_delta": 0.03351648351648351,
+          "recall025_delta": -0.010638297872340496
+        }
+      },
+      "fairness": "closer but verify config",
+      "claim_use": "Only after config audit."
+    },
+    {
+      "status": "partial",
+      "label": "edge6_gated_hardx2_seed1 - rgb640_hardx2_seed1",
+      "base": "rgb640_hardx2_seed1",
+      "candidate": "edge6_gated_hardx2_seed1",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": 0.005983551335032811,
+          "map5095_delta": 0.0018118294162460247,
+          "precision025_delta": 0.012893939697887657,
+          "recall025_delta": 0.015789473684210464
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": 0.03428355287815443,
+          "map5095_delta": 0.006767043039129339,
+          "precision025_delta": 0.050078247261345854,
+          "recall025_delta": 0.05714285714285705
+        },
+        "thin": {
+          "target_gt_count": 140,
+          "map50_delta": 0.015913558523021898,
+          "map5095_delta": -0.005859641557689366,
+          "precision025_delta": 0.03214285714285714,
+          "recall025_delta": 0.021428571428571463
+        },
+        "small_or_thin": {
+          "target_gt_count": 188,
+          "map50_delta": 0.015906868761105253,
+          "map5095_delta": -0.004113865828297647,
+          "precision025_delta": 0.029816306216632005,
+          "recall025_delta": 0.037234042553191515
+        }
+      },
+      "fairness": "hard-mined pair",
+      "claim_use": "Candidate; needs matched seed repeat."
+    },
+    {
+      "status": "partial",
+      "label": "edge6_gated_hardx3_seed1 - rgb640_hardx3_seed1",
+      "base": "rgb640_hardx3_seed1",
+      "candidate": "edge6_gated_hardx3_seed1",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": 0.0015221028318765928,
+          "map5095_delta": 0.0004241603633250435,
+          "precision025_delta": 0.01633457543644956,
+          "recall025_delta": 0.010526315789473717
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": -0.017470211244019374,
+          "map5095_delta": -0.003298683840672556,
+          "precision025_delta": 0.055237489397794715,
+          "recall025_delta": 0.02857142857142847
+        },
+        "thin": {
+          "target_gt_count": 140,
+          "map50_delta": 0.008045132436352964,
+          "map5095_delta": -0.010326624025590814,
+          "precision025_delta": 0.04664709866787087,
+          "recall025_delta": 0.02857142857142858
+        },
+        "small_or_thin": {
+          "target_gt_count": 188,
+          "map50_delta": 0.005644747352460788,
+          "map5095_delta": -0.00622121123989039,
+          "precision025_delta": 0.03560364429929652,
+          "recall025_delta": 0.02659574468085102
+        }
+      },
+      "fairness": "hard-mined pair",
+      "claim_use": "Candidate; needs matched seed repeat."
+    },
+    {
+      "status": "partial",
+      "label": "edge6_gated_from_rgb_hardx3_seed1 - rgb640_hardx3_seed1",
+      "base": "rgb640_hardx3_seed1",
+      "candidate": "edge6_gated_from_rgb_hardx3_seed1",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": 0.0017924440244484474,
+          "map5095_delta": 0.0009391863705966452,
+          "precision025_delta": -0.013595290983945185,
+          "recall025_delta": 0.007017543859649145
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": -0.025311076537755772,
+          "map5095_delta": 0.00041966408124632926,
+          "precision025_delta": -0.014242745930644007,
+          "recall025_delta": 0.042857142857142816
+        },
+        "thin": {
+          "target_gt_count": 140,
+          "map50_delta": 0.0003288257999725097,
+          "map5095_delta": -0.004187067795512256,
+          "precision025_delta": -0.023255813953488413,
+          "recall025_delta": 0.0071428571428571175
+        },
+        "small_or_thin": {
+          "target_gt_count": 188,
+          "map50_delta": -0.002833547238844103,
+          "map5095_delta": -0.002777283345821391,
+          "precision025_delta": -0.02326502326502322,
+          "recall025_delta": 0.015957446808510634
+        }
+      },
+      "fairness": "hard-mined aux-init pair",
+      "claim_use": "Candidate; needs matched seed repeat."
+    }
+  ],
+  "acquisition": {
+    "lod_status": "partial",
+    "lod_message": "LOD_BMVC2021.zip.part: 2.34 GiB / 20.49 GiB (11.4%)",
+    "lod_readiness": "blocked",
+    "aodraw_state": "annotations_present=True, test_raw=missing, srgb=partial",
+    "status": "partial"
+  },
+  "status": "partial"
+}

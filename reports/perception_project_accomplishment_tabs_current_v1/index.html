@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PerceptionISP Achievement Report</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --paper: #ffffff;
+      --ink: #17202a;
+      --muted: #5f6f82;
+      --line: #d9e2ec;
+      --blue: #1f6feb;
+      --green: #137a45;
+      --amber: #9a6700;
+      --red: #b42318;
+      --steel: #2f3b4a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+      padding: 30px 34px 22px;
+    }
+    h1 { margin: 0 0 8px; font-size: 31px; letter-spacing: 0; }
+    h2 { margin: 0 0 14px; font-size: 22px; }
+    h3 { margin: 22px 0 10px; font-size: 17px; }
+    p { line-height: 1.58; }
+    code { background: #eef3f8; border-radius: 4px; padding: 1px 5px; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .subtitle { max-width: 1180px; margin: 0; color: var(--muted); line-height: 1.55; }
+    .wrap { padding: 18px 34px 42px; }
+    .cards { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 12px; margin: 18px 0; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-height: 118px; }
+    .card .label { color: var(--muted); font-size: 13px; }
+    .card .value { font-size: 24px; font-weight: 740; margin-top: 6px; }
+    .card .detail { color: var(--muted); margin-top: 8px; line-height: 1.45; }
+    .status { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 12px; border: 1px solid var(--line); background: #eef3f8; }
+    .pass, .supported, .present { color: var(--green); border-color: #b7e3c7; background: #eefaf2; }
+    .partial, .pending, .running, .unknown { color: var(--amber); border-color: #ead18a; background: #fff8df; }
+    .fail, .missing, .blocked { color: var(--red); border-color: #f1b8b3; background: #fff1f0; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--line); margin-top: 20px; }
+    .tab-button { border: 1px solid var(--line); border-bottom: 0; background: #edf2f7; color: var(--steel); padding: 10px 13px; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 680; }
+    .tab-button.active { background: var(--paper); color: var(--blue); }
+    .tab-panel { display: none; background: var(--paper); border: 1px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; padding: 20px; }
+    .tab-panel.active { display: block; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 14px 0 6px; }
+    .node { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fbfcfe; min-height: 114px; }
+    .node strong { display: block; margin-bottom: 7px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid var(--line); padding: 9px 10px; text-align: left; vertical-align: top; }
+    th { background: #f0f4f9; }
+    ul { line-height: 1.56; }
+    .note { border-left: 4px solid var(--blue); background: #f2f7ff; padding: 12px 14px; margin: 14px 0; }
+    .warn { border-left-color: var(--amber); background: #fff9e8; }
+    .bad { border-left-color: var(--red); background: #fff2f1; }
+    .small { color: var(--muted); font-size: 13px; }
+    @media (max-width: 1180px) { .cards, .grid2, .flow { grid-template-columns: 1fr; } .wrap, header { padding-left: 18px; padding-right: 18px; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>PerceptionISP Achievement Report</h1>
+  <p class="subtitle">이 문서는 지금까지 우리가 만든 PerceptionISP의 목적, 구현 아키텍처, 검증 데이터, 실제 성과, 아직 검증하지 못한 주장과 그 이유를 하나의 standalone HTML로 정리한 자료입니다. 핵심은 “무엇을 자랑할 수 있는가”와 “아직 주장하면 안 되는 경계”를 분리하는 것입니다.</p>
+  <p class="small">Generated: 2026-06-13T23:22:25.743343+00:00 · Overall status: <span class="status partial">partial</span></p>
+</header>
+<div class="wrap">
+  <section class="cards"><article class="card"><div class="label">Native RAW gate</div><div class="value">750 samples</div><div class="detail">dP50=+0.0358, dFP50=-0.7293, dR50=-0.0043</div><p><span class="status pass">pass</span></p></article><article class="card"><div class="label">Aux input dependence</div><div class="value">3 seeds</div><div class="detail">zero-aux recall delta=-0.4621</div><p><span class="status pass">pass</span></p></article><article class="card"><div class="label">Gated YOLO seed2</div><div class="value">RGB+Aux vs RGB</div><div class="detail">dR=-0.0095, dAP50=-0.0011, dAP50-95=-0.0011</div><p><span class="status partial">partial</span></p></article><article class="card"><div class="label">Hard-object slice</div><div class="value">small/thin</div><div class="detail">small|thin dAP50=-0.0263, dAP50-95=-0.0070</div><p><span class="status partial">partial</span></p></article><article class="card"><div class="label">LOD acquisition</div><div class="value">partial</div><div class="detail">LOD_BMVC2021.zip.part: 2.34 GiB / 20.49 GiB (11.4%)</div><p><span class="status partial">partial</span></p></article></section>
+  <nav class="tabs" aria-label="Report tabs">
+    <button class="tab-button active" type="button" data-tab="story">1. Story</button>
+    <button class="tab-button" type="button" data-tab="architecture">2. Architecture</button>
+    <button class="tab-button" type="button" data-tab="blocks">3. Blocks</button>
+    <button class="tab-button" type="button" data-tab="datasets">4. Datasets</button>
+    <button class="tab-button" type="button" data-tab="evidence">5. Evidence</button>
+    <button class="tab-button" type="button" data-tab="hard">6. Hard Slices</button>
+    <button class="tab-button" type="button" data-tab="training">7. Training</button>
+    <button class="tab-button" type="button" data-tab="gaps">8. Gaps</button>
+    <button class="tab-button" type="button" data-tab="roadmap">9. Roadmap</button>
+    <button class="tab-button" type="button" data-tab="sources">10. Sources</button>
+  </nav>
+
+  <section id="story" class="tab-panel active">
+    <h2>Storyline</h2>
+    <p>HumanISP는 사람이 보기에 자연스러운 RGB를 만드는 방향입니다. PerceptionISP는 같은 RAW/CFA 입력에서 detector가 쓰기 좋은 edge evidence, artifact/noise reliability, PSF/blur confidence, demosaic-aware auxiliary signals를 같이 만들도록 설계했습니다.</p>
+    <div class="note">현재 가장 강하게 말할 수 있는 성과는 세 가지입니다. 첫째, native RAW 프로토콜에서 HumanISP 대비 FP/precision 개선 가능성을 보였습니다. 둘째, RGB+Aux DNN이 aux 채널을 실제로 사용한다는 ablation evidence를 만들었습니다. 셋째, edge/PSF/hard-object 검증 장치를 만들어 어떤 조건에서 PerceptionISP가 의미 있는지 확인하는 구조를 갖췄습니다.</div>
+    <h3>목적에서 성과까지</h3>
+    <table><thead><tr><th>Question</th><th>Engineering action</th><th>Current answer</th></tr></thead><tbody><tr><td>왜 HumanISP가 아니라 PerceptionISP인가?</td><td>사람이 보기 좋은 RGB와 detector가 쓰기 좋은 신호를 분리해 비교 가능한 pipeline을 구축했습니다.</td><td>Native RAW에서 FP/precision 개선 가능성을 보였고, aux evidence를 detector input/fusion으로 연결했습니다.</td></tr><tr><td>Aux map이 실제로 쓸모가 있는가?</td><td>RGB+Aux tensor export, compact DNN training, input ablation, YOLO aux stem training을 구현했습니다.</td><td>Compact DNN은 aux를 실제로 사용합니다. YOLO full-val에서는 recall gain은 있으나 AP 품질 개선은 아직 부족합니다.</td></tr><tr><td>어떤 조건에서 효과가 클 것으로 보는가?</td><td>small/thin object, low-MTF blur, demosaic artifact, weak edge, low light, CFA/PSF-sensitive slice를 분리했습니다.</td><td>Scene-edge/PSF diagnostic은 방향성이 맞고, hard-object slice 평가가 시작됐습니다.</td></tr><tr><td>다음 성능개선의 핵심은 무엇인가?</td><td>Fair matched training, hard-slice mining, LOD low-light RAW validation, better aux pretraining 순서로 좁힙니다.</td><td>큰 리포트보다 개선 loop가 우선입니다. 보고서는 이 loop의 증거를 자동 정리하는 역할입니다.</td></tr></tbody></table>
+    <h3>현재 claim ladder</h3>
+    <table><thead><tr><th>Claim</th><th>Status</th><th>Evidence</th><th>Boundary</th></tr></thead><tbody><tr><td>Software feasibility</td><td>Supported</td><td>RAW/CFA ingestion, HumanISP, PerceptionISP, aux export, detector gates, YOLO RGB+Aux path, reports are implemented.</td><td>Production ISP quality is separate from software feasibility.</td></tr><tr><td>Native RAW FP/precision benefit</td><td>Supported in PascalRAW RGGB-heavy gate</td><td>dP50=+0.0358, dFP50=-0.7293, dR50=-0.0043.</td><td>Not all CFA/adverse-condition proof.</td></tr><tr><td>DNN uses aux input</td><td>Supported for compact DNN</td><td>zero-aux recall delta=-0.4621 across 3 seeds.</td><td>Not yet enough for production detector superiority.</td></tr><tr><td>YOLO RGB+Aux full-val improvement</td><td>Partially tested; not broadly supported</td><td>Matched seed2 dR=+0.0112, dAP50-95=-0.0070.</td><td>Recall gain exists, but localization/AP quality is weaker.</td></tr><tr><td>Hard-slice edge advantage</td><td>Open</td><td>gated_hardx3_seed2 small|thin dAP50=-0.0263, dAP50-95=-0.0070.</td><td>Thin-object AP quality shows a weak positive signal, but small-object performance is worse. Need stronger hard mining and low-light/adverse data.</td></tr><tr><td>Low-light/adverse RAW advantage</td><td>Pending</td><td>LOD=partial: LOD_BMVC2021.zip.part: 2.34 GiB / 20.49 GiB (11.4%)</td><td>Need complete dataset and native RAW inspection.</td></tr></tbody></table>
+  </section>
+
+  <section id="architecture" class="tab-panel">
+    <h2>Architecture</h2>
+    <div class="flow">
+      <div class="node"><strong>Scene / Native RAW</strong>CameraE2E scene simulation, PascalRAW native NEF, and future LOD/AODRaw low-light/adverse RAW sources.</div>
+      <div class="node"><strong>Sensor Model</strong>CFA mosaic, source CFA provenance, LensPSF blur, noise/exposure stress, and native/remapped-source tracking.</div>
+      <div class="node"><strong>HumanISP</strong>Baseline RGB branch for conventional perception pipeline comparison and RGB edge proxy measurement.</div>
+      <div class="node"><strong>PerceptionISP</strong>Machine-facing RGB plus aux maps: edge strength, edge evidence, blur/PSF, noise/artifact/reliability signals.</div>
+      <div class="node"><strong>Detector / Gate</strong>Fusion calibration, compact RGB+Aux DNN, YOLO RGB+Aux fine-tuning, held-out native/hard-slice reports.</div>
+    </div>
+    <h3>왜 이런 구조인가</h3>
+    <p>Aux map은 object class label을 직접 예측하는 독립 detector가 아닙니다. 그래서 aux map만 detector처럼 평가하면 label-aware mAP가 거의 0에 가깝습니다. 올바른 구조는 RGB detector의 semantic label/proposal을 유지하면서 aux evidence를 calibration 또는 DNN input으로 넣는 것입니다.</p>
+    <div class="note warn">잘못 주장하면 안 되는 부분: “aux map 자체가 detector를 대체한다”가 아닙니다. 현재 방향은 “기존 RGB detector가 판단하기 어려운 edge/artifact/blur case에서 aux evidence가 RGB 판단을 보조한다”입니다.</div>
+    <h3>Expected effects</h3>
+    <table><thead><tr><th>Component</th><th>Signal</th><th>Expected perception effect</th><th>Current validation</th></tr></thead><tbody><tr><td>CFA provenance</td><td>source CFA, target CFA, native/remapped flag, source resolution</td><td>Prevents invalid comparisons caused by silent CFA mismatch or RGB-proxy RAW.</td><td>Used in native PascalRAW gate; all-CFA claim still pending.</td></tr><tr><td>Perception RGB</td><td>edge-preserving demosaic/tone path</td><td>Can reduce false edges/artifacts while keeping object boundaries useful.</td><td>Scene edge dF1 vs Human=+0.0122.</td></tr><tr><td>Aux edge evidence</td><td>edge strength/evidence channels exposed to DNN or fusion gate</td><td>Should help weak boundaries, small/thin objects, blur and demosaic ambiguity.</td><td>Matched YOLO seed2 recall delta=+0.0112; hard slice still not proven.</td></tr><tr><td>Noise/artifact reliability</td><td>confidence channels for noisy or artifact-prone regions</td><td>Can suppress proposals caused by sensor or ISP artifacts.</td><td>Native gate FP reduction supports this direction, but condition-specific proof is pending.</td></tr><tr><td>LensPSF-aware evidence</td><td>blur/PSF-sensitive edge confidence</td><td>Can expose optical ambiguity when PSF is meaningful.</td><td>Aux/scene diagnostic best dF1=+0.2685; stronger PSF cases needed.</td></tr><tr><td>Hard-slice gate</td><td>small/thin object metrics separated from easy full-val</td><td>Prevents easy objects from hiding the value of edge aux.</td><td>gated_hardx3_seed2 small|thin dAP50=-0.0263, dAP50-95=-0.0070.</td></tr></tbody></table>
+  </section>
+
+  <section id="blocks" class="tab-panel">
+    <h2>Implemented Blocks</h2>
+    <table><thead><tr><th>Block</th><th>What is implemented</th><th>How it is validated</th></tr></thead><tbody><tr><td>RAW/CFA ingestion</td><td>PascalRAW NEF, CameraE2E bridge, CFA provenance, native source checks.</td><td>Native audit and CFA provenance summaries.</td></tr><tr><td>HumanISP baseline</td><td>RGB-facing demosaic/tone baseline used as detector and edge comparison.</td><td>HumanISP vs PerceptionISP gates.</td></tr><tr><td>PerceptionISP RGB</td><td>Edge-aware demosaic/denoise/tone/artifact-aware RGB branch.</td><td>Scene-edge and native detector gates.</td></tr><tr><td>Aux maps</td><td>edge strength, edge evidence, PSF/blur, noise/artifact/reliability style maps.</td><td>Aux sweep, edge6 export, DNN ablations.</td></tr><tr><td>RGB+Aux export</td><td>NPZ/YOLO dataset export with explicit channel names and edge6 validation.</td><td>YOLO edge6 audit and matched training summaries.</td></tr><tr><td>Fusion/calibration</td><td>RGB detector class label retained while aux evidence calibrates proposal confidence.</td><td>Native claim dashboard and FP/precision gate.</td></tr><tr><td>DNN training</td><td>Compact RGB+Aux training, YOLO aux stem, gated_sum aux stem, adapter initialization.</td><td>Train summaries and ablation reports.</td></tr><tr><td>Dataset acquisition</td><td>PascalRAW in use, LOD/AODRaw local-state/readiness tracking.</td><td>Raw acquisition and LOD readiness reports.</td></tr></tbody></table>
+    <div class="note warn">여기서 “구현됨”은 SW simulation/evaluation pipeline에서 실제로 생성하고 테스트할 수 있다는 뜻입니다. production ISP quality, all-sensor robustness, all-detector superiority를 의미하지는 않습니다.</div>
+  </section>
+
+  <section id="datasets" class="tab-panel">
+    <h2>Datasets and Test Protocol</h2>
+    <table><thead><tr><th>Dataset / protocol</th><th>Purpose</th><th>What we tested</th><th>Current limitation</th></tr></thead><tbody><tr><td>PascalRAW native held-out 750</td><td>Main HumanISP vs PerceptionISP native RAW claim gate.</td><td>dP50=+0.0358, dFP50=-0.7293, dR50=-0.0043.</td><td>Not enough adverse low-light/weather diversity.</td></tr><tr><td>PascalRAW native1581 compact DNN</td><td>Prove RGB+Aux model uses aux channels.</td><td>zero-aux recall delta=-0.4621; seeds=3.</td><td>Compact DNN, not production detector proof.</td></tr><tr><td>Scene-edge CFA/PSF sweep</td><td>Check whether edge information follows richer source scene edge proxy.</td><td>Perception RGB dF1=+0.0122, aux strength dF1=+0.2049.</td><td>Source-edge proxy, not object boundary GT.</td></tr><tr><td>YOLO seed2 full PascalRAW</td><td>Fair RGB-only vs RGB+Aux edge6 detector comparison.</td><td>dR=+0.0112, dAP50-95=-0.0070.</td><td>Recall signal but not AP superiority.</td></tr><tr><td>Hard-object slice</td><td>Expose small/thin object behavior instead of averaging over easy objects.</td><td>gated_hardx3_seed2 small|thin dAP50=-0.0263, dAP50-95=-0.0070.</td><td>Gated edge6 gives a slight thin/small|thin AP50-95 signal, but small-object AP is still worse.</td></tr><tr><td>LOD low-light RAW</td><td>Next practical low-light dataset for adverse-condition claim.</td><td>partial: LOD_BMVC2021.zip.part: 2.34 GiB / 20.49 GiB (11.4%)</td><td>Download incomplete and archive/native format must be inspected.</td></tr><tr><td>AODRaw</td><td>Large adverse object detection dataset candidate.</td><td>annotations_present=True, test_raw=missing, srgb=partial</td><td>Large storage/network cost; local RAW image package not ready.</td></tr></tbody></table>
+    <h3>Dataset acquisition state</h3>
+    <table><thead><tr><th>Item</th><th>Status</th><th>Meaning</th></tr></thead><tbody><tr><td>LOD archive</td><td>partial</td><td>LOD_BMVC2021.zip.part: 2.34 GiB / 20.49 GiB (11.4%)</td></tr><tr><td>LOD readiness</td><td>blocked</td><td>Ready only after full archive and image/annotation format check.</td></tr><tr><td>AODRaw</td><td>annotations_present=True, test_raw=missing, srgb=partial</td><td>Stronger adverse benchmark, but heavier and currently not locally ready.</td></tr><tr><td>Practical decision</td><td>Use LOD first</td><td>Given disk pressure, LOD is the realistic next low-light RAW validation path.</td></tr></tbody></table>
+  </section>
+
+  <section id="evidence" class="tab-panel">
+    <h2>Evidence Summary</h2>
+    <div class="grid2">
+      <div>
+        <h3>Native RAW held-out gate</h3>
+        <table><thead><tr><th>Item</th><th>Evidence</th></tr></thead><tbody><tr><td>Samples</td><td>750</td></tr><tr><td>Status</td><td>pass</td></tr><tr><td>Claim status</td><td>large_native_fp_reducer_with_recall_tradeoff</td></tr><tr><td>Precision@0.50 delta</td><td>+0.0358</td></tr><tr><td>FP@0.50 delta</td><td>-0.7293</td></tr><tr><td>Recall@0.50 delta</td><td>-0.0043</td></tr><tr><td>Native RAW accepted fraction</td><td>1.0000</td></tr><tr><td>True CFA mosaic fraction</td><td>1.0000</td></tr><tr><td>Source CFA patterns</td><td>{&quot;RGGB&quot;: 750}</td></tr><tr><td>Boundary</td><td>This proves large held-out native RAW provenance only for the CFA pattern represented by the report. It does not prove all-CFA coverage, real adverse RAW coverage, broad detector superiority, or trained RGB+Aux DNN improvement.</td></tr></tbody></table>
+      </div>
+      <div>
+        <h3>RGB+Aux input ablation</h3>
+        <table><thead><tr><th>Item</th><th>Evidence</th></tr></thead><tbody><tr><td>Status</td><td>pass</td></tr><tr><td>Seeds</td><td>3</td></tr><tr><td>Test samples</td><td>198</td></tr><tr><td>Full RGB+Aux precision</td><td>0.0384</td></tr><tr><td>Full RGB+Aux recall</td><td>0.5961</td></tr><tr><td>Zero aux recall delta</td><td>-0.4621</td></tr><tr><td>Zero RGB recall delta</td><td>-0.4513</td></tr><tr><td>Shuffle aux recall delta</td><td>+0.0236</td></tr><tr><td>Boundary</td><td>This proves input dependence for the compact dense detector under this held-out split. It is not yet a production-detector proof or a broad adverse-condition benchmark.</td></tr></tbody></table>
+      </div>
+    </div>
+    <h3>Scene-edge / PSF diagnostics</h3>
+    <table><thead><tr><th>Item</th><th>Evidence</th></tr></thead><tbody><tr><td>Scene edge proxy</td><td>High-information source scene edge used as proxy, not object-boundary GT.</td></tr><tr><td>Perception RGB vs Human RGB</td><td>dF1=+0.0122, win-rate=1.0000.</td></tr><tr><td>Aux strength vs Human RGB</td><td>dF1=+0.2049, win-rate=1.0000.</td></tr><tr><td>Old aux confidence</td><td>dF1=-0.2825; this is weaker than edge strength/evidence.</td></tr><tr><td>Best aux evidence candidate</td><td>name=edge_evidence, dF1=+0.2685.</td></tr><tr><td>PSF interpretation</td><td>If PSF kernel is too small, effect is expected to be weak; larger meaningful PSF should expose edge ambiguity more clearly.</td></tr></tbody></table>
+    <h3>Matched YOLO seed2 full-val result: plain edge6</h3>
+    <table><thead><tr><th>Item</th><th>Evidence</th></tr></thead><tbody><tr><td>Status</td><td>partial</td></tr><tr><td>Protocol</td><td>edge6_seed2 - rgb_seed2</td></tr><tr><td>RGB-only</td><td>P=0.9428, R=0.8699, mAP50=0.9329, mAP50-95=0.6673</td></tr><tr><td>RGB+Aux edge6</td><td>P=0.9568, R=0.8811, mAP50=0.9330, mAP50-95=0.6603</td></tr><tr><td>Delta</td><td>dP=+0.0140, dR=+0.0112, dAP50=+0.0001, dAP50-95=-0.0070.</td></tr><tr><td>Interpretation</td><td>Aux path improves recall but loses AP50-95; this is a signal path, not broad superiority.</td></tr></tbody></table>
+    <h3>Matched YOLO seed2 full-val result: gated edge6</h3>
+    <table><thead><tr><th>Item</th><th>Evidence</th></tr></thead><tbody><tr><td>Status</td><td>partial</td></tr><tr><td>Protocol</td><td>gated_edge6_seed2 - rgb_seed2</td></tr><tr><td>RGB-only</td><td>P=0.9428, R=0.8699, mAP50=0.9329, mAP50-95=0.6673</td></tr><tr><td>RGB+Aux edge6</td><td>P=0.9698, R=0.8604, mAP50=0.9318, mAP50-95=0.6662</td></tr><tr><td>Delta</td><td>dP=+0.0270, dR=-0.0095, dAP50=-0.0011, dAP50-95=-0.0011.</td></tr><tr><td>Interpretation</td><td>No clear detector advantage over RGB-only under this recipe.</td></tr></tbody></table>
+    <div class="note warn">Matched YOLO seed2는 recall이 좋아졌지만 mAP50-95가 낮아졌습니다. 따라서 이 결과만으로 “PerceptionISP가 RGB-only보다 우월하다”고 말하면 안 됩니다. 의미 있는 해석은 “aux path가 recall signal을 만들었고, hard-case targeting 또는 better pretraining이 필요하다”입니다.</div>
+  </section>
+
+  <section id="hard" class="tab-panel">
+    <h2>Hard-Object Slice Results</h2>
+    <p>PerceptionISP의 edge aux가 정말 필요하다면 전체 val보다 small object, thin/long object, weak edge, blur/low-MTF 같은 hard slice에서 먼저 신호가 보여야 합니다.</p>
+    <h3>Matched hardx3 fine-tune: gated edge6 vs RGB-only</h3>
+    <table><thead><tr><th>Slice</th><th>Target GT</th><th>dAP50</th><th>dAP50-95</th><th>dP@0.25</th><th>dR@0.25</th><th>Interpretation</th></tr></thead><tbody><tr><td>all</td><td>570</td><td>-0.0059</td><td>-0.0060</td><td>-0.0030</td><td>-0.0351</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr><tr><td>small</td><td>70</td><td>-0.1195</td><td>-0.0355</td><td>-0.0846</td><td>-0.2143</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr><tr><td>thin</td><td>141</td><td>+0.0240</td><td>+0.0142</td><td>-0.0050</td><td>+0.0213</td><td>AP improves; usable hard-slice evidence.</td></tr><tr><td>small_or_thin</td><td>189</td><td>-0.0263</td><td>-0.0070</td><td>-0.0175</td><td>-0.0688</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr></tbody></table>
+    <div class="note warn">Hard-case oversampling은 RGB-only 쪽 small-object 성능을 개선했지만, 같은 recipe의 gated Aux fine-tune은 small slice를 크게 잃고 thin slice에서만 AP 개선을 보였습니다. 따라서 현재 결론은 “PerceptionISP가 전체 PascalRAW에서 우월하다”가 아니라 “thin/edge-like object에는 신호가 있으나 aux stem 안정화와 small-object 특화 학습이 필요하다”입니다.</div>
+    <h3>Fair seed2: gated edge6 vs RGB-only</h3>
+    <table><thead><tr><th>Slice</th><th>Target GT</th><th>dAP50</th><th>dAP50-95</th><th>dP@0.25</th><th>dR@0.25</th><th>Interpretation</th></tr></thead><tbody><tr><td>all</td><td>570</td><td>-0.0017</td><td>+0.0012</td><td>-0.0033</td><td>+0.0018</td><td>Recall signal but AP/localization tradeoff.</td></tr><tr><td>small</td><td>70</td><td>-0.0592</td><td>-0.0141</td><td>-0.0831</td><td>-0.0571</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr><tr><td>thin</td><td>141</td><td>+0.0037</td><td>+0.0068</td><td>-0.0312</td><td>+0.0213</td><td>AP improves; usable hard-slice evidence.</td></tr><tr><td>small_or_thin</td><td>189</td><td>-0.0137</td><td>+0.0017</td><td>-0.0293</td><td>-0.0159</td><td>Mixed; needs gated or hard-mined validation.</td></tr></tbody></table>
+    <h3>Fair seed2: plain edge6 vs RGB-only</h3>
+    <table><thead><tr><th>Slice</th><th>Target GT</th><th>dAP50</th><th>dAP50-95</th><th>dP@0.25</th><th>dR@0.25</th><th>Interpretation</th></tr></thead><tbody><tr><td>all</td><td>570</td><td>-0.0060</td><td>-0.0083</td><td>-0.0204</td><td>-0.0035</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr><tr><td>small</td><td>70</td><td>-0.0053</td><td>+0.0024</td><td>-0.1060</td><td>-0.0429</td><td>Mixed; needs gated or hard-mined validation.</td></tr><tr><td>thin</td><td>141</td><td>-0.0070</td><td>-0.0207</td><td>-0.0315</td><td>-0.0071</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr><tr><td>small_or_thin</td><td>189</td><td>-0.0063</td><td>-0.0098</td><td>-0.0441</td><td>-0.0265</td><td>Plain edge6 is weaker than RGB on this slice.</td></tr></tbody></table>
+    <h3>Gated / hard-mining candidates</h3>
+    <table><thead><tr><th>Pair</th><th>Recipe fairness</th><th>All dAP50-95</th><th>Small dAP50-95</th><th>Thin dAP50-95</th><th>Small|thin dAP50-95</th><th>Use as claim?</th></tr></thead><tbody><tr><td>edge6_adapter512_seed1 - rgb512_seed1</td><td>partially matched</td><td>+0.0026</td><td>+0.0009</td><td>+0.0031</td><td>+0.0121</td><td>No; adapter only, use as supporting context.</td></tr><tr><td>edge6_gated512_seed1 - rgb512_seed1</td><td>mismatched recipe</td><td>+0.0712</td><td>+0.0769</td><td>+0.0670</td><td>+0.0697</td><td>No; promising candidate only.</td></tr><tr><td>edge6_gated640_seed1 - rgb640_seed1</td><td>closer but verify config</td><td>+0.0117</td><td>-0.0104</td><td>+0.0174</td><td>+0.0134</td><td>Only after config audit.</td></tr><tr><td>edge6_gated_hardx2_seed1 - rgb640_hardx2_seed1</td><td>hard-mined pair</td><td>+0.0018</td><td>+0.0068</td><td>-0.0059</td><td>-0.0041</td><td>Candidate; needs matched seed repeat.</td></tr><tr><td>edge6_gated_hardx3_seed1 - rgb640_hardx3_seed1</td><td>hard-mined pair</td><td>+0.0004</td><td>-0.0033</td><td>-0.0103</td><td>-0.0062</td><td>Candidate; needs matched seed repeat.</td></tr><tr><td>edge6_gated_from_rgb_hardx3_seed1 - rgb640_hardx3_seed1</td><td>hard-mined aux-init pair</td><td>+0.0009</td><td>+0.0004</td><td>-0.0042</td><td>-0.0028</td><td>Candidate; needs matched seed repeat.</td></tr></tbody></table>
+    <div class="note warn">Seed1 gated512 결과는 수치상 매우 유망하지만, RGB baseline과 batch/augmentation/lrf recipe가 달라 fair claim으로 쓰면 안 됩니다. 이것은 “다시 matched recipe로 검증해야 하는 후보”입니다.</div>
+  </section>
+
+  <section id="training" class="tab-panel">
+    <h2>Training Status</h2>
+    <h3>Completed matched runs</h3>
+    <table><thead><tr><th>Run</th><th>Status</th><th>Precision</th><th>Recall</th><th>mAP50</th><th>mAP50-95</th><th>Delta vs RGB</th></tr></thead><tbody><tr><td>RGB-only seed2</td><td>complete</td><td>0.9428</td><td>0.8699</td><td>0.9329</td><td>0.6673</td><td>baseline</td></tr><tr><td>Plain RGB+Aux edge6 seed2</td><td>complete</td><td>0.9568</td><td>0.8811</td><td>0.9330</td><td>0.6603</td><td>dR=+0.0112, dAP50-95=-0.0070</td></tr><tr><td>Gated RGB+Aux edge6 seed2 matched</td><td>complete</td><td>0.9698</td><td>0.8604</td><td>0.9318</td><td>0.6662</td><td>dR=-0.0095, dAP50-95=-0.0011</td></tr><tr><td>Gated RGB+Aux hardx3 seed2 matched</td><td>complete</td><td>0.9692</td><td>0.8508</td><td>0.9319</td><td>0.6560</td><td>dR=-0.0268, dAP50-95=-0.0078</td></tr></tbody></table>
+    <h3>Why we are training RGB+Aux</h3>
+    <ul>
+      <li>기존 RGB DNN을 그대로 쓰면 aux map이 network input에 들어가지 않으므로 DNN이 aux를 학습적으로 사용할 수 없습니다.</li>
+      <li>현재 구조는 RGB input stem을 RGB+Aux stem으로 확장하고, 가능하면 기존 RGB feature behavior를 유지하면서 aux branch만 추가 학습하는 방향입니다.</li>
+      <li>Aux feature pretraining은 aux-only feature가 RGB first feature와 비슷한 표현을 만들도록 초기화하는 목적입니다. 작은 데이터에서 random aux branch보다 빠르고 안정적인 시작점이 됩니다.</li>
+    </ul>
+    <div class="note">Hardx3 matched fine-tune까지 완료됐고, 결과는 RGB-only hardx3가 더 강했습니다. 다음 실험은 freeze/gate/aux pretraining variant 또는 small/thin focused sampling으로 좁히는 것이 맞습니다.</div>
+  </section>
+
+  <section id="gaps" class="tab-panel">
+    <h2>Not Yet Proven</h2>
+    <table><thead><tr><th>Unverified claim</th><th>Why not proven yet</th><th>How to verify</th><th>Expected likelihood</th></tr></thead><tbody><tr><td>HumanISP 대비 universal superiority</td><td>PascalRAW에서는 일부 gate가 pass했지만 YOLO full-val seed2는 AP superiority가 아닙니다.</td><td>multi-seed, matched recipe, hard/adverse held-out gate에서 같은 FP budget 또는 same recall budget으로 비교.</td><td>Medium only for hard/adverse slices, low for easy whole-val.</td></tr><tr><td>All CFA utility</td><td>현재 강한 native evidence는 특정 source CFA 중심입니다.</td><td>RGGB/GRBG/BGGR/GBRG별 native 또는 credible remosaic sweep, same sensor protocol.</td><td>Medium.</td></tr><tr><td>LensPSF-aware production value</td><td>작은 PSF에서는 효과가 거의 안 보이는 것이 맞고, 지금은 diagnostic 수준입니다.</td><td>의미 있는 PSF blur 조건에서 object-boundary confidence와 detector FP/recall을 비교.</td><td>Medium if PSF is strong enough.</td></tr><tr><td>RGB+Aux production DNN gain</td><td>Compact DNN ablation은 통과했지만 production-scale detector fine-tune은 아직 제한적입니다.</td><td>Matched RGB-only vs RGB+Aux detector with adequate data, hard-slice APs/APm/APl, low-light split.</td><td>Unknown-medium; data volume and recipe matter.</td></tr><tr><td>Adverse-condition RAW advantage</td><td>LOD/AODRaw가 아직 로컬 평가 가능한 상태가 아닙니다.</td><td>LOD complete download, archive/native format audit, low-light subset smoke, then full held-out gate.</td><td>Medium-high if low-light edges/noise artifacts are present.</td></tr><tr><td>Object boundary edge confidence</td><td>현재 scene-edge proxy는 object GT boundary와 다릅니다.</td><td>GT box/mask boundary 주변 HumanISP/PerceptionISP edge confidence alignment metric 추가.</td><td>Medium-high for small/thin object analysis.</td></tr></tbody></table>
+    <h3>검증하지 못한 이유에 대한 고찰</h3>
+    <p>PascalRAW는 지금 가장 현실적으로 쓸 수 있는 native RAW detection dataset이지만, 일반 장면 비중이 높아 small/thin/low-light/blur 같은 PerceptionISP 유리 조건이 희석됩니다. 반대로 AODRaw/LOD는 더 의미 있는 adverse RAW 후보지만 접근성, 용량, 다운로드 안정성, 실제 native RAW 여부 확인이 필요합니다. 그러므로 지금은 PascalRAW로 pipeline correctness와 fair comparison을 고정하고, LOD로 low-light evidence를 추가하는 순서가 맞습니다.</p>
+  </section>
+
+  <section id="roadmap" class="tab-panel">
+    <h2>Roadmap</h2>
+    <table><thead><tr><th>Priority</th><th>Action</th><th>Output evidence</th><th>Decision gate</th></tr></thead><tbody><tr><td>P0</td><td>Finish current matched gated seed2 run</td><td>Final train summary and hard-slice eval.</td><td>Keep only if it beats RGB in hard slice or same FP/recall gate.</td></tr><tr><td>P0</td><td>Run hard-object eval for gated seed2</td><td>all/small/thin/small_or_thin AP and fixed-conf deltas.</td><td>Use as claim only if recipe is matched.</td></tr><tr><td>P0</td><td>Complete LOD download and inspect archive</td><td>native/raw-like format, image count, annotations, decode smoke.</td><td>Proceed if images and labels align.</td></tr><tr><td>P1</td><td>Mine hard PascalRAW cases</td><td>small/thin/weak-edge/blur/artifact slice list and casebook.</td><td>Train/evaluate on hard slices without overfitting full-val.</td></tr><tr><td>P1</td><td>Aux pretraining refinement</td><td>RGB feature matching for aux branch and gated_sum stability comparison.</td><td>Keep if it improves convergence or hard-slice AP.</td></tr><tr><td>P1</td><td>Object-boundary edge metric</td><td>HumanISP RGB edge, PerceptionISP RGB edge, aux edge vs GT boundary confidence.</td><td>Use for sensor/ISP co-design claim.</td></tr><tr><td>P2</td><td>CFA/LensPSF sweep</td><td>CFA-by-CFA and PSF-strength utility matrix.</td><td>Use for joint sensor/ISP design story.</td></tr><tr><td>P2</td><td>AODRaw or larger adverse benchmark</td><td>night/rain/fog/glare/HDR condition-wise AP.</td><td>Use only after disk/access are stable.</td></tr></tbody></table>
+  </section>
+
+  <section id="sources" class="tab-panel">
+    <h2>Sources</h2>
+    <p>이 보고서는 로컬 실험 산출물과 summary JSON에서 생성되었습니다.</p>
+    <h3>Report summaries</h3>
+    <table><thead><tr><th>Key</th><th>Summary JSON</th><th>Expected report</th></tr></thead><tbody><tr><td>native_gate</td><td>reports/perception_native_heldout_benchmark_audit_pascalraw_rawdet7_val750_fusion_v2/native_heldout_benchmark_audit_summary.json</td><td>reports/perception_native_heldout_benchmark_audit_pascalraw_rawdet7_val750_fusion_v2/index.html</td></tr><tr><td>dense_ablation</td><td>reports/perception_dense_input_ablation_gate_pascalraw_native1581_union_seed101_202_303_broad_cached_v1/dense_input_ablation_summary.json</td><td>reports/perception_dense_input_ablation_gate_pascalraw_native1581_union_seed101_202_303_broad_cached_v1/index.html</td></tr><tr><td>scene_edge</td><td>reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/scene_edge_confidence_summary.json</td><td>reports/perception_scene_edge_confidence_bus_cfa_psf_sweep/index.html</td></tr><tr><td>scene_edge_aux</td><td>reports/perception_scene_edge_aux_sweep_sid_lowlight_native16_edge_evidence_v1/scene_edge_aux_sweep_summary.json</td><td>reports/perception_scene_edge_aux_sweep_sid_lowlight_native16_edge_evidence_v1/index.html</td></tr><tr><td>yolo_audit</td><td>reports/perception_yolo_edge6_evidence_audit_current_v1/yolo_evidence_audit_summary.json</td><td>reports/perception_yolo_edge6_evidence_audit_current_v1/index.html</td></tr><tr><td>raw_acquisition</td><td>reports/perception_raw_dataset_acquisition_lod_priority_v1/raw_dataset_acquisition_summary.json</td><td>reports/perception_raw_dataset_acquisition_lod_priority_v1/index.html</td></tr><tr><td>lod_readiness</td><td>reports/perception_lod_local_readiness_current_v1/lod_local_readiness_summary.json</td><td>reports/perception_lod_local_readiness_current_v1/index.html</td></tr><tr><td>hard_seed2</td><td>reports/perception_yolo_hard_object_eval_seed2_edge6_vs_rgb_pascalraw1581_v1/summary.json</td><td>reports/perception_yolo_hard_object_eval_seed2_edge6_vs_rgb_pascalraw1581_v1/index.html</td></tr><tr><td>hard_gated_seed2</td><td>reports/perception_yolo_hard_object_eval_seed2_gated_edge6_vs_rgb_pascalraw1581_v1/summary.json</td><td>reports/perception_yolo_hard_object_eval_seed2_gated_edge6_vs_rgb_pascalraw1581_v1/index.html</td></tr><tr><td>hard_hardx3_seed2</td><td>reports/perception_yolo_hard_object_eval_seed2_hardx3_ft_rgb_vs_gated_pascalraw1581_v1/summary.json</td><td>reports/perception_yolo_hard_object_eval_seed2_hardx3_ft_rgb_vs_gated_pascalraw1581_v1/index.html</td></tr><tr><td>hard_candidates</td><td>reports/perception_yolo_hard_object_eval_gated_candidates_pascalraw1581_v1/summary.json</td><td>reports/perception_yolo_hard_object_eval_gated_candidates_pascalraw1581_v1/index.html</td></tr></tbody></table>
+    <h3>Training summaries</h3>
+    <table><thead><tr><th>Key</th><th>Summary JSON</th><th>Expected report</th></tr></thead><tbody><tr><td>rgb_seed2</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_only3_full_e20_mps_seed2_adamw_lr5e4_v1/perception_yolo_aux_train_summary.json</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_only3_full_e20_mps_seed2_adamw_lr5e4_v1/index.html</td></tr><tr><td>edge6_seed2</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_edge6_adapter025_full_e20_mps_seed2_adamw_lr5e4_v1/perception_yolo_aux_train_summary.json</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_edge6_adapter025_full_e20_mps_seed2_adamw_lr5e4_v1/index.html</td></tr><tr><td>gated_edge6_seed2_matched</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_edge6_gated_adapter025_full_e20_mps_seed2_matched_adamw_lr5e4_v1/perception_yolo_aux_train_summary.json</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_edge6_gated_adapter025_full_e20_mps_seed2_matched_adamw_lr5e4_v1/index.html</td></tr><tr><td>rgb_hardx3_seed2</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_only_full_hardx3_ft_e4_mps_seed2_adamw_lr2e4_b8_matched_v1/perception_yolo_aux_train_summary.json</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_only_full_hardx3_ft_e4_mps_seed2_adamw_lr2e4_b8_matched_v1/index.html</td></tr><tr><td>gated_hardx3_seed2</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_gated_full_hardx3_ft_e4_mps_seed2_adamw_lr2e4_b8_matched_v1/perception_yolo_aux_train_summary.json</td><td>runs/detect/outputs/yolo_aux_pascalraw1581/rgb_aux_gated_full_hardx3_ft_e4_mps_seed2_adamw_lr2e4_b8_matched_v1/index.html</td></tr></tbody></table>
+  </section>
+</div>
+<script>
+  const buttons = Array.from(document.querySelectorAll('.tab-button'));
+  const panels = Array.from(document.querySelectorAll('.tab-panel'));
+  function activate(id) {
+    buttons.forEach(button => button.classList.toggle('active', button.dataset.tab === id));
+    panels.forEach(panel => panel.classList.toggle('active', panel.id === id));
+    history.replaceState(null, '', '#' + id);
+  }
+  buttons.forEach(button => button.addEventListener('click', () => activate(button.dataset.tab)));
+  const initial = location.hash ? location.hash.slice(1) : 'story';
+  if (document.getElementById(initial)) activate(initial);
+</script>
+</body>
+</html>

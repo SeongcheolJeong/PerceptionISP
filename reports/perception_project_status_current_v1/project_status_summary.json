@@ -1,0 +1,312 @@
+{
+  "schema_version": "perception_isp_project_status_v1",
+  "title": "PerceptionISP 목적·현재 진행상황·다음 단계",
+  "generated_at": "2026-07-17T12:29:36.052689+00:00",
+  "status": "partial",
+  "project_root": "${PROJECT_ROOT}",
+  "executive_conclusion": "PerceptionISP는 sensor-aware software reference와 evidence pipeline으로서는 완성도가 높은 단계다. 다만 production ISP 또는 HumanISP 대비 일반 성능 우월성을 주장할 단계는 아니며, 다음 핵심은 native multi-exposure RAW·실센서 calibration·공정한 multi-seed task benchmark·temporal registration이다.",
+  "validation": {
+    "status": "pass",
+    "pytest_passed": 431,
+    "pytest_skipped": 6,
+    "pytest_subtests_passed": 170,
+    "camerae2e_python312_runtime_smoke": "pass",
+    "showcase_status": "pass"
+  },
+  "showcase": {
+    "path": "reports/perception_nuscenes_scene0061_camerae2e_pipeline_showcase_v1/summary.json",
+    "status": "pass",
+    "source_frames": 6,
+    "pipeline_results": 11,
+    "aux_maps_per_result": 33,
+    "aux_map_artifacts": 363,
+    "cache_hits": 0,
+    "native_hdr_quality_claim_eligible": false
+  },
+  "software": {
+    "aux_map_count": 33,
+    "aux_rationale_count": 33,
+    "aux_groups": {
+      "normalization_calibration": 2,
+      "hdr_exposure": 5,
+      "cfa_spectral": 8,
+      "noise_reliability": 3,
+      "edge_optics": 10,
+      "timing_temporal": 5
+    },
+    "core_python": "3.11+",
+    "camerae2e_python": "3.12+",
+    "perceptionisp_git": {
+      "available": true,
+      "path": "${PROJECT_ROOT}",
+      "head": "92e3e01",
+      "dirty_count": 59
+    },
+    "camerae2e_git": {
+      "available": true,
+      "path": "${CAMERAE2E_ROOT}",
+      "head": "6858f00",
+      "dirty_count": 6
+    }
+  },
+  "evidence": {
+    "overall_status": "partial",
+    "native_raw": {
+      "status": "pass",
+      "claim_status": "large_native_fp_reducer_with_recall_tradeoff",
+      "sample_count": 750,
+      "precision50_delta": 0.03582781783823924,
+      "fp50_delta": -0.729333333333333,
+      "recall50_delta": -0.004266666666666641,
+      "native_raw_fraction": 1.0,
+      "true_cfa_fraction": 1.0,
+      "source_cfa_patterns": {
+        "RGGB": 750
+      },
+      "boundary": "This proves large held-out native RAW provenance only for the CFA pattern represented by the report. It does not prove all-CFA coverage, real adverse RAW coverage, broad detector superiority, or trained RGB+Aux DNN improvement."
+    },
+    "dense_aux_ablation": {
+      "status": "pass",
+      "claim_status": "aux_input_used_by_dense_dnn",
+      "seed_count": 3,
+      "test_sample_count": 198,
+      "full_precision": 0.03844434429866288,
+      "full_recall": 0.5960998877665544,
+      "full_fp": 21.124579124579125,
+      "zero_aux_recall_delta": -0.4620744481855593,
+      "zero_aux_precision_delta": -0.013811638718389349,
+      "zero_rgb_recall_delta": -0.4512719790497568,
+      "shuffle_aux_recall_delta": 0.023569023569023573,
+      "boundary": "This proves input dependence for the compact dense detector under this held-out split. It is not yet a production-detector proof or a broad adverse-condition benchmark."
+    },
+    "scene_edge": {
+      "status": "pass",
+      "sample_count": 12,
+      "perception_rgb_d_f1": 0.012167541634487697,
+      "perception_rgb_win_rate": 1.0,
+      "aux_strength_d_f1": 0.2048923127387081,
+      "aux_strength_win_rate": 1.0,
+      "aux_confidence_d_f1": -0.28250321135063,
+      "aux_best_name": "edge_evidence",
+      "aux_best_d_f1": 0.2684776162368251
+    },
+    "yolo_seed2": {
+      "status": "partial",
+      "comparison": "edge6_seed2 - rgb_seed2",
+      "base": {
+        "status": "complete",
+        "precision": 0.942797385475083,
+        "recall": 0.8698782276750738,
+        "map50": 0.9329053479912627,
+        "map5095": 0.667302131347576
+      },
+      "candidate": {
+        "status": "complete",
+        "precision": 0.9568291809214897,
+        "recall": 0.881103965386516,
+        "map50": 0.933040345806476,
+        "map5095": 0.6602782095911255
+      },
+      "candidate_aux_stem": {
+        "enabled": false,
+        "mode": "none",
+        "status": "not_requested"
+      },
+      "candidate_aux_stem_state_after_train": null,
+      "precision_delta": 0.014031795446406758,
+      "recall_delta": 0.011225737711442196,
+      "map50_delta": 0.00013499781521331133,
+      "map5095_delta": -0.007023921756450502,
+      "delta_text": "dR=+0.0112, dAP50-95=-0.0070",
+      "interpretation": "Aux path improves recall but loses AP50-95; this is a signal path, not broad superiority."
+    },
+    "hard_slice_seed3": {
+      "status": "partial",
+      "label": "aux_fixedopt_gate1_e2_seed3 - rgb_continue_seed3",
+      "base": "rgb_continue_seed3",
+      "candidate": "aux_gate1_e2_seed3",
+      "filters": {
+        "all": {
+          "target_gt_count": 570,
+          "map50_delta": -0.0027621474749643937,
+          "map5095_delta": 0.004173209175515669,
+          "precision025_delta": 0.0013551953628166968,
+          "recall025_delta": -0.0052631578947368585
+        },
+        "small": {
+          "target_gt_count": 70,
+          "map50_delta": 0.015243524868513214,
+          "map5095_delta": 0.0159342259971052,
+          "precision025_delta": 0.027009222661396604,
+          "recall025_delta": 0.0
+        },
+        "thin": {
+          "target_gt_count": 141,
+          "map50_delta": 0.007625071754018498,
+          "map5095_delta": 0.009921069955164508,
+          "precision025_delta": -0.01883390102183935,
+          "recall025_delta": 0.014184397163120588
+        },
+        "small_or_thin": {
+          "target_gt_count": 189,
+          "map50_delta": 0.0012500885310229304,
+          "map5095_delta": 0.00990333622224604,
+          "precision025_delta": 0.005376344086021501,
+          "recall025_delta": 0.005291005291005346
+        }
+      }
+    }
+  },
+  "milestones": [
+    {
+      "area": "RAW/metadata/calibration contract",
+      "status": "partial",
+      "completed": "RawFrame, exposure axis, CFA and origin validation, native/pseudo contradiction rejection.",
+      "remaining": "Unknown origin과 계산 validity 분리, sensor-specific importer, per-channel level과 profile registry."
+    },
+    {
+      "area": "PerceptionISP core",
+      "status": "complete",
+      "completed": "Human/machine RGB, accurate/fast paths, health, 33 Aux maps, opt-in trace.",
+      "remaining": "Measured latency, fixed-point mapping, closed-loop controller."
+    },
+    {
+      "area": "CameraE2E AE/AEB",
+      "status": "complete",
+      "completed": "Stateful delayed AE, same-scene AE bracket, AEB sequence, readback and seed audit.",
+      "remaining": "Clean committed integration baseline and calibrated temporal noise behavior."
+    },
+    {
+      "area": "nuScenes temporal/showcase",
+      "status": "complete",
+      "completed": "6-frame CAM_FRONT chain, pose/intrinsic propagation, 11-result/363-map fresh evidence bundle.",
+      "remaining": "No native source exposure metadata; no geometric registration."
+    },
+    {
+      "area": "Inter-frame HDR approximation",
+      "status": "stress-only",
+      "completed": "Unregistered dynamic stack and same-frame comparator expose ghost/flicker risk.",
+      "remaining": "Registration, deghosting and native RAW before HDR-quality claims."
+    },
+    {
+      "area": "Native HDR input",
+      "status": "partial",
+      "completed": "Strict NPZ+JSON contract and provenance contradiction checks.",
+      "remaining": "Representative real multi-exposure sensor data and radiometric quality benchmark."
+    },
+    {
+      "area": "RGB+Aux learned path",
+      "status": "partial",
+      "completed": "Compact DNN, YOLO gated fusion, distillation, corrected optimizer/freeze path.",
+      "remaining": "Genuinely independent multi-seed win and adverse-condition generalization."
+    },
+    {
+      "area": "Evaluation/reporting",
+      "status": "complete",
+      "completed": "Matched metrics, hard slices, claim gates, counterexamples, tabbed evidence reports.",
+      "remaining": "Automated report-size optimization and CI-published acceptance summary."
+    },
+    {
+      "area": "Production readiness",
+      "status": "open",
+      "completed": "Software reference only.",
+      "remaining": "Throughput, memory, power, fixed point, safety, on-device integration."
+    }
+  ],
+  "roadmap": [
+    {
+      "priority": "P0",
+      "work": "두 repository 기준점 고정",
+      "why": "현재 PerceptionISP와 CameraE2E 모두 미커밋 변경을 포함해 재현 기준점이 불안정합니다.",
+      "acceptance": "변경 review·commit, clean checkout, Python 3.11 core/3.12 CameraE2E CI, full tests와 scene-0061 smoke 재통과.",
+      "depends_on": "없음"
+    },
+    {
+      "priority": "P0",
+      "work": "감사에서 발견한 correctness gap 수정",
+      "why": "16채널 extended CHW tensor를 feature-distillation loader가 HWC로 오해할 수 있고, same-camera temporal state·MTF finite/range가 내부에서 강제되지 않습니다.",
+      "acceptance": "layout을 tensor contract로 명시하고 16×H×W/H×W×16 fixture 모두 통과; PreviousFrameState camera/timestamp validation; MTF/PSF finite/range rejection 또는 명시적 clamp; regression test 추가.",
+      "depends_on": "기준점 고정"
+    },
+    {
+      "priority": "P0",
+      "work": "HDR Aux 의미·분산 모델 강화",
+      "why": "현재 any/max input saturation은 복구된 HDR 픽셀도 억제하고 noise variance는 exposure weight별 분산을 전파하지 않습니다.",
+      "acceptance": "source-plane risk와 fused recoverability를 별도 map/semantic으로 분리; Σw²V 기반 fusion variance와 exposure별 dark-current를 synthetic radiance truth 및 native bracket에서 검증.",
+      "depends_on": "Native truth 또는 calibrated fixture"
+    },
+    {
+      "priority": "P0",
+      "work": "Metadata/calibration validity gate",
+      "why": "Origin이 unknown인 기본 수치와 실측 calibration을 구분하지 않으면 물리 Aux map을 과도하게 해석할 수 있습니다.",
+      "acceptance": "33개 map 각각 valid/calibrated/heuristic/not-applicable 상태와 required origins 제공; unknown fixture의 radiance/noise/HDR-quality claim 차단; measured fixture 통과.",
+      "depends_on": "기준점 고정"
+    },
+    {
+      "priority": "P0",
+      "work": "실제 native multi-exposure RAW 확보",
+      "why": "현재 nuScenes path는 pseudo-RAW이므로 HDR 화질·radiance claim을 만들 수 없습니다.",
+      "acceptance": "정적·동적 장면 E×H×W, 노출/gain/CFA/black-white/calibration source attestation, loader round-trip, pseudo/native contradiction 0건.",
+      "depends_on": "센서 또는 공개 native HDR dataset"
+    },
+    {
+      "priority": "P0",
+      "work": "실센서 calibration package",
+      "why": "noise/MTF/PSF/lens/color confidence가 neutral default가 아닌 물리적 의미를 가져야 합니다.",
+      "acceptance": "black/white, noise, WB/CCM, lens shading, defect, MTF/PSF를 versioned profile로 저장하고 모든 field origin을 source/readback으로 감사.",
+      "depends_on": "Native sensor와 calibration capture"
+    },
+    {
+      "priority": "P0",
+      "work": "공정한 task superiority gate",
+      "why": "현재 성능 결과는 positive signal과 counterexample이 혼재합니다.",
+      "acceptance": "동일 split/model/epoch/augmentation/운영점, 실제 stochastic source가 다른 3+ seeds, bootstrap CI, FP/sample·AP50/75·APs/m/l·boundary F1, counterexample 포함.",
+      "depends_on": "데이터·학습 protocol freeze"
+    },
+    {
+      "priority": "P1",
+      "work": "Temporal registration와 deghosting",
+      "why": "인접-frame 근사를 HDR 결과로 사용하려면 motion/ego pose 보정이 필요합니다.",
+      "acceptance": "pose warp + optical flow residual + occlusion mask, registered/unregistered comparator, moving-edge ghost metric와 radiance error 개선.",
+      "depends_on": "HDR-quality 목표 선택, native 또는 calibrated sequence"
+    },
+    {
+      "priority": "P1",
+      "work": "Aux profile/ablation 정리",
+      "why": "33개 전체는 연구에는 유용하지만 모델 입력·대역폭·설명 가능성 측면에서 과합니다.",
+      "acceptance": "core6/edge/HDR/temporal profile 정의, one-group-at-a-time ablation, 성능·latency·memory Pareto, stale/unused map 제거 기준.",
+      "depends_on": "Task gate"
+    },
+    {
+      "priority": "P1",
+      "work": "Runtime·저장 효율화",
+      "why": "현재 showcase는 1.1GB이며 float64 reference는 제품 배포에 비효율적입니다.",
+      "acceptance": "float32 equivalence tolerance, compressed/chunked arrays, duplicate preview 제거, peak RAM·wall latency 측정, report size 목표 설정.",
+      "depends_on": "Reference output freeze"
+    },
+    {
+      "priority": "P1",
+      "work": "RuntimeController closed loop",
+      "why": "현재는 설정 제안만 하고 다음 capture/ISP에 자동 적용하지 않습니다.",
+      "acceptance": "bounded state transition, hysteresis, oscillation test, exposure/flicker scenario convergence, audit log.",
+      "depends_on": "Camera control contract"
+    },
+    {
+      "priority": "P2",
+      "work": "Hardware/embedded mapping",
+      "why": "Software reference와 automotive/robotics ISP는 throughput·power·safety 요구가 다릅니다.",
+      "acceptance": "fixed-point error budget, target SoC prototype, FPS/latency/power/memory 측정, deterministic failure handling.",
+      "depends_on": "P0/P1 algorithm freeze"
+    }
+  ],
+  "sources": {
+    "architecture": "docs/ARCHITECTURE.md",
+    "evidence_boundaries": "docs/EVIDENCE_AND_LIMITATIONS.md",
+    "user_guide": "docs/USER_GUIDE_KO.md",
+    "aux_catalog": "src/perception_isp/core/aux_map_catalog.py",
+    "aux_rationale": "src/perception_isp/core/aux_map_rationale.py",
+    "pipeline": "src/perception_isp/core/pipeline.py",
+    "showcase_report": "reports/perception_nuscenes_scene0061_camerae2e_pipeline_showcase_v1/index.html",
+    "historical_accomplishment_report": "reports/perception_project_accomplishment_tabs_current_v1/index.html"
+  }
+}

@@ -1,0 +1,2632 @@
+{
+  "artifact_count": 436,
+  "artifacts": [
+    {
+      "kind": "evidence_document",
+      "path": "DATA_NOTICE.md",
+      "sha256": "83dbac340b26f2a8daea329f9af1b57710810d703da3585f38a175e96f6b3b80",
+      "size_bytes": 1695
+    },
+    {
+      "kind": "evidence_document",
+      "path": "EVIDENCE.md",
+      "sha256": "de3abdd2ddf88d69f3383839139b8c5458fb10a4f1875418efd17879cd43a484",
+      "size_bytes": 3497
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_dynamic_ghost_motion_artifact.png",
+      "sha256": "b207f7b5b1fe93866ef89351300b27a3f1211d628de34274399f837b861b6a10",
+      "size_bytes": 120413
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_dynamic_hdr_confidence.png",
+      "sha256": "66c01e9c4f7011db6c83e7a5c96ec8cb7cb6ff98b18c2078441c0cc5c3ee7d52",
+      "size_bytes": 110655
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_dynamic_hdr_exposure_source.png",
+      "sha256": "5a019cb7aa7e51099d3683c11cffab9a6d70adf9ce2600aa6866d5fc3d640547",
+      "size_bytes": 14620
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_dynamic_saturation.png",
+      "sha256": "04486fb6df7769be84d1f2ff80ce891c71a67a18e5c9200c31ea0371005bc820",
+      "size_bytes": 2802
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_dynamic_vision_rgb.png",
+      "sha256": "660fde7fc40a8c4a225ebd5c43b383ff91181ac2ad92b2f8d7a7d95a9b8123e5",
+      "size_bytes": 66271
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_frame_000_source_jpeg_rgb.png",
+      "sha256": "ca447ff26b96bb4f67c66aac0a41cac07bedffa9e2bbdff4320d4bea29f36d12",
+      "size_bytes": 405069
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_frame_001_source_jpeg_rgb.png",
+      "sha256": "743c33139573b2363651a69bf3549f6e67d651d5e620e1cca08a4534f02ccca6",
+      "size_bytes": 408038
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_frame_002_source_jpeg_rgb.png",
+      "sha256": "76b6ee91429375b55be9cb9495a4554f35915321a61755064cb4425fb40e0488",
+      "size_bytes": 406524
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_blur_focus_confidence.png",
+      "sha256": "ffb317711dd9da01bab98d53bd871818b83262b3c1c53065508fb8687f5d6573",
+      "size_bytes": 126634
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_clipping_distance.png",
+      "sha256": "015f9fd002dd423de47f473723b5c88f998e7b2970bacf70ee8a513a23129e44",
+      "size_bytes": 82257
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_color_confidence.png",
+      "sha256": "09779c5cac13647fe90723844c0011522466e5dedadc0d6d0842a395002ae4f7",
+      "size_bytes": 51615
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_demosaic_confidence.png",
+      "sha256": "1b0c8bfd7a42311a5b0417bf82e8278484a7dbff1a43de5d5381f68b702342c6",
+      "size_bytes": 58287
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_edge_confidence.png",
+      "sha256": "4caf1ce113666b5421506f44cb9b4d05d50711aec6f9334e521fb0a06753e3da",
+      "size_bytes": 82270
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_edge_evidence.png",
+      "sha256": "683ecd1f8f08692853fd1252063765fc344097c529b7b70a389d0fc2d3dd67a3",
+      "size_bytes": 82948
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_edge_orientation.png",
+      "sha256": "fd3fca246ed6f513cd519d4c51fabd5246b19fafed96a33e93f81ecc2070e9f4",
+      "size_bytes": 143690
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_edge_strength.png",
+      "sha256": "36c7c50618791bd471c9e3ba2a102c9ff586d84c1c07384d2a1f423acb31625a",
+      "size_bytes": 104934
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_edge_type.png",
+      "sha256": "b5fc88cd707784a1ccce134e18c43e66ddbec3c74c24d907224de456ca6a42d1",
+      "size_bytes": 8307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_ghost_motion_artifact.png",
+      "sha256": "b207f7b5b1fe93866ef89351300b27a3f1211d628de34274399f837b861b6a10",
+      "size_bytes": 120413
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_hdr_confidence.png",
+      "sha256": "66c01e9c4f7011db6c83e7a5c96ec8cb7cb6ff98b18c2078441c0cc5c3ee7d52",
+      "size_bytes": 110655
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_hdr_exposure_source.png",
+      "sha256": "5a019cb7aa7e51099d3683c11cffab9a6d70adf9ce2600aa6866d5fc3d640547",
+      "size_bytes": 14620
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_led_flicker_confidence.png",
+      "sha256": "9a81e4a533fdea528dced82f9862fc7bb25640c95b61bb17dc9c6d2474ef9697",
+      "size_bytes": 59378
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_light_source_confidence.png",
+      "sha256": "2a8960c97c0aaeac5787d2c1e61997f5882441a6d5059c233e2bf74db53a479e",
+      "size_bytes": 52497
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_log_b_over_g.png",
+      "sha256": "ee87a93dd2dc4e713df4b6af65e5f806880c8565c85b0d3a19085284632b4e5b",
+      "size_bytes": 92921
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_log_r_over_g.png",
+      "sha256": "82cb96a74fd0a97607412fa4fd092b8fc850378973f3c2ea8944362dc45d115d",
+      "size_bytes": 87588
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_luma.png",
+      "sha256": "ac52d674a8de517b372687c8625487ad15ed5f7b1208c6ed0911fa2d795de84c",
+      "size_bytes": 26072
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_noise_normalized_gradient.png",
+      "sha256": "f4995f5c9ad6fe8bf5df294389caa8677d4e9c2dfaa809819c814a6c08441b47",
+      "size_bytes": 103850
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_noise_variance.png",
+      "sha256": "fe629790c2a239f1e2bc6d46d4174b6ed83385cab2b2d749ca0aa89378877278",
+      "size_bytes": 116943
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_psf_edge_likelihood.png",
+      "sha256": "d2da0f944daf0888afda44441c8c5e0e679e716d85a3f90d26735ad194a35333",
+      "size_bytes": 89226
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_saturation.png",
+      "sha256": "04486fb6df7769be84d1f2ff80ce891c71a67a18e5c9200c31ea0371005bc820",
+      "size_bytes": 2802
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_snr_map.png",
+      "sha256": "91f0b31c33d1291fd25fac2cd17535cc4c3c795348ef8b92b701bae62a7cbc64",
+      "size_bytes": 85766
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_temporal_consistency.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_dynamic_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_blur_focus_confidence.png",
+      "sha256": "0b83701bf9c743d83abd73a11566e91bf7b2729da5e5fdf2257e3f0c48095235",
+      "size_bytes": 127147
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_clipping_distance.png",
+      "sha256": "2d8ea01f0c923da33cb03878abced31e34ef6734cea55c73589e62ca5db21674",
+      "size_bytes": 83599
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_color_confidence.png",
+      "sha256": "fabede68504cd899a9c2154a404b1652cd35205ccfeab52ca23dfcb2dcf4de07",
+      "size_bytes": 43855
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_demosaic_confidence.png",
+      "sha256": "386781b73c0acaa503d1e03c78329d4e76b7f1c231715b2caa31c29236363b89",
+      "size_bytes": 59542
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_edge_confidence.png",
+      "sha256": "3f25a44b97dfa3137aac59562d4b4ff2ea9ecec85c2ffde0c8f7fd0ab3cb011c",
+      "size_bytes": 84925
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_edge_evidence.png",
+      "sha256": "505098821ad7e6534760a0ad36a571921ce69c8b65f71d034fe5fb16353d8469",
+      "size_bytes": 84715
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_edge_orientation.png",
+      "sha256": "463dcacffef0d693957b4e4d48c273f427e57a9c454ebf73aca68bc8cb408b5a",
+      "size_bytes": 146138
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_edge_strength.png",
+      "sha256": "dd6f356fc8f2f5853f987602c2539472e94ff826349c62fd42d57416b5d7684e",
+      "size_bytes": 105622
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_edge_type.png",
+      "sha256": "9936af64378e8b570b8ee827adeea3d91bd8937739e0517739e400e7cad6731b",
+      "size_bytes": 8056
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_ghost_motion_artifact.png",
+      "sha256": "3be992821f500f9694aa3386d953b45eaf6f1152e1b233afa0cdbdb64ca26e6b",
+      "size_bytes": 105677
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_hdr_confidence.png",
+      "sha256": "109704dd7d0b08481fb3b7def0823ac69347299dddaacd06b987599c754119e3",
+      "size_bytes": 86525
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_hdr_exposure_source.png",
+      "sha256": "94ec053f6558210373145447f73d2c9a2acb1879fcdf7b09166bd555de2d7caf",
+      "size_bytes": 19914
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_led_flicker_confidence.png",
+      "sha256": "9fd48e814675efac87520afe17d0e64f37c5c70abae7293627fda3ba29994a64",
+      "size_bytes": 57559
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_light_source_confidence.png",
+      "sha256": "53804dc2b70ffa2551a009af4bfd37fbe43ce16637ad4c65518c5c9c57e934d7",
+      "size_bytes": 55413
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_log_b_over_g.png",
+      "sha256": "a05e32b56bc32aba10c56c6620166cd96b921e25e5a37da7dc2c0e8db647a92a",
+      "size_bytes": 98344
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_log_r_over_g.png",
+      "sha256": "688d8f93b42333e34880b50ec8007e3f6ffd8016a8e281208bdf15eaae291edf",
+      "size_bytes": 88716
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_luma.png",
+      "sha256": "e7e64b99ead07c74038309f94051d78cd7dad3c208bf292412cac597b11b1004",
+      "size_bytes": 27179
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_noise_normalized_gradient.png",
+      "sha256": "c8e82aba22e2b6b3b8791234bb4adf46511c8b9e184eb4589192575e8d2eaaf0",
+      "size_bytes": 105278
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_noise_variance.png",
+      "sha256": "ac698b66bfef6b5f264a4045061ed858755a0e1e67a66296a4627425b62e5c23",
+      "size_bytes": 118752
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_psf_edge_likelihood.png",
+      "sha256": "0b975cf9ff4dca5825dbc93923575182bed748489c83d6d1b266117edcf573a2",
+      "size_bytes": 90127
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_saturation.png",
+      "sha256": "503fd1698002df13aa63ee5e44a728fc54c55ee5f890c3418678e5303dc48f25",
+      "size_bytes": 2802
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_snr_map.png",
+      "sha256": "26442aa2dcb33d3c1933efbc95a7a39e8ca97e30da1cad35dab8c02092052e91",
+      "size_bytes": 78269
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_temporal_consistency.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_maps_static_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_raw_plane_000_8000us.png",
+      "sha256": "1f56373b5e93a23dc7be2f45ae6352fefcb30bd0e0ef9872477d541b67d107d2",
+      "size_bytes": 39260
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_raw_plane_001_2000us.png",
+      "sha256": "29e3617569d84652613d014dd7e84786f7da4e47c4996898329cf0eef564f12e",
+      "size_bytes": 23768
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_raw_plane_002_32000us.png",
+      "sha256": "90803b4667b41a4212dfa7a053a40886cc8935ceb2f5678e9341a5bedb4ce3f8",
+      "size_bytes": 32621
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_ghost_motion_artifact.png",
+      "sha256": "3be992821f500f9694aa3386d953b45eaf6f1152e1b233afa0cdbdb64ca26e6b",
+      "size_bytes": 105677
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_hdr_confidence.png",
+      "sha256": "109704dd7d0b08481fb3b7def0823ac69347299dddaacd06b987599c754119e3",
+      "size_bytes": 86525
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_hdr_exposure_source.png",
+      "sha256": "94ec053f6558210373145447f73d2c9a2acb1879fcdf7b09166bd555de2d7caf",
+      "size_bytes": 19914
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_raw_plane_000_8000us.png",
+      "sha256": "570bad2bb7cd1e3387d06f8550c9647ff0690f059fed12eeab8a99365bf793dd",
+      "size_bytes": 38968
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_raw_plane_001_2000us.png",
+      "sha256": "bd7c82360aa15bbaa6c891811b5c7614c46a42aedbb72c4508801627a632ff17",
+      "size_bytes": 23879
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_raw_plane_002_32000us.png",
+      "sha256": "cd6d18f67a9a0b1e843dd041c312934f37651531e8b9ffa9a3948aefb85626cc",
+      "size_bytes": 33585
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_saturation.png",
+      "sha256": "503fd1698002df13aa63ee5e44a728fc54c55ee5f890c3418678e5303dc48f25",
+      "size_bytes": 2802
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_000_static_vision_rgb.png",
+      "sha256": "bd6908c478a778074ca00ced8409f74ccb047d7cd01d3f4b48157081262c5c72",
+      "size_bytes": 68050
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_dynamic_ghost_motion_artifact.png",
+      "sha256": "c2569d5985c70bea2e80391462e0335492d70bd17c087d3d7e13dad6cac98ba9",
+      "size_bytes": 112840
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_dynamic_hdr_confidence.png",
+      "sha256": "1ac7f002cc35efcfedb8f1db226dc8fe46dac4b1fb0e1ae0039054ac3e53eaf9",
+      "size_bytes": 112125
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_dynamic_hdr_exposure_source.png",
+      "sha256": "4dae262f818817b094d8a676abb5c4b40d1da9523c6987ede25042532de20220",
+      "size_bytes": 16508
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_dynamic_saturation.png",
+      "sha256": "1ce21ea3602233cae845e3c74aca27aad52adf376d5cbbf5b4761047389253b4",
+      "size_bytes": 2679
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_dynamic_vision_rgb.png",
+      "sha256": "2d71dd808937139db6b481efb34ec055146a18d952afbe6c24043f791deee209",
+      "size_bytes": 76952
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_frame_000_source_jpeg_rgb.png",
+      "sha256": "f39101bffa3d47e45fb418bf54f8ace2222a5be12165a2291fb4ae083c9a57e7",
+      "size_bytes": 415229
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_frame_001_source_jpeg_rgb.png",
+      "sha256": "04af8d915c5c013e74b52277110dafc9af6531c17c6366a2f3f6367d19211d30",
+      "size_bytes": 408990
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_frame_002_source_jpeg_rgb.png",
+      "sha256": "3b5402ae41574ddda3bf7cce11c084f68834282965e8d215c6c2ba035eab13c8",
+      "size_bytes": 414789
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_blur_focus_confidence.png",
+      "sha256": "0c9d3a9866f5d85801c80c4d393a3a23d747fb235dfd397219db0ca47d6191ca",
+      "size_bytes": 136293
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_clipping_distance.png",
+      "sha256": "0b05f20e079f340d79967fd14b4888e82c4a61f13b5413e139e1bab31b685044",
+      "size_bytes": 97427
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_color_confidence.png",
+      "sha256": "f66008b18f57b3807db2fc70a48d1eac4db1c821640db886b9031cf9bc56a953",
+      "size_bytes": 60350
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_demosaic_confidence.png",
+      "sha256": "f292284719e18574a8533af3166d9bb71564b6e68f83709412e4fe171dc69ac4",
+      "size_bytes": 56157
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_edge_confidence.png",
+      "sha256": "32c2e5272a8bd0c5fe6dcb208a69615bc4652853d46cfc77ea5c5083851dc71a",
+      "size_bytes": 105654
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_edge_evidence.png",
+      "sha256": "2e4edc82c9586eaad3405229d1a6a03a376e9a0a6bddae2b3f302337c8ce1f2b",
+      "size_bytes": 103419
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_edge_orientation.png",
+      "sha256": "da74b93ee378050c7f8e839e07bb9a2fef980f94b5e9eb2b10ef97c7dfd43a88",
+      "size_bytes": 146915
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_edge_strength.png",
+      "sha256": "542a525fcc2de0b51d49dd8e8d3044a02d243d027f6ec43fa0a8956a8a5fb46f",
+      "size_bytes": 105564
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_edge_type.png",
+      "sha256": "2755b7a845516e14733feef7f25785f7874d1dc82c08e38c24b356f74b2adcb4",
+      "size_bytes": 9306
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_ghost_motion_artifact.png",
+      "sha256": "c2569d5985c70bea2e80391462e0335492d70bd17c087d3d7e13dad6cac98ba9",
+      "size_bytes": 112840
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_hdr_confidence.png",
+      "sha256": "1ac7f002cc35efcfedb8f1db226dc8fe46dac4b1fb0e1ae0039054ac3e53eaf9",
+      "size_bytes": 112125
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_hdr_exposure_source.png",
+      "sha256": "4dae262f818817b094d8a676abb5c4b40d1da9523c6987ede25042532de20220",
+      "size_bytes": 16508
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_led_flicker_confidence.png",
+      "sha256": "f29f286070be21d56f6bef12f36e29f78070e4e26916a58c1e23ef4f797ee1d1",
+      "size_bytes": 34288
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_light_source_confidence.png",
+      "sha256": "7f396fec7a46fd5ef1a677a7a0fb77517530a40fbe82af91d10728313d25fe98",
+      "size_bytes": 51603
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_log_b_over_g.png",
+      "sha256": "d8208b5fd91d790d4fda03bb79582de8d3e6c341750ebfedb826a2be6e022bbb",
+      "size_bytes": 96500
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_log_r_over_g.png",
+      "sha256": "1260f8db60410eb09a3d3a95c3021909513780c2b06cd0656d62496533cc8e52",
+      "size_bytes": 88752
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_luma.png",
+      "sha256": "224dfba6ff1d9fb26b2fde29a42da6c1610865c85b52fd525bc4bad34f1309d4",
+      "size_bytes": 27087
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_noise_normalized_gradient.png",
+      "sha256": "d81d476881d21d9e09c2a2c04d403a420700ccd717803bc8e2a8369828f300a5",
+      "size_bytes": 105453
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_noise_variance.png",
+      "sha256": "2b8cad9928e42b8463834393fd3b8332ab1a9fe67a0f80343ac8a1a1868c846b",
+      "size_bytes": 121953
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_psf_edge_likelihood.png",
+      "sha256": "b9683915c5b81a547a0e721981a3d6ea0b27597909e3179d67f3629f24ea62a2",
+      "size_bytes": 111651
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_saturation.png",
+      "sha256": "1ce21ea3602233cae845e3c74aca27aad52adf376d5cbbf5b4761047389253b4",
+      "size_bytes": 2679
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_snr_map.png",
+      "sha256": "6343d3900e97f46fbe29a07983767007b36aa2a6479573fd619a37261255d616",
+      "size_bytes": 85513
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_temporal_consistency.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_dynamic_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_blur_focus_confidence.png",
+      "sha256": "b82432c3dea2f86da5e5fa359e2a3dbae40fcc209dc1dd1a2530b94199becaa9",
+      "size_bytes": 135517
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_clipping_distance.png",
+      "sha256": "defc097b349ff3e5988071d13674a9153267680ebd7a2f83aae04bc70473dd26",
+      "size_bytes": 93647
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_color_confidence.png",
+      "sha256": "6ac928b7d3130515341e3d6f9b75167455d689c5d70e8477affeeb28bde7670a",
+      "size_bytes": 50630
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_demosaic_confidence.png",
+      "sha256": "bcc4f4b575f129f5acf7adabc77001b81a638e3b5616ca92f3494800a87c141e",
+      "size_bytes": 59595
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_edge_confidence.png",
+      "sha256": "f9f4974aedd2b641c6b7782d1a9839c16b573daec6d19923f6f58a25a7d83587",
+      "size_bytes": 102965
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_edge_evidence.png",
+      "sha256": "1ca87d0a6a63a1c63ca16b4de88ab1f439d3b92ccff1a4405a10a26920a00f9b",
+      "size_bytes": 101933
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_edge_orientation.png",
+      "sha256": "3f0c489a3bb4a98221a98413d0b548ac9f1aaa8ae2e8db513091792e1e6d4aa2",
+      "size_bytes": 148212
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_edge_strength.png",
+      "sha256": "4022c951d77b734b08e8a75bfbf6897d0ae69e1865ea515ecda7f79731706a71",
+      "size_bytes": 106428
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_edge_type.png",
+      "sha256": "8d5597ffc7ed64990ade7ca19a250501efb78e5b75cedd7cb5519fb888ce7854",
+      "size_bytes": 8731
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_ghost_motion_artifact.png",
+      "sha256": "61635494f4f0e509aff1315d4ee600898eb4e69ebbda247755798f768b51d40f",
+      "size_bytes": 93136
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_hdr_confidence.png",
+      "sha256": "794c2b39906163c8400113ad98b21dd51ecc2b1c6152cb613f40be56986cb31d",
+      "size_bytes": 89284
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_hdr_exposure_source.png",
+      "sha256": "fdb887d43d493519e96a9a7574ead82b70436e7c4ee9109cc71228ccaeaeb7d3",
+      "size_bytes": 20427
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_led_flicker_confidence.png",
+      "sha256": "de72dba64a7ae9f7f6b6b66eb7f5b43d6ef85002bad95411ba071235860f916e",
+      "size_bytes": 36445
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_light_source_confidence.png",
+      "sha256": "ded94a9e7f9afdcd703a2203817cf427db38fd69050fda77f3db0caa351b57d8",
+      "size_bytes": 55368
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_log_b_over_g.png",
+      "sha256": "4492bb5fbcf0455d39f604f62405182f66972bcdcc00a324c2275cbb799872bc",
+      "size_bytes": 98474
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_log_r_over_g.png",
+      "sha256": "c871bd5a48ed95607707bcd78aa7b61c5d4139c68131e61746b60a340751fced",
+      "size_bytes": 87536
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_luma.png",
+      "sha256": "010edc317361e621bb176af0f10af3f607441b82f9f045b53a70cf6e92083152",
+      "size_bytes": 28143
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_noise_normalized_gradient.png",
+      "sha256": "2b208ce6a19fbff2bc634ca51a92d7d2eea97781b8637b6f46daea01695f79fe",
+      "size_bytes": 106078
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_noise_variance.png",
+      "sha256": "63c761746f3c5e96dd4c76828ae33980c9077a75f7d6f0644244da04f509ee17",
+      "size_bytes": 123026
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_psf_edge_likelihood.png",
+      "sha256": "5bdc2bbce2fa3009451eb003af928a5684b18784647a4764b50364534578a77e",
+      "size_bytes": 106943
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_saturation.png",
+      "sha256": "3f78d29580c6c76c22a69aac71cf173843c9579a7f07b478380267526bbd8717",
+      "size_bytes": 2722
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_snr_map.png",
+      "sha256": "0fcaf10e3b9dfd8150bf66479d420477ac436633c881591fee71e4c6bdd48541",
+      "size_bytes": 82879
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_temporal_consistency.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_maps_static_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_raw_plane_000_5404.06us.png",
+      "sha256": "c0de3c708c22f27efc7485f88361e5efd6b239ac7f4d2780c6f365018f632dc0",
+      "size_bytes": 34341
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_raw_plane_001_1351.01us.png",
+      "sha256": "3f978049c0c5c538eef22ac318232a1f0bf0950cef3fffbea8d569efed699261",
+      "size_bytes": 20497
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_raw_plane_002_21616.2us.png",
+      "sha256": "049979d1a59512fa0023365c7cd13d227ce576c028e37f5c889acf9fad5d52bb",
+      "size_bytes": 38659
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_ghost_motion_artifact.png",
+      "sha256": "61635494f4f0e509aff1315d4ee600898eb4e69ebbda247755798f768b51d40f",
+      "size_bytes": 93136
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_hdr_confidence.png",
+      "sha256": "794c2b39906163c8400113ad98b21dd51ecc2b1c6152cb613f40be56986cb31d",
+      "size_bytes": 89284
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_hdr_exposure_source.png",
+      "sha256": "fdb887d43d493519e96a9a7574ead82b70436e7c4ee9109cc71228ccaeaeb7d3",
+      "size_bytes": 20427
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_raw_plane_000_5404.06us.png",
+      "sha256": "2c6ea5c0fb70b5e6e5c7bf10fd585bda606f26d7e81d386e49a48dc6c69a3df8",
+      "size_bytes": 33631
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_raw_plane_001_1351.01us.png",
+      "sha256": "1e386b94b747c091228441d35bc06d37f15f19d51c9d4bdff0e7a87536f2060a",
+      "size_bytes": 20243
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_raw_plane_002_21616.2us.png",
+      "sha256": "a1c041546d5f9d8f1c4e4063df449fe78b032ea5ff534810c3a1757a8acaf403",
+      "size_bytes": 37984
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_saturation.png",
+      "sha256": "3f78d29580c6c76c22a69aac71cf173843c9579a7f07b478380267526bbd8717",
+      "size_bytes": 2722
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/interframe_cycle_001_static_vision_rgb.png",
+      "sha256": "ff0dd70f0e5bd425a5f5775673388abb40558c6aefd112333c6eba5bdf511353",
+      "size_bytes": 78433
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_blur_focus_confidence.png",
+      "sha256": "a9292647f38ffa144f4482e8c5f948f7252e4f47a5e89faa48e1ceda9d50d409",
+      "size_bytes": 129745
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_clipping_distance.png",
+      "sha256": "7a1286bc09d7f8fdd95c28045d28691f27e0f75665ca2a2d8c124c695e48beed",
+      "size_bytes": 98121
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_color_confidence.png",
+      "sha256": "c87932d2133f073be7088f3840bdf14d5eb1b9980aa9f4e12fc45f617b032d33",
+      "size_bytes": 49444
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_demosaic_confidence.png",
+      "sha256": "3da9497d5f8474f1f1e7acdb9ba1868bf4dcca093ee1da1f10d62ed236e428d1",
+      "size_bytes": 56922
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_edge_confidence.png",
+      "sha256": "48ced526fdbd7902a95d8eec5833340bc0e0c31ac0cb1afc8cba20472d114fc8",
+      "size_bytes": 100810
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_edge_evidence.png",
+      "sha256": "3459863a39b3c0ca24cb8caa89ee53c946cd4d50907cd5973a8f0836b5202fb9",
+      "size_bytes": 99391
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_edge_orientation.png",
+      "sha256": "da5630133bbffb162e5aaeeb10190a1bf33f2157486c361cfe7b770f95b6de3a",
+      "size_bytes": 145178
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_edge_strength.png",
+      "sha256": "42240a30c06bafbb8a8181abc78ac282c320d4e4602a21dae3c862bb842be2f8",
+      "size_bytes": 103782
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_edge_type.png",
+      "sha256": "0ddcbd181f198828b59949ecdbbaa130c422d6100060581b796299819017ea7d",
+      "size_bytes": 7953
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_ghost_motion_artifact.png",
+      "sha256": "83e685b604d13d2844b85bb22124b23ee198f8c8d8f12828e7c30d3257a03173",
+      "size_bytes": 96738
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_hdr_confidence.png",
+      "sha256": "a086358cd15cf2aa761c56d0b6b5eb8ec67f45187c86939ea385ddf65da390b8",
+      "size_bytes": 94727
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_hdr_exposure_source.png",
+      "sha256": "a0f97a44ab8121e77c19dc757aef03316f70867d26cb132ebd772dd5611d1a56",
+      "size_bytes": 22604
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_led_flicker_confidence.png",
+      "sha256": "62284572e748526b34f2231e73539699a90e4a85e77d6bb0ac625b7672558890",
+      "size_bytes": 37407
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_light_source_confidence.png",
+      "sha256": "7541ee17ef90893fe7222947518addf88c2992db29277223069c88c20b57becd",
+      "size_bytes": 50673
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_log_b_over_g.png",
+      "sha256": "3d509253ce604205b16d3a74f8dbc525b630749babde9584bc18fc0fdc83fc44",
+      "size_bytes": 96055
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_log_r_over_g.png",
+      "sha256": "da736e41c8e3d4f85ded96294aa0af2ac16b8b69a9d6e1432a484a1d9723a906",
+      "size_bytes": 88428
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_luma.png",
+      "sha256": "337cc5b56e72002407a98f87bb8389f2277583c213390efe4d2fb1183b12b774",
+      "size_bytes": 26712
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_noise_normalized_gradient.png",
+      "sha256": "8e63b5b4023c1190f8bc4037977573c1066f09a310cec0795ef0a375f62d9a51",
+      "size_bytes": 103756
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_noise_variance.png",
+      "sha256": "3052c40d928be0922855e431ef83368c1eaf3484789b00b92a6d15a3e4226956",
+      "size_bytes": 116974
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_psf_edge_likelihood.png",
+      "sha256": "5123eccfcbef4b0186a867d972a0db96036b1209c010a1f94d05eb541806185c",
+      "size_bytes": 105541
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_saturation.png",
+      "sha256": "4100c000a06b1e56b5f830173d2e88a74b2b3f15e8c6580e8c557ca1c6b99887",
+      "size_bytes": 2462
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_snr_map.png",
+      "sha256": "cb4742b3c047d4fde3e77ba91f22f5e444de3adcf7224ac88f0fe5db8dcc318e",
+      "size_bytes": 78974
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_temporal_consistency.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_maps_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_source_jpeg_rgb.png",
+      "sha256": "ca447ff26b96bb4f67c66aac0a41cac07bedffa9e2bbdff4320d4bea29f36d12",
+      "size_bytes": 405069
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/static_ae_bracket_result_000_vision_rgb.png",
+      "sha256": "a7ad523e1c562734eacc571b750b16f8c5ceaa22bbd35747440e22c63ed98fda",
+      "size_bytes": 75585
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_led_flicker_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_blur_focus_confidence.png",
+      "sha256": "995bffaf0b88e751661f60ee8f83160e4a8efba256de8b63ce2020df83b64793",
+      "size_bytes": 127742
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_clipping_distance.png",
+      "sha256": "53f7d90249c5ecc184e6f9bd8ce59cb2249a893581a957466ce4ed9c5bb0cffb",
+      "size_bytes": 120741
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_color_confidence.png",
+      "sha256": "7d6d549841e483eaf833cea1600efc80f0f2f8a361fee37d0a68e171b6634f83",
+      "size_bytes": 55844
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_demosaic_confidence.png",
+      "sha256": "b2c183b44ad7eab70f42d70efbf5182a749d49b984d87927cc696814e0308e32",
+      "size_bytes": 51234
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_edge_confidence.png",
+      "sha256": "9ddba38052d14a5d8a4988f2e5f0287935f2dba3e33d63e3b2c90b9b1d72352d",
+      "size_bytes": 136352
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_edge_evidence.png",
+      "sha256": "9710396110e4cdfa8c1e3fbae7797d1f534cb610da564339b9006ce7992949f0",
+      "size_bytes": 120260
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_edge_orientation.png",
+      "sha256": "7ac98390bb7038bd9ad3508e75b474e9ac244fca6fdb36f6b62bd65fb8706cc0",
+      "size_bytes": 144096
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_edge_strength.png",
+      "sha256": "4e74ece60ac560e82a15898646d5a7a5bbcb0c215d759a1622b40bb6e7d0751a",
+      "size_bytes": 100108
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_edge_type.png",
+      "sha256": "ac91afa229b2056511246b595aa6f0b333e1eacade051c1d2731aeb8bf6af6ce",
+      "size_bytes": 8306
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_ghost_motion_artifact.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_hdr_confidence.png",
+      "sha256": "9106669d2522100795a6ccf43fb2699a77b99bfecef09d0129e48cf29d947dbf",
+      "size_bytes": 74939
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_hdr_exposure_source.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_led_flicker_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_light_source_confidence.png",
+      "sha256": "7ca141761b1769832d8f2429ccd210aa42ebed8a83256c38efd0e83ee2a6aa1d",
+      "size_bytes": 5395
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_log_b_over_g.png",
+      "sha256": "2529e979e0bda3d00bf746ac5ed02ef1c91180a9d060ab2ce8e178e3b0e278e8",
+      "size_bytes": 94023
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_log_r_over_g.png",
+      "sha256": "810420154238df9b31f35236f76fa23d700ab2040a06f7afbb45789b15f82d7f",
+      "size_bytes": 86918
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_luma.png",
+      "sha256": "6108492da9d7e699f1e962a821cb4648d736a8027427958dd760d9c78ed3e56f",
+      "size_bytes": 26287
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_noise_normalized_gradient.png",
+      "sha256": "cbd18854b628832a69dda45378f109ba061f26f85845066b1c1d992269d16508",
+      "size_bytes": 100633
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_noise_variance.png",
+      "sha256": "47975bbd66b72b8ce8fff3258a04a8eb3bf0e92d52970a3f1578150af4724a9f",
+      "size_bytes": 116848
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_psf_edge_likelihood.png",
+      "sha256": "c9049699ff8fc1ba48450f859b50e11e8423a1eb1e448d343438efdc0ba9a2b6",
+      "size_bytes": 139929
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_saturation.png",
+      "sha256": "74477b32c9c9827778e48f13c495beef3b0c2771cccb1ea013db615c77ed183e",
+      "size_bytes": 696
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_snr_map.png",
+      "sha256": "06827bb5bea213c2615f87fd95641522042d2d02381645d9ccda22da126ad4ca",
+      "size_bytes": 83240
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_temporal_consistency.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_maps_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_source_jpeg_rgb.png",
+      "sha256": "ca447ff26b96bb4f67c66aac0a41cac07bedffa9e2bbdff4320d4bea29f36d12",
+      "size_bytes": 405069
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_temporal_difference.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_000_vision_rgb.png",
+      "sha256": "a8f39c78fd36eb467328b89d7801c6154e7de9d0fd87e72590556c698ed860d7",
+      "size_bytes": 82150
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_led_flicker_confidence.png",
+      "sha256": "e706c8487a692bfcec1f251d838e290ddf5955877a758c5d18512ddcc0693434",
+      "size_bytes": 2971
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_blur_focus_confidence.png",
+      "sha256": "fd7fad49a1cf4b2544b3bc7b6dbbc8ee4169d137f3d36edb4be30dafda1160f2",
+      "size_bytes": 128015
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_clipping_distance.png",
+      "sha256": "36da0cbbbe621c34caabda5cedd2c0375dad675f8f9849f6ff0c8dbd996d8e44",
+      "size_bytes": 121130
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_color_confidence.png",
+      "sha256": "5bb696cb6798c4b03996e2c505cecb8a9616ed27af20a57eeb28eac20d541ca5",
+      "size_bytes": 56149
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_demosaic_confidence.png",
+      "sha256": "d82cf429cc7a3c467515a7cb3a77d670c664c3fa6029553bcad319a472d7ec43",
+      "size_bytes": 52221
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_edge_confidence.png",
+      "sha256": "4f27fef422722bf88f4e3e0dfc97ef193d726c804f2a0ed67cfdb7534d739c10",
+      "size_bytes": 137090
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_edge_evidence.png",
+      "sha256": "f2bf541755b07aa79285c1c11a62e64e745c3f8e17d9771b17d38220cb33a7d2",
+      "size_bytes": 121233
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_edge_orientation.png",
+      "sha256": "67f4e031eac81022b45ab68e01c2849ea873ba4397f2d96dae228e4785f8e8cc",
+      "size_bytes": 144148
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_edge_strength.png",
+      "sha256": "0db9b4feccb54040e73db273b17e3329c9141f78b039a0a96eff85ba5b181e6f",
+      "size_bytes": 100588
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_edge_type.png",
+      "sha256": "8301fe6efdaeb4a179099e7a42a1eb78e8b0dc91be79c18a5675c316b30af285",
+      "size_bytes": 8304
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_ghost_motion_artifact.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_hdr_confidence.png",
+      "sha256": "ae0e3f7f97fc5d72d446414021d7c01ae5dc39a1d35dd902eed6337cfaa64e31",
+      "size_bytes": 75802
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_hdr_exposure_source.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_led_flicker_confidence.png",
+      "sha256": "e706c8487a692bfcec1f251d838e290ddf5955877a758c5d18512ddcc0693434",
+      "size_bytes": 2971
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_light_source_confidence.png",
+      "sha256": "d1157c6e70e4cc42ae75afa57a3bde4b157cb9cbe6199d492282e449c4886ff5",
+      "size_bytes": 3830
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_log_b_over_g.png",
+      "sha256": "e9e70b9b0bab0708bc5671c7c581e60adadb8bd350926b1dc8a6d02935153456",
+      "size_bytes": 96188
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_log_r_over_g.png",
+      "sha256": "7e9ddad11b926d7ce52bab32fc9f68746a30f5fe6d42e53b4d30d4b184c5227f",
+      "size_bytes": 86634
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_luma.png",
+      "sha256": "2369a68e5006f9a852c278ffe4a4afdb251d2dfde25c85de380ef0eee0cdfe07",
+      "size_bytes": 26531
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_noise_normalized_gradient.png",
+      "sha256": "1d8f464647edfbea73c1edeb681b21e5193348ca79a447946cfd48f6a01e3929",
+      "size_bytes": 101387
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_noise_variance.png",
+      "sha256": "e9f2067fe5c15cc21b0f56d677fa539af7ddca1c2ba8573c5c206cdad140d621",
+      "size_bytes": 117446
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_psf_edge_likelihood.png",
+      "sha256": "6cbeca606af26288011980264dfae1c2b3e36ed8c8f055d4c53a4eaa6361d36b",
+      "size_bytes": 140719
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_saturation.png",
+      "sha256": "3593f14663650737d8fb3625b42dad70896aa4518498266964716f00779a9c8d",
+      "size_bytes": 700
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_snr_map.png",
+      "sha256": "9784945178ee77704d715b1616918b0354b5ae0a478aae6076be12b7f75b0783",
+      "size_bytes": 84049
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_temporal_consistency.png",
+      "sha256": "c3c8e1a3a9949346dc86ea5c7792c328ff44d89b479d35967a27968f851cb555",
+      "size_bytes": 98234
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_maps_temporal_difference.png",
+      "sha256": "0306b596a1a6542e48d33d798fbf832ab0f2622799cb0dffc5e7f091841ad693",
+      "size_bytes": 63052
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_source_jpeg_rgb.png",
+      "sha256": "743c33139573b2363651a69bf3549f6e67d651d5e620e1cca08a4534f02ccca6",
+      "size_bytes": 408038
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_temporal_difference.png",
+      "sha256": "0306b596a1a6542e48d33d798fbf832ab0f2622799cb0dffc5e7f091841ad693",
+      "size_bytes": 63052
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_001_vision_rgb.png",
+      "sha256": "f3203918798d1f4afffcdb40a778b46b0e726943aca57d03e8f42ba77c93d615",
+      "size_bytes": 81943
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_led_flicker_confidence.png",
+      "sha256": "aee19cd492af31760b1a83a8f14a37f98cd76cf81a2e8140a88fc3ccb27cb251",
+      "size_bytes": 619
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_blur_focus_confidence.png",
+      "sha256": "500fb2e3fdd15eca52349f6be3b74bb957be7c367edbfcd073124442f9a2fdc4",
+      "size_bytes": 128003
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_clipping_distance.png",
+      "sha256": "a06bb0d5a9f1fafb650c5c2d53fd64d37671b19858644119abc897005b4898e7",
+      "size_bytes": 123673
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_color_confidence.png",
+      "sha256": "9179d63b2317024d2503f8a0140c294977e214bacf952de4cb8d66ff3c946201",
+      "size_bytes": 59143
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_demosaic_confidence.png",
+      "sha256": "6e807619d39ee3bb6b6b7ee00f383851a2a78d2dca2f1706fb85a8654a341a59",
+      "size_bytes": 59277
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_edge_confidence.png",
+      "sha256": "d6d91ed99379741537565ef16f72e038af8a7b5f0a3fe6619c9a164a233a9f53",
+      "size_bytes": 138408
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_edge_evidence.png",
+      "sha256": "f59935407d72ad38b371ba7b659e2828306cb670f0ca6318d24847d30fb34d1f",
+      "size_bytes": 122104
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_edge_orientation.png",
+      "sha256": "f3851d5a2e529d75129c33e80083278e7605a00f9c3d46d8865f4725382197c5",
+      "size_bytes": 145119
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_edge_strength.png",
+      "sha256": "fa3596be00500e9461ffbb418db9e892875e06a78c099f22bcfabdf1e105ccfd",
+      "size_bytes": 101723
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_edge_type.png",
+      "sha256": "8c2496efef287c1769d955552fefabc4292a89cd48ae9aae12a6c4ea8d243e81",
+      "size_bytes": 8701
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_ghost_motion_artifact.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_hdr_confidence.png",
+      "sha256": "c50010fb8f4153892d38ddea1515131e9d282be7c1fb5d95730026b6d6a932ab",
+      "size_bytes": 80409
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_hdr_exposure_source.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_led_flicker_confidence.png",
+      "sha256": "aee19cd492af31760b1a83a8f14a37f98cd76cf81a2e8140a88fc3ccb27cb251",
+      "size_bytes": 619
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_light_source_confidence.png",
+      "sha256": "cfa8b22089eb4bdbfd42f154421af32fe4085efe436b34551e43d98522e5a3dd",
+      "size_bytes": 620
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_log_b_over_g.png",
+      "sha256": "d98e7efa2fad1e398ffeea548ca56ffc8ffd0f1ff739a43f90e82ae48a50747c",
+      "size_bytes": 96847
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_log_r_over_g.png",
+      "sha256": "a8c8d76492ebf4ba02d694262ae44b508bb5fafb87d7f823de1cbf341a4e55b4",
+      "size_bytes": 86814
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_luma.png",
+      "sha256": "f9aba291ef158af8be7827095c8a27b61320a90f142e73752c44f9672c56420f",
+      "size_bytes": 27245
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_noise_normalized_gradient.png",
+      "sha256": "31b141a81725b719ca332870faecd76ca2bf1300c407bbd0237548b88a3aaaeb",
+      "size_bytes": 102347
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_noise_variance.png",
+      "sha256": "b5fd7963811963620e6506e0233f5032a63d44e779ada7f070d0f6260d1be2b2",
+      "size_bytes": 120921
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_psf_edge_likelihood.png",
+      "sha256": "f45f8bf0fee49bd0c0ece4b5056b28b95bba7011373edf4b225a61a976647943",
+      "size_bytes": 142412
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_saturation.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_snr_map.png",
+      "sha256": "02bf582ea6a97fb7fdf46f0ff46a94820085602b6fcc42e186ce07d2ad07c64f",
+      "size_bytes": 89845
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_temporal_consistency.png",
+      "sha256": "ee0b0c76ea32267bb0ca855edf4b2fe1651e27fd0a8e47edb67c60620e21f1c2",
+      "size_bytes": 96884
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_maps_temporal_difference.png",
+      "sha256": "c15409fa04eb8f4b96696bf3861f5a327a81c2dd65573f517ba4b543e5335349",
+      "size_bytes": 68919
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_source_jpeg_rgb.png",
+      "sha256": "76b6ee91429375b55be9cb9495a4554f35915321a61755064cb4425fb40e0488",
+      "size_bytes": 406524
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_temporal_difference.png",
+      "sha256": "c15409fa04eb8f4b96696bf3861f5a327a81c2dd65573f517ba4b543e5335349",
+      "size_bytes": 68919
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_002_vision_rgb.png",
+      "sha256": "d175ecc7fab789c892096b2e0c407f45b36099fee26fbe1157c299aa7f2b560a",
+      "size_bytes": 78184
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_led_flicker_confidence.png",
+      "sha256": "fd6fcd002dc801607596f4ad3a3ff70fdcef708a248e426f8a0e71a3ae111ed4",
+      "size_bytes": 684
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_blur_focus_confidence.png",
+      "sha256": "68d86abc799398639f71dc50216bed4d89b8a9f0c44b96e8970b1680d8643be8",
+      "size_bytes": 128562
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_clipping_distance.png",
+      "sha256": "6c9f27c99a95fc9faac40767c819aa5a1bd81d062304b446db51979a024a83c8",
+      "size_bytes": 123617
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_color_confidence.png",
+      "sha256": "bd2e6e0848582fa8389e1a3921f21f2ca6dfcdffddcdf3ec9f5b25bd20613a48",
+      "size_bytes": 58556
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_demosaic_confidence.png",
+      "sha256": "03a280d452e0d86e7958442dfcf1f8906dd7c9a3450392cb92b9c0a0481961e0",
+      "size_bytes": 61024
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_edge_confidence.png",
+      "sha256": "e764a6634b37d68404a9d5c70aa5f83e5979742947777e0a4dd284660a7f8d39",
+      "size_bytes": 138487
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_edge_evidence.png",
+      "sha256": "e9012b13384eb84dcafb129ad30bff2a73ff1ec529bf958b8a36c09ddb3c587a",
+      "size_bytes": 122662
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_edge_orientation.png",
+      "sha256": "11d727230ab9ac61a52d4c291c979969aa7311cf4a933648dc0dbfdf535e577b",
+      "size_bytes": 145964
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_edge_strength.png",
+      "sha256": "022d862d17710f596e41ebbe8e19c100c9a715bacc8d77134da6996a766cd486",
+      "size_bytes": 103028
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_edge_type.png",
+      "sha256": "e74f2fab4490708b500d2f1a272ae75073089c700d1a6b09fb9dc67831decfe3",
+      "size_bytes": 9215
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_ghost_motion_artifact.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_hdr_confidence.png",
+      "sha256": "d2e858122f2be21488e8c87dcd8dfce6755463060125e29b8ea9c820e4300466",
+      "size_bytes": 78081
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_hdr_exposure_source.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_led_flicker_confidence.png",
+      "sha256": "fd6fcd002dc801607596f4ad3a3ff70fdcef708a248e426f8a0e71a3ae111ed4",
+      "size_bytes": 684
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_light_source_confidence.png",
+      "sha256": "dbe6476f6d904ab664467b0fe990b4dd7544f159d3cf6a0da60a05a947593208",
+      "size_bytes": 686
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_log_b_over_g.png",
+      "sha256": "b7d4f1fff4f30894166b8c7423a524ee38c340f4d9c1280d2edc86d9a1557077",
+      "size_bytes": 97518
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_log_r_over_g.png",
+      "sha256": "0173a1517a2f30f6dc5a7b48ac6768b3ace168938cf1a680357f7c18ffb7cffa",
+      "size_bytes": 86394
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_luma.png",
+      "sha256": "619afde235e9f8b2904f3d8f82680d13f6be5a9348f298f06dbd0f0218e24660",
+      "size_bytes": 27562
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_noise_normalized_gradient.png",
+      "sha256": "27c24b4289759d5052d83571e91f6e740e999f4caee53661192ecdd2d1d1ed90",
+      "size_bytes": 103612
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_noise_variance.png",
+      "sha256": "94f31a958affbc0c1827b5ea68edcc3c7d447253b7c13e519c9b8113384e4ff5",
+      "size_bytes": 122298
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_psf_edge_likelihood.png",
+      "sha256": "44e013bf00ca77f904737752ab759b88c0cc714ba26e4c10be90b595cfd2a513",
+      "size_bytes": 142084
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_saturation.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_snr_map.png",
+      "sha256": "4d8eded90bb5ef7116b822006c661ae5fa91240272017cd48184112ed4a16a93",
+      "size_bytes": 87395
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_temporal_consistency.png",
+      "sha256": "0a27e529323774f13185d7232eb362e04849790f23b451f1ce7632715e4907bb",
+      "size_bytes": 96283
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_maps_temporal_difference.png",
+      "sha256": "e1f58b6c259af9b2262f15cc2a6dd31a2d70c3b956ae058eed18da49f250bda8",
+      "size_bytes": 61250
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_source_jpeg_rgb.png",
+      "sha256": "f39101bffa3d47e45fb418bf54f8ace2222a5be12165a2291fb4ae083c9a57e7",
+      "size_bytes": 415229
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_temporal_difference.png",
+      "sha256": "e1f58b6c259af9b2262f15cc2a6dd31a2d70c3b956ae058eed18da49f250bda8",
+      "size_bytes": 61250
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_003_vision_rgb.png",
+      "sha256": "65fea4cad418107f89bf9a58f571540f4fec550b459a3ae28253b14fb559a7c0",
+      "size_bytes": 78787
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_led_flicker_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_blur_focus_confidence.png",
+      "sha256": "d1159eba747a912bfbcc1481d4bfc570b0ca625ba381fe5ad0af6efcecaaeb35",
+      "size_bytes": 129335
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_clipping_distance.png",
+      "sha256": "d6b80bc2ec4eb6f6287069656fdd5c8d3ca182f99409630cc71824853122ef94",
+      "size_bytes": 123456
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_color_confidence.png",
+      "sha256": "1d9b047b83028fea370c27271086711c08731ef988397a5f3a09dc64699aa088",
+      "size_bytes": 58142
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_demosaic_confidence.png",
+      "sha256": "41408da1eade5563f4f83f1ed70c00514b9cfdc6309623a1111ae02ccb72d114",
+      "size_bytes": 64208
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_edge_confidence.png",
+      "sha256": "d447a97732992849475e26ad09808993b067dd8c72fde3425c4683879079a3f9",
+      "size_bytes": 140154
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_edge_evidence.png",
+      "sha256": "69bd48e47de42d22078d26bd74b02acb91e71d285dbfbc0ac5e4d42359bfc5b1",
+      "size_bytes": 122318
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_edge_orientation.png",
+      "sha256": "c30a469011f20e82a382bd9fbadfed0c95f8c99129e2a571c0f4f5971b536830",
+      "size_bytes": 147045
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_edge_strength.png",
+      "sha256": "da2df3af550ef84de417e3109bddfda7223261845287de8be3c885530aeb9224",
+      "size_bytes": 101310
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_edge_type.png",
+      "sha256": "feb71a6386ceabdbc11a33f89a40a10f9972cca52576835f69a60ed21a0ddc35",
+      "size_bytes": 8929
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_ghost_motion_artifact.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_hdr_confidence.png",
+      "sha256": "c1398c30e3e4c282949f8bfbe1180349326b8d24513f42a66700c0622a85fde2",
+      "size_bytes": 78776
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_hdr_exposure_source.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_led_flicker_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_light_source_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_log_b_over_g.png",
+      "sha256": "7a2578d2c47f27eec2ec176a71bf3f62045eddad104306e2639bb0022bf8d80b",
+      "size_bytes": 96654
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_log_r_over_g.png",
+      "sha256": "5b272e8903f32e385a1d392fb1680a0c6b945839252d156aa240309824d30916",
+      "size_bytes": 85656
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_luma.png",
+      "sha256": "93eb7a6006fd9fc559d132a78296168cd27783a4316ca1d16d1a5452b8d606ff",
+      "size_bytes": 27537
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_noise_normalized_gradient.png",
+      "sha256": "cd348cb539eebdfb4df5ff58abe81729c340c6d1f74923ab0f9c590f51a945be",
+      "size_bytes": 102354
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_noise_variance.png",
+      "sha256": "f301f92ff84de0069a7bb8bd3f4982f257e64f20672f1a534cb9c7788e99384a",
+      "size_bytes": 121656
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_psf_edge_likelihood.png",
+      "sha256": "0b1e30ff285274dda12f35c2d19c42345512f6d4d6e6a013a6f944c7830f8529",
+      "size_bytes": 143546
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_saturation.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_snr_map.png",
+      "sha256": "701779f352628eb307c2218d3e4f83dd41e29ba0d2d4ef61b67591ccb374d1a5",
+      "size_bytes": 87495
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_temporal_consistency.png",
+      "sha256": "da2c2016f003f6597c13ba707cbaa84e543bb1f74f594befd15982f85b975d44",
+      "size_bytes": 90532
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_maps_temporal_difference.png",
+      "sha256": "0b9c620574dcbb7ea274cf5bf652a24814acacddd6b8813f534054e42288632f",
+      "size_bytes": 56156
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_source_jpeg_rgb.png",
+      "sha256": "04af8d915c5c013e74b52277110dafc9af6531c17c6366a2f3f6367d19211d30",
+      "size_bytes": 408990
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_temporal_difference.png",
+      "sha256": "0b9c620574dcbb7ea274cf5bf652a24814acacddd6b8813f534054e42288632f",
+      "size_bytes": 56156
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_004_vision_rgb.png",
+      "sha256": "0b4ed787be777f3183dd332019543878bd1d15af1ecc25ea97c0d34c960fe5f3",
+      "size_bytes": 76801
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_led_flicker_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_blur_focus_confidence.png",
+      "sha256": "d1a879c4c699ecf400d80c343e82f9a27c73adbf613ebff3e31f8ce3adfd7a46",
+      "size_bytes": 128982
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_clear_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_clipping_distance.png",
+      "sha256": "d3f95fbabda94c65b38574a174280f2a5247a3f2583b860ade115521e1bddc49",
+      "size_bytes": 121011
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_color_confidence.png",
+      "sha256": "6a52eb7e4c38ab82dbfa4a5a42fb226e1d2d5ca6a506bb3a46ca5db6c55b8c6d",
+      "size_bytes": 58990
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_defect_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_demosaic_confidence.png",
+      "sha256": "7a66efc89453e35792c1a300fbff40bae63847ee753d528a8732e67fc9527b5b",
+      "size_bytes": 65953
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_edge_confidence.png",
+      "sha256": "3034e394386eb460cc1753307de1b5aa3b1536b81d1cd400de494b5c8be443e7",
+      "size_bytes": 139408
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_edge_evidence.png",
+      "sha256": "6086d3d91467efd5dba274c2bf1f59987fe9afbf89cb3de9d7d584e0a1b659a5",
+      "size_bytes": 121424
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_edge_orientation.png",
+      "sha256": "9ef7a1641240e11a88a32ea324e266134ffdb2e7f8184762fabde4fb5c989402",
+      "size_bytes": 147064
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_edge_strength.png",
+      "sha256": "230e834e66e17c146d89f102701f7bc5703daad60f39b6c0ff3737c48e7c0a10",
+      "size_bytes": 100957
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_edge_type.png",
+      "sha256": "5051970798678b74b9ca7242e60c9c3f88ce3c62bc3f179f0110f84715baaec0",
+      "size_bytes": 9037
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_ghost_motion_artifact.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_hdr_confidence.png",
+      "sha256": "f3b159fcc56d5e2e9488f37a4ee7b862a1a844fef9d4fcbb43b87a183bdd2cd2",
+      "size_bytes": 80054
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_hdr_exposure_source.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_ir_channel.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_ir_contamination.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_led_flicker_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_lens_gain.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_light_source_confidence.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_log_b_over_g.png",
+      "sha256": "d5ed2ef92a6b845bab60fe9caadbb68b1b2e4a16bb96efcee754ffe988bc44e5",
+      "size_bytes": 98987
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_log_r_over_g.png",
+      "sha256": "ac4935540f0fc7a8725ee37e4f9fe70aeae5251eaf9148b6b23a7e15e445afcf",
+      "size_bytes": 86846
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_luma.png",
+      "sha256": "804d46493fe4cd71ac78131574459236686aff0d98402f0be8ced11a55aeb8f0",
+      "size_bytes": 27241
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_mtf_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_noise_normalized_gradient.png",
+      "sha256": "2344d42678bc87dd07e5eefe48d99a604aa5da80cf68f2ffb21dc883306108db",
+      "size_bytes": 102913
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_noise_variance.png",
+      "sha256": "287971149206e81ac4e91babfe84fdcd4c88de299c64c4e0f541af5c78a4c418",
+      "size_bytes": 118650
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_psf_blur_confidence.png",
+      "sha256": "852b7257107ec7578a7ac9eaf6db18447010c3a8cf099220306c0d8de41bcd9a",
+      "size_bytes": 609
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_psf_edge_likelihood.png",
+      "sha256": "6ea386977f2872b22b5873ac513894500dd8bf5b120c4b0960cd36ef5714f52b",
+      "size_bytes": 142262
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_psf_sigma.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_rolling_row_fraction.png",
+      "sha256": "b317c717ed87bfc870f0a75719750095b62be4ab34475281f786d3dc06386fa0",
+      "size_bytes": 307
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_saturation.png",
+      "sha256": "536ddf1d0e0ebdf80107beaa63fd2bef15a66afc8813126fc220f6f87749e33e",
+      "size_bytes": 610
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_snr_map.png",
+      "sha256": "d1c87f72c7df5f794f7358765d0a934492536c1067e088fab77d5de892918d3a",
+      "size_bytes": 88061
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_temporal_consistency.png",
+      "sha256": "4a5356736c706f760819a9f983d16b90a6a42fbbd4b06165ab00360c99babe54",
+      "size_bytes": 93522
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_maps_temporal_difference.png",
+      "sha256": "35893ea3109747f5ae6c6cf8d193aee7305904857d804d10c9062a818dce2572",
+      "size_bytes": 58468
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_source_jpeg_rgb.png",
+      "sha256": "3b5402ae41574ddda3bf7cce11c084f68834282965e8d215c6c2ba035eab13c8",
+      "size_bytes": 414789
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_temporal_difference.png",
+      "sha256": "35893ea3109747f5ae6c6cf8d193aee7305904857d804d10c9062a818dce2572",
+      "size_bytes": 58468
+    },
+    {
+      "kind": "visual_preview",
+      "path": "assets/temporal_frame_005_vision_rgb.png",
+      "sha256": "59ef985012090c7396f6d465bc3e0485afab90d61098f02d7d47a896fb71d763",
+      "size_bytes": 76718
+    },
+    {
+      "kind": "manifest",
+      "path": "aux_map_catalog.json",
+      "sha256": "a34a7168e391ea88ca842d8d79fcf419e2ba71bc4e055fac6bb565e00e90f5a9",
+      "size_bytes": 28361
+    },
+    {
+      "kind": "manifest",
+      "path": "environment.json",
+      "sha256": "df574e059bee687f8be8ec96dd93c32fd00a94f7580914f6b3767e5052e6161a",
+      "size_bytes": 9343
+    },
+    {
+      "kind": "audit_table",
+      "path": "exposure_plane_sources.csv",
+      "sha256": "b7e1d878177694d8bf95b11001cf183bb3ddf66eb96df1156f259ac6430e71dc",
+      "size_bytes": 26565
+    },
+    {
+      "kind": "html_report",
+      "path": "index.html",
+      "sha256": "2fd98acc674377d4b9e7f67da65db0607b5c9739e68c26f8e26c0411b39f2f50",
+      "size_bytes": 158130
+    },
+    {
+      "kind": "audit_table",
+      "path": "metadata_origins.csv",
+      "sha256": "aeb001b9da9c320accc21b2b195e4f276127860c13c960e636fdd3e10db4e891",
+      "size_bytes": 7122
+    },
+    {
+      "kind": "manifest",
+      "path": "source_manifest.json",
+      "sha256": "3d38e80b3f29bf73d0af334ecd1e27a2bc251a9667244f2a6f07c4d8b79bb322",
+      "size_bytes": 41964
+    },
+    {
+      "kind": "report_summary",
+      "path": "summary.json",
+      "sha256": "4320f567b113dd0e27d784b0f92f51b0de6afd2a318abbc4d956a948e8fe7cd1",
+      "size_bytes": 460205
+    }
+  ],
+  "notes": {
+    "arrays_included": false,
+    "checksums_file_included": false,
+    "manifest_self_included": false,
+    "preview_only": true,
+    "source_rgb_preview_downscaled_count": 13,
+    "source_rgb_preview_max_edge_px": 800,
+    "source_rgb_preview_path_count": 13,
+    "source_rgb_preview_unique_frame_count": 6
+  },
+  "schema_version": "perception_isp_public_report_bundle_v1"
+}

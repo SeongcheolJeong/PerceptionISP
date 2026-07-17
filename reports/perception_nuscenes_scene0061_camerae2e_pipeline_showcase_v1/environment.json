@@ -1,0 +1,258 @@
+{
+  "argv": [
+    "${CAMERAE2E_ROOT}/.venv/bin/python",
+    "-m",
+    "perception_isp",
+    "report",
+    "showcase",
+    "data/nuscenes",
+    "--scene-name",
+    "scene-0061",
+    "--camera",
+    "CAM_FRONT",
+    "--frames",
+    "6",
+    "--width",
+    "320",
+    "--height",
+    "180",
+    "--output-dir",
+    "${TEMP_ROOT}/perceptionisp-showcase-fixed.yLh9b0"
+  ],
+  "camerae2e_git": {
+    "available": true,
+    "dirty": true,
+    "head": "6858f00ace4f1c2292822116ec3faaafbb24614c",
+    "path": "${CAMERAE2E_ROOT}",
+    "status_porcelain": [
+      " M README.md",
+      " M src/pyisetcam/__init__.py",
+      " M src/pyisetcam/hwisp.py",
+      "?? docs/ae-raw-capture.md",
+      "?? src/pyisetcam/capture.py",
+      "?? tests/unit/test_capture.py"
+    ],
+    "status_sha256": "911de6665d7f1a1f02c06e81c1d5041dfc1e8a328f87174206c9610f81ffadfe",
+    "tracked_diff_sha256": "1d0c63bd32728c63bc8e2390ec2089f716cc5d07e31b762fa7b03ba3828258ed"
+  },
+  "command": "${CAMERAE2E_ROOT}/.venv/bin/python -m perception_isp report showcase data/nuscenes --scene-name scene-0061 --camera CAM_FRONT --frames 6 --width 320 --height 180 --output-dir ${TEMP_ROOT}/perceptionisp-showcase-fixed.yLh9b0",
+  "config": {
+    "camera_channel": "CAM_FRONT",
+    "cfa_pattern": "auto",
+    "dataset_root": "${PROJECT_ROOT}/data/nuscenes",
+    "dataset_version": "v1.0-mini",
+    "frames": 6,
+    "fresh_capture_required": true,
+    "height": 180,
+    "noise_seed": 0,
+    "reproduction_argv": [
+      "${CAMERAE2E_ROOT}/.venv/bin/python",
+      "-m",
+      "perception_isp",
+      "report",
+      "showcase",
+      "data/nuscenes",
+      "--scene-name",
+      "scene-0061",
+      "--camera",
+      "CAM_FRONT",
+      "--frames",
+      "6",
+      "--width",
+      "320",
+      "--height",
+      "180",
+      "--output-dir",
+      "${TEMP_ROOT}/perceptionisp-showcase-fixed.yLh9b0"
+    ],
+    "scene_name": "scene-0061",
+    "scene_reference_white_luminance": 10000.0,
+    "scene_token": null,
+    "synthetic_fallback_allowed": false,
+    "width": 320
+  },
+  "created_at_utc": "2026-07-17T11:24:59.009919+00:00",
+  "cwd": "${PROJECT_ROOT}",
+  "packages": {
+    "numpy": "2.5.1",
+    "perception-isp": "0.2.0",
+    "pillow": "12.3.0",
+    "pyisetcam": "0.1.0"
+  },
+  "perception_isp_git": {
+    "available": true,
+    "dirty": true,
+    "head": "92e3e012e1d3c0fabe398d88b70f1e605ac741f4",
+    "path": "${PROJECT_ROOT}",
+    "status_porcelain": [
+      " M .gitignore",
+      " M README.md",
+      " M docs/ARCHITECTURE.md",
+      " M docs/EVIDENCE_AND_LIMITATIONS.md",
+      " M docs/USER_GUIDE_KO.md",
+      " M examples/README.md",
+      " M src/perception_isp/cli.py",
+      " M src/perception_isp/core/camerae2e_bridge.py",
+      " M src/perception_isp/core/detectors.py",
+      " M src/perception_isp/core/numeric.py",
+      " M src/perception_isp/core/pipeline.py",
+      " M src/perception_isp/core/types.py",
+      " M src/perception_isp/datasets/__init__.py",
+      " M src/perception_isp/datasets/kitti_dataset.py",
+      " M src/perception_isp/datasets/yolo_dataset.py",
+      " M src/perception_isp/evaluation/comparison.py",
+      " M src/perception_isp/evaluation/eval_cli.py",
+      " M src/perception_isp/evaluation/example_suite.py",
+      " M tests/test_camerae2e_bridge.py",
+      " M tests/test_cli.py",
+      " M tests/test_eval_cli.py",
+      " M tests/test_example_suite.py",
+      " M tests/test_kitti_dataset.py",
+      " M tests/test_pipeline.py",
+      " M tests/test_yolo_dataset.py",
+      "?? examples/camerae2e_hdr_example.py",
+      "?? examples/kitti_real_driving_example.py",
+      "?? examples/native_hdr_example.py",
+      "?? examples/nuscenes_interframe_hdr_stress_example.py",
+      "?? examples/nuscenes_temporal_example.py",
+      "?? src/perception_isp/core/aux_map_catalog.py",
+      "?? src/perception_isp/core/metadata_provenance.py",
+      "?? src/perception_isp/datasets/hdr_raw_loader.py",
+      "?? src/perception_isp/datasets/nuscenes_temporal.py",
+      "?? src/perception_isp/evaluation/camerae2e_hdr_example.py",
+      "?? src/perception_isp/evaluation/external_example_report.py",
+      "?? src/perception_isp/evaluation/kitti_real_example.py",
+      "?? src/perception_isp/evaluation/native_hdr_example.py",
+      "?? src/perception_isp/evaluation/nuscenes_evidence_bundle.py",
+      "?? src/perception_isp/evaluation/nuscenes_interframe_hdr_stress_example.py",
+      "?? src/perception_isp/evaluation/nuscenes_temporal_example.py",
+      "?? src/perception_isp/reporting/pipeline_showcase_report.py",
+      "?? src/perception_isp/reporting/project_status_report.py",
+      "?? tests/test_aux_map_catalog.py",
+      "?? tests/test_camerae2e_hdr_example.py",
+      "?? tests/test_external_example_report.py",
+      "?? tests/test_hdr_raw_loader.py",
+      "?? tests/test_kitti_real_example.py",
+      "?? tests/test_metadata_provenance.py",
+      "?? tests/test_native_hdr_example.py",
+      "?? tests/test_nuscenes_evidence_bundle.py",
+      "?? tests/test_nuscenes_interframe_hdr_stress_example.py",
+      "?? tests/test_nuscenes_temporal.py",
+      "?? tests/test_nuscenes_temporal_example.py",
+      "?? tests/test_pipeline_showcase_report.py",
+      "?? tests/test_project_status_report.py"
+    ],
+    "status_sha256": "e4c31913fa2a4d184048c9b03f601149f486732e285535dcd5d43c2bdc632ab9",
+    "tracked_diff_sha256": "5c15e8b79af7cc0a7208820d1b6545c547fd59d5f8769c27b6ee9089b915b02e"
+  },
+  "platform": {
+    "machine": "arm64",
+    "platform": "macOS-26.3-arm64-arm-64bit",
+    "release": "25.3.0",
+    "system": "Darwin"
+  },
+  "python": {
+    "executable": "${CAMERAE2E_ROOT}/.venv/bin/python",
+    "implementation": "CPython",
+    "version": "3.12.13"
+  },
+  "runtime_source_files": [
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/core/aux_map_catalog.py",
+      "sha256": "0c90c16cacd4185903400a37f89e24c93b96938859e381231df428fddfc32807",
+      "size_bytes": 22288
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/core/camerae2e_bridge.py",
+      "sha256": "f4af35a3b23f070e01e4a89ece320496463c91c4c6e2fd9750b62b70f3e4a4cb",
+      "size_bytes": 118839
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/core/pipeline.py",
+      "sha256": "98b8c60f2813f1cfd3c503ec0ae2d58325fa53d45226ddb3ef462a99a8958a7c",
+      "size_bytes": 61962
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/core/types.py",
+      "sha256": "e9f9bfd8f5c49ff8196ffc3c7dbbb8a5f1e1e26af5f660413339a87374cc99ba",
+      "size_bytes": 9131
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/datasets/nuscenes_temporal.py",
+      "sha256": "b52d1ddea42d7eafd583773ac34776efadcc11c5d1c68ee4aac7c6a38b859dee",
+      "size_bytes": 39544
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/evaluation/nuscenes_temporal_example.py",
+      "sha256": "4d021627f160ee306d000759a6c8bbffe9761b1ab03386532aa4cb59b47f6709",
+      "size_bytes": 26129
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/evaluation/nuscenes_interframe_hdr_stress_example.py",
+      "sha256": "798fb478ac2c64219e209d29360b3ae340a3ce67abf180a0eb16c4b33e351cde",
+      "size_bytes": 88760
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/evaluation/nuscenes_evidence_bundle.py",
+      "sha256": "cd403b5787ae61f35a86aad7ca0f678fb3cd42bb9bc585ccd9fd23e682e1bb1a",
+      "size_bytes": 28946
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/evaluation/external_example_report.py",
+      "sha256": "509cbeb549961e091d37957ce46da8463b1b10a4a99362233617ec65f042e4b0",
+      "size_bytes": 19721
+    },
+    {
+      "project": "PerceptionISP",
+      "relative_path": "src/perception_isp/reporting/pipeline_showcase_report.py",
+      "sha256": "77396e54c2c4b6bf5c73924e7e56333b661a11a74d906e45bcbe64a912c22542",
+      "size_bytes": 39353
+    },
+    {
+      "project": "CameraE2E",
+      "relative_path": "src/pyisetcam/__init__.py",
+      "sha256": "8a3c5d7229b5a62955afb52c83e2877e3606d2b4b4f6aa74b5783cd00e489916",
+      "size_bytes": 103291
+    },
+    {
+      "project": "CameraE2E",
+      "relative_path": "src/pyisetcam/capture.py",
+      "sha256": "3bc7428dbb054aa90da23489f29d91451edf641eb9d210208244e78990e1bd6a",
+      "size_bytes": 36176
+    },
+    {
+      "project": "CameraE2E",
+      "relative_path": "src/pyisetcam/hwisp.py",
+      "sha256": "98eeebc6e02c6b61c5a8773d17971eb203df667e607999100ca9112d662882bc",
+      "size_bytes": 53392
+    },
+    {
+      "project": "CameraE2E",
+      "relative_path": "src/pyisetcam/scene.py",
+      "sha256": "288c7f1c314a10cb3e452d191ad3cee2fdb620ba577efd260a5549a6d5ac350e",
+      "size_bytes": 290479
+    },
+    {
+      "project": "CameraE2E",
+      "relative_path": "src/pyisetcam/optics.py",
+      "sha256": "4b140b327470c33bf36c921f22388596306d50de56aecb3e0551dfc5038d83c1",
+      "size_bytes": 468278
+    },
+    {
+      "project": "CameraE2E",
+      "relative_path": "src/pyisetcam/sensor.py",
+      "sha256": "a81522550078152fca373b3604dc926eeb5138fdc822ce7aaa44f448275d0cba",
+      "size_bytes": 361954
+    }
+  ],
+  "schema_version": "perception_isp_nuscenes_evidence_v1"
+}

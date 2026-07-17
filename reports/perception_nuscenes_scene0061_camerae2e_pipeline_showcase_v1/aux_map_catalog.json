@@ -1,0 +1,587 @@
+[
+  {
+    "name": "lens_gain",
+    "group": "normalization_calibration",
+    "stage": "raw_physical_normalization",
+    "purpose": "Expose spatial lens-shading compensation and its noise amplification context.",
+    "expected_effect": "Lets downstream gating distinguish center and vignetted regions when a calibrated gain map exists.",
+    "algorithm": "Nearest-resize the calibration lens_shading_gain map and multiply it into gain-corrected RAW.",
+    "value_semantics": "Positive gain; 1 means neutral and values above 1 amplify signal and modeled noise.",
+    "derivation": "calibration_passthrough",
+    "consumers": [
+      "accurate",
+      "dnn_extended",
+      "noise_model"
+    ],
+    "applicability": "Meaningful only with a sensor/lens calibration map.",
+    "limitations": "A uniform value of 1 is missing/neutral calibration, not proof of uniform optics.",
+    "rendering": "sequential",
+    "implementation_ref": "PerceptionISPPipeline._raw_physical_normalization"
+  },
+  {
+    "name": "defect_confidence",
+    "group": "normalization_calibration",
+    "stage": "raw_physical_normalization",
+    "purpose": "Mark pixels replaced from the defect table.",
+    "expected_effect": "Allows DNN and health logic to reduce trust in interpolated sensor samples.",
+    "algorithm": "Initialize ones and set calibrated defect coordinates to zero after local box-filter replacement.",
+    "value_semantics": "[0,1]; 0 marks a corrected defect and 1 an unlisted pixel.",
+    "derivation": "calibration_derived",
+    "consumers": [],
+    "applicability": "Requires an accurate defect-pixel table.",
+    "limitations": "An all-one map means no table entries were supplied, not that the sensor has no defects.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._raw_physical_normalization"
+  },
+  {
+    "name": "hdr_exposure_source",
+    "group": "hdr_exposure",
+    "stage": "hdr_fusion",
+    "purpose": "Identify the exposure with the largest fusion weight at each pixel.",
+    "expected_effect": "Makes exposure switching auditable and can condition highlight/shadow processing.",
+    "algorithm": "Argmax of SNR \u00d7 non-saturation \u00d7 low-signal \u00d7 inter-plane-consistency weights; use the darkest fallback when every weight is zero.",
+    "value_semantics": "Categorical exposure-plane index 0..E-1.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "edge_packet"
+    ],
+    "applicability": "Useful for multi-exposure inputs; single exposure is uniformly index 0.",
+    "limitations": "It is the dominant contributor, not a hard statement that other planes were unused.",
+    "rendering": "categorical",
+    "implementation_ref": "PerceptionISPPipeline._hdr_fusion"
+  },
+  {
+    "name": "saturation",
+    "group": "hdr_exposure",
+    "stage": "hdr_fusion",
+    "purpose": "Locate pixels saturated in any input exposure.",
+    "expected_effect": "Supports highlight-risk gating and prevents saturated structure from receiving high edge confidence.",
+    "algorithm": "Threshold every normalized exposure and reduce with logical any across the exposure axis.",
+    "value_semantics": "Binary [0,1]; 1 means at least one source plane crossed hdr_saturation_threshold.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "fast",
+      "dnn",
+      "health"
+    ],
+    "applicability": "Applies to single and multi-exposure RAW.",
+    "limitations": "It does not mean the fused HDR result is clipped; a shorter plane may still recover the pixel.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._hdr_fusion"
+  },
+  {
+    "name": "clipping_distance",
+    "group": "hdr_exposure",
+    "stage": "hdr_fusion",
+    "purpose": "Express remaining headroom below the saturation threshold.",
+    "expected_effect": "Provides a continuous highlight-risk signal beyond the binary saturation map.",
+    "algorithm": "Normalize threshold minus the maximum normalized exposure by the threshold and clip to [0,1].",
+    "value_semantics": "[0,1]; 0 is at/above threshold and larger values have more headroom.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended"
+    ],
+    "applicability": "Applies to the configured pseudo-RAW scale.",
+    "limitations": "It is based on the brightest input plane, not fused-radiance headroom.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._hdr_fusion"
+  },
+  {
+    "name": "hdr_confidence",
+    "group": "hdr_exposure",
+    "stage": "hdr_fusion",
+    "purpose": "Summarize usable HDR fusion support.",
+    "expected_effect": "Allows output and DNN validity to fall where exposures are saturated, noisy, or inconsistent.",
+    "algorithm": "Sum nonnegative fusion weights and divide by exposure count, then clip to [0,1].",
+    "value_semantics": "[0,1]; higher means stronger aggregate usable exposure support.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended",
+      "health",
+      "color_confidence"
+    ],
+    "applicability": "Applies to single and multi-exposure inputs.",
+    "limitations": "This is a heuristic confidence and is not calibrated probability or HDR quality ground truth.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._hdr_fusion"
+  },
+  {
+    "name": "ghost_motion_artifact",
+    "group": "hdr_exposure",
+    "stage": "hdr_fusion",
+    "purpose": "Expose inter-plane radiance disagreement that can create ghosting.",
+    "expected_effect": "Can suppress unreliable HDR edges and reveal motion/flicker merge risk.",
+    "algorithm": "Compute per-pixel radiance standard deviation divided by mean absolute radiance, clipped to [0,1].",
+    "value_semantics": "[0,1]; higher means greater normalized disagreement.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "psf_edge_likelihood",
+      "temporal_flicker"
+    ],
+    "applicability": "Informative only for two or more exposure planes.",
+    "limitations": "No registration or optical flow is used; motion, JPEG differences, AE errors, and noise are conflated.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._hdr_fusion"
+  },
+  {
+    "name": "luma",
+    "group": "cfa_spectral",
+    "stage": "cfa_decode",
+    "purpose": "Provide a dense structural intensity channel close to the sensor domain.",
+    "expected_effect": "Supports low-latency edge and temporal processing without waiting for display rendering.",
+    "algorithm": "For Bayer use the measured/interpolated green plane; clear, IR, and mono layouts use their decoder-specific intensity.",
+    "value_semantics": "Nonnegative linear intensity on the fused pseudo-RAW scale.",
+    "derivation": "model_derived",
+    "consumers": [
+      "fast",
+      "raw_like",
+      "temporal_state"
+    ],
+    "applicability": "Applicable to all supported CFA modes.",
+    "limitations": "Bayer green is a luma proxy, not colorimetric luminance.",
+    "rendering": "sequential",
+    "implementation_ref": "PerceptionISPPipeline._cfa_pixel_structure_decoder"
+  },
+  {
+    "name": "clear_channel",
+    "group": "cfa_spectral",
+    "stage": "cfa_decode",
+    "purpose": "Expose clear-pixel signal for clear-filter CFA layouts.",
+    "expected_effect": "May improve low-light structure when genuine clear pixels and calibration are available.",
+    "algorithm": "Interpolate C samples for RCCB/RCCC/RCCG; use fused signal for mono; emit zeros for Bayer/RGB-IR.",
+    "value_semantics": "Nonnegative linear clear signal; zero when the active CFA has no clear samples.",
+    "derivation": "sensor_channel_derived",
+    "consumers": [
+      "accurate_ir_or_clear"
+    ],
+    "applicability": "Only physically meaningful for native clear/mono CFA capture.",
+    "limitations": "CameraE2E Bayer and RGB proxy bridges do not create native clear measurements.",
+    "rendering": "sequential",
+    "implementation_ref": "_decode_clear_cfa/_decode_monochrome"
+  },
+  {
+    "name": "ir_channel",
+    "group": "cfa_spectral",
+    "stage": "cfa_decode",
+    "purpose": "Expose interpolated infrared-pixel signal.",
+    "expected_effect": "Can let a model reason about IR illumination and visible-color contamination.",
+    "algorithm": "Interpolate IR samples in RGB-IR mode; emit zeros for Bayer, clear, and mono modes.",
+    "value_semantics": "Nonnegative linear IR signal; zero when the CFA has no IR samples.",
+    "derivation": "sensor_channel_derived",
+    "consumers": [
+      "accurate_ir_or_clear",
+      "ir_contamination"
+    ],
+    "applicability": "Only physically meaningful for native RGB-IR capture and crosstalk calibration.",
+    "limitations": "An RGB-derived CameraE2E proxy is not a native IR measurement.",
+    "rendering": "sequential",
+    "implementation_ref": "_decode_rgb_ir"
+  },
+  {
+    "name": "demosaic_confidence",
+    "group": "cfa_spectral",
+    "stage": "cfa_decode_edge",
+    "purpose": "Estimate reliability of reconstructed color samples.",
+    "expected_effect": "Supports artifact suppression and downweights uncertain color edges.",
+    "algorithm": "Combine CFA neighborhood support, horizontal/vertical gradient separation and local contrast, then mix with edge confidence and non-edge support.",
+    "value_semantics": "[0,1]; higher indicates stronger reconstruction support.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended",
+      "image_formation"
+    ],
+    "applicability": "Decoder-specific; valid as a relative diagnostic for supported CFA modes.",
+    "limitations": "Not calibrated against demosaic ground truth and partly depends on later edge confidence.",
+    "rendering": "bounded",
+    "implementation_ref": "_decode_bayer_edge_aware/PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "color_confidence",
+    "group": "cfa_spectral",
+    "stage": "color_spectral",
+    "purpose": "Estimate where color information is trustworthy.",
+    "expected_effect": "Can reduce reliance on chroma under low SNR, saturation, poor HDR support, or strong global imbalance.",
+    "algorithm": "Multiply normalized SNR, non-saturation, global WB-balance confidence, and HDR confidence.",
+    "value_semantics": "[0,1]; higher means stronger modeled color reliability.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended",
+      "health"
+    ],
+    "applicability": "Applicable to decoded RGB but depends on calibration quality.",
+    "limitations": "Global channel imbalance is only a WB heuristic and can penalize legitimately colored scenes.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._color_spectral_engine"
+  },
+  {
+    "name": "log_r_over_g",
+    "group": "cfa_spectral",
+    "stage": "color_spectral",
+    "purpose": "Represent red chromaticity relative to green.",
+    "expected_effect": "Offers illumination/color cues with reduced dependence on overall brightness.",
+    "algorithm": "Compute safe log(R/G) after the camera color matrix.",
+    "value_semantics": "Signed log ratio; 0 means R equals G.",
+    "derivation": "model_derived",
+    "consumers": [],
+    "applicability": "Applicable when decoded camera RGB is meaningful.",
+    "limitations": "Sensitive to color matrix, demosaic error, clipping, and very small green values.",
+    "rendering": "diverging",
+    "implementation_ref": "PerceptionISPPipeline._color_spectral_engine"
+  },
+  {
+    "name": "log_b_over_g",
+    "group": "cfa_spectral",
+    "stage": "color_spectral",
+    "purpose": "Represent blue chromaticity relative to green.",
+    "expected_effect": "Offers illumination/color cues with reduced dependence on overall brightness.",
+    "algorithm": "Compute safe log(B/G) after the camera color matrix.",
+    "value_semantics": "Signed log ratio; 0 means B equals G.",
+    "derivation": "model_derived",
+    "consumers": [],
+    "applicability": "Applicable when decoded camera RGB is meaningful.",
+    "limitations": "Sensitive to color matrix, demosaic error, clipping, and very small green values.",
+    "rendering": "diverging",
+    "implementation_ref": "PerceptionISPPipeline._color_spectral_engine"
+  },
+  {
+    "name": "ir_contamination",
+    "group": "cfa_spectral",
+    "stage": "color_spectral",
+    "purpose": "Estimate the fraction of signal attributable to IR.",
+    "expected_effect": "Can gate visible-color features where IR leakage is strong.",
+    "algorithm": "Compute IR divided by mean visible RGB plus IR.",
+    "value_semantics": "[0,1]; higher means larger modeled IR contribution.",
+    "derivation": "heuristic_derived",
+    "consumers": [],
+    "applicability": "Only meaningful for genuine RGB-IR input.",
+    "limitations": "Uniform zero on Bayer is not evidence of an IR-free physical sensor.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._color_spectral_engine"
+  },
+  {
+    "name": "noise_variance",
+    "group": "noise_reliability",
+    "stage": "noise_uncertainty",
+    "purpose": "Expose modeled per-pixel uncertainty in the fused RAW signal.",
+    "expected_effect": "Allows denoising, fast-path features, and DNN inputs to distinguish signal from noisy regions.",
+    "algorithm": "Sum shot, read, temperature/exposure dark-current, quantization, and calibration-residual variance; scale by lens_gain squared.",
+    "value_semantics": "Positive modeled variance in normalized signal units squared.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "fast",
+      "dnn_extended",
+      "edge_engine"
+    ],
+    "applicability": "Requires representative sensor-noise and calibration coefficients.",
+    "limitations": "CameraE2E bridge defaults are not a calibrated nuScenes camera noise model.",
+    "rendering": "positive_robust",
+    "implementation_ref": "PerceptionISPPipeline._noise_uncertainty_engine"
+  },
+  {
+    "name": "snr_map",
+    "group": "noise_reliability",
+    "stage": "noise_uncertainty",
+    "purpose": "Provide bounded signal reliability.",
+    "expected_effect": "Selected as the compact reliability channel in the stable RGB+Aux tensor and as a gate for edge/color confidence.",
+    "algorithm": "Compute signal/sqrt(variance), then map SNR to SNR/(SNR+1).",
+    "value_semantics": "[0,1]; higher means stronger modeled signal relative to noise.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "dnn",
+      "edge_engine",
+      "color_confidence"
+    ],
+    "applicability": "Relative validity follows the supplied noise model.",
+    "limitations": "It is not measured SNR and is optimistic or pessimistic when calibration coefficients are wrong.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._noise_uncertainty_engine"
+  },
+  {
+    "name": "noise_normalized_gradient",
+    "group": "noise_reliability",
+    "stage": "noise_uncertainty",
+    "purpose": "Measure local intensity change relative to expected noise.",
+    "expected_effect": "Helps distinguish structured transitions from noise-only gradients.",
+    "algorithm": "Divide luma gradient magnitude by sqrt(2 \u00d7 modeled variance).",
+    "value_semantics": "Nonnegative, unbounded standardized gradient-like score.",
+    "derivation": "model_derived",
+    "consumers": [],
+    "applicability": "Useful when both luma and the noise model are meaningful.",
+    "limitations": "Large texture and demosaic artifacts can also produce high values.",
+    "rendering": "positive_robust",
+    "implementation_ref": "PerceptionISPPipeline._noise_uncertainty_engine"
+  },
+  {
+    "name": "edge_strength",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Represent local structural gradient magnitude.",
+    "expected_effect": "Supports boundary-aware image formation, sparse EdgePackets, and DNN spatial features.",
+    "algorithm": "Build a noise-weighted luma/R-G/B-G structure tensor, take sqrt of the largest eigenvalue, and normalize by the frame maximum.",
+    "value_semantics": "[0,1] frame-relative strength.",
+    "derivation": "model_derived",
+    "consumers": [
+      "accurate",
+      "fast",
+      "dnn",
+      "edge_packet"
+    ],
+    "applicability": "Applicable to all decoded inputs.",
+    "limitations": "Frame-max normalization prevents absolute comparison across unrelated runs without stored statistics.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "edge_orientation",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Expose the dominant local edge direction.",
+    "expected_effect": "Can support orientation-aware filtering or geometric feature extraction.",
+    "algorithm": "Use half-angle atan2 of the structure-tensor off-diagonal and diagonal difference.",
+    "value_semantics": "Cyclic radians in approximately [-pi/2, pi/2].",
+    "derivation": "model_derived",
+    "consumers": [
+      "edge_packet"
+    ],
+    "applicability": "Meaningful where edge strength/confidence is sufficient.",
+    "limitations": "Orientation is unstable in flat, noisy, or isotropic texture regions.",
+    "rendering": "cyclic",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "edge_confidence",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Estimate whether a detected edge is structurally and sensor-wise reliable.",
+    "expected_effect": "Expected to suppress noisy, saturated, blurred, or isotropic edges while retaining supported boundaries.",
+    "algorithm": "Multiply structure-tensor anisotropy, MTF, exp(-0.5\u00d7PSF sigma squared), non-saturation, and SNR.",
+    "value_semantics": "[0,1]; higher means stronger modeled edge reliability.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "accurate",
+      "fast",
+      "edge_packet",
+      "image_formation"
+    ],
+    "applicability": "Depends on valid noise and optics calibration.",
+    "limitations": "A high value is not object-boundary probability or detector performance evidence.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "edge_evidence",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Combine edge magnitude and reliability into one compact feature.",
+    "expected_effect": "Selected for DNN/proposal experiments where strength alone admits noise and confidence alone can be weak at strong boundaries.",
+    "algorithm": "Robust-normalize strength and confidence with p1/p99 ranges and take their geometric mean.",
+    "value_semantics": "[0,1] frame-relative combined evidence.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "accurate",
+      "fast",
+      "dnn_extended"
+    ],
+    "applicability": "Applicable to decoded inputs with meaningful edge maps.",
+    "limitations": "Percentile normalization makes values run-relative rather than calibrated probabilities.",
+    "rendering": "bounded",
+    "implementation_ref": "_combined_edge_evidence"
+  },
+  {
+    "name": "edge_type",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Separate luminance and chromatic edge evidence.",
+    "expected_effect": "Can distinguish intensity boundaries from color-only transitions and demosaic-sensitive locations.",
+    "algorithm": "Normalize luma and maximum chroma gradient by frame maxima and classify at threshold 0.12 as none/luma/chroma/both.",
+    "value_semantics": "Categorical: 0 none, 1 luma, 2 chroma, 3 both.",
+    "derivation": "heuristic_derived",
+    "consumers": [],
+    "applicability": "Applicable when decoded chroma differences are meaningful.",
+    "limitations": "Fixed frame-relative thresholds are diagnostic and not universally calibrated.",
+    "rendering": "categorical",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "blur_focus_confidence",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Summarize local focus support from strong reliable edges.",
+    "expected_effect": "Can flag regions where detail-sensitive downstream features should be downweighted.",
+    "algorithm": "Average edge confidence with edge strength normalized by the configured high-percentile strength threshold.",
+    "value_semantics": "[0,1]; higher means stronger local focus-like support.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended",
+      "health"
+    ],
+    "applicability": "Relative within a frame and most meaningful around edges.",
+    "limitations": "Texture scarcity, motion blur, defocus, and low contrast are not separated.",
+    "rendering": "bounded",
+    "implementation_ref": "_blur_focus_confidence"
+  },
+  {
+    "name": "mtf_confidence",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Carry calibrated spatial MTF reliability into edge processing.",
+    "expected_effect": "Allows known lens/sensor resolution loss to reduce edge confidence.",
+    "algorithm": "Nearest-resize calibration.mtf_confidence_map, defaulting to one.",
+    "value_semantics": "Normally [0,1]; one means no attenuation in the model.",
+    "derivation": "calibration_passthrough",
+    "consumers": [
+      "accurate",
+      "edge_confidence"
+    ],
+    "applicability": "Meaningful only with measured/calibrated MTF data.",
+    "limitations": "Uniform one is a neutral default, not measured perfect MTF.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "psf_sigma",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Expose calibrated local PSF blur scale.",
+    "expected_effect": "Lets downstream logic reason about spatially varying optical blur.",
+    "algorithm": "Nearest-resize calibration.psf_sigma_map and clamp to nonnegative values.",
+    "value_semantics": "Nonnegative sigma in calibration-defined sensor-pixel units.",
+    "derivation": "calibration_passthrough",
+    "consumers": [
+      "accurate",
+      "psf_blur_confidence"
+    ],
+    "applicability": "Meaningful only with calibrated PSF data.",
+    "limitations": "Zero is the default when no PSF map is supplied and is not a measured diffraction-free result.",
+    "rendering": "positive_robust",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "psf_blur_confidence",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Convert PSF width into a bounded sharpness prior.",
+    "expected_effect": "Expected to reduce trust in edges where calibrated blur is large.",
+    "algorithm": "Compute exp(-0.5 \u00d7 psf_sigma squared).",
+    "value_semantics": "[0,1]; 1 at sigma 0 and decreasing with blur scale.",
+    "derivation": "calibration_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended",
+      "edge_confidence"
+    ],
+    "applicability": "Depends entirely on PSF calibration.",
+    "limitations": "A uniform one usually reflects missing/default PSF calibration.",
+    "rendering": "bounded",
+    "implementation_ref": "_psf_blur_confidence"
+  },
+  {
+    "name": "psf_edge_likelihood",
+    "group": "edge_optics",
+    "stage": "edge_structure",
+    "purpose": "Prefer reliable edges that are not explained by HDR disagreement.",
+    "expected_effect": "Selected as a compact edge/optics cue for DNN experiments under blur and multi-exposure stress.",
+    "algorithm": "Subtract ghost_motion_artifact from edge_confidence and clip to [0,1].",
+    "value_semantics": "[0,1]; higher means confident edge with low inter-plane disagreement.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "accurate",
+      "dnn_extended"
+    ],
+    "applicability": "Useful as a diagnostic fusion of edge and HDR consistency.",
+    "limitations": "It is not a fitted PSF likelihood despite the historical name.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._edge_structure_engine"
+  },
+  {
+    "name": "rolling_row_fraction",
+    "group": "timing_temporal",
+    "stage": "optics_geometry_timing",
+    "purpose": "Expose normalized sensor-row readout position.",
+    "expected_effect": "Allows models or diagnostics to condition on rolling-readout timing.",
+    "algorithm": "Generate a linear 0..1 vector over rows and reverse it for bottom-to-top readout.",
+    "value_semantics": "One-dimensional [0,1] row coordinate.",
+    "derivation": "metadata_derived",
+    "consumers": [],
+    "applicability": "Requires correct readout direction; row timestamps are available in Trace.",
+    "limitations": "No rolling-shutter geometric compensation is performed.",
+    "rendering": "bounded_strip",
+    "implementation_ref": "PerceptionISPPipeline._optics_geometry_timing_engine"
+  },
+  {
+    "name": "temporal_difference",
+    "group": "timing_temporal",
+    "stage": "temporal_flicker",
+    "purpose": "Expose change from the previous processed frame.",
+    "expected_effect": "Supports low-latency motion/change awareness and frozen-frame diagnostics.",
+    "algorithm": "Absolute difference between current linear perception luma and PreviousFrameState luma; zero without compatible state.",
+    "value_semantics": "Nonnegative linear intensity difference.",
+    "derivation": "temporal_derived",
+    "consumers": [
+      "fast"
+    ],
+    "applicability": "Requires correctly chained same-camera PreviousFrameState.",
+    "limitations": "No motion compensation; ego/object motion, AE, JPEG artifacts, and flicker are mixed.",
+    "rendering": "temporal_shared",
+    "implementation_ref": "PerceptionISPPipeline._led_flicker_temporal_engine"
+  },
+  {
+    "name": "temporal_consistency",
+    "group": "timing_temporal",
+    "stage": "temporal_flicker",
+    "purpose": "Convert frame change into bounded stability.",
+    "expected_effect": "Allows downstream paths to downweight temporally unstable regions.",
+    "algorithm": "Compute exp(-temporal_difference / temporal_flicker_threshold).",
+    "value_semantics": "[0,1]; 1 is unchanged and lower values indicate larger change.",
+    "derivation": "temporal_derived",
+    "consumers": [
+      "edge_packet",
+      "flicker"
+    ],
+    "applicability": "Requires compatible previous-frame state.",
+    "limitations": "It measures photometric consistency, not correspondence or optical flow confidence.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._led_flicker_temporal_engine"
+  },
+  {
+    "name": "led_flicker_confidence",
+    "group": "timing_temporal",
+    "stage": "temporal_flicker",
+    "purpose": "Highlight bright temporally unstable or HDR-disagreeing regions.",
+    "expected_effect": "Intended to expose LED/flicker risk to runtime control and downstream gating.",
+    "algorithm": "Combine (1-temporal_consistency) \u00d7 bright-light gate with HDR disagreement \u00d7 saturation, then clip.",
+    "value_semantics": "[0,1]; higher means stronger flicker-like evidence.",
+    "derivation": "heuristic_derived",
+    "consumers": [
+      "runtime_control"
+    ],
+    "applicability": "Most informative for bright light sources in a chained sequence or multi-exposure input.",
+    "limitations": "Not an LED classifier; motion, exposure change, and compression can raise it.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._led_flicker_temporal_engine"
+  },
+  {
+    "name": "light_source_confidence",
+    "group": "timing_temporal",
+    "stage": "temporal_flicker",
+    "purpose": "Represent bright light-source-like regions with a flicker penalty.",
+    "expected_effect": "Can help distinguish stable lights from unstable highlights.",
+    "algorithm": "Map luma above 0.65 into a 0..1 bright gate and multiply by 1-0.5\u00d7flicker.",
+    "value_semantics": "[0,1]; higher means bright and relatively stable.",
+    "derivation": "heuristic_derived",
+    "consumers": [],
+    "applicability": "Diagnostic for the configured linear intensity scale.",
+    "limitations": "Brightness alone cannot distinguish lamps, reflections, sky, or saturated surfaces.",
+    "rendering": "bounded",
+    "implementation_ref": "PerceptionISPPipeline._led_flicker_temporal_engine"
+  }
+]
